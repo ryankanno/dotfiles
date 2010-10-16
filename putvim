@@ -1,6 +1,6 @@
 #!/bin/bash
 
-DROPBOX_DIR=/Users/ryankanno/Dropbox/temp
+DROPBOX_DIR=/Users/ryankanno/Dropbox/Install/vim
 GIT_EXEC=/opt/local/bin/git
 GIT_REPO=git://github.com/ryankanno/vim-config.git
 
