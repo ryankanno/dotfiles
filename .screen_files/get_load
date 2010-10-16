@@ -1,0 +1,5 @@
+#!/bin/sh
+
+# Returns the uptime of your Mac
+
+uptime | awk -F 'averages: ' '{ print $2}'
