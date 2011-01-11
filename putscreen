@@ -4,8 +4,8 @@ DROPBOX_DIR=/Users/ryankanno/Dropbox/Install/dotfiles
 GIT_EXEC=/opt/local/bin/git
 GIT_REPO=git://github.com/ryankanno/dotfiles.git
 
-# If .viminstall exists, use those variables instead
-if [ -d "$HOME/.screeninstall" ]; then
+# If .screeninstall exists, use those variables instead
+if [ -e "$HOME/.screeninstall" ]; then
     . "$HOME/.screeninstall"
 fi
 
