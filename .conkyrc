@@ -1,0 +1,95 @@
+# Create own window instead of using desktop (required in nautilus)
+own_window yes
+on_bottom yes 
+own_window_type override
+own_window_transparent yes
+own_window_hints undecorated,below,sticky,skip_taskbar,skip_pager
+
+# Use double buffering (reduces flicker, may not work for everyone)
+double_buffer yes
+
+# fiddle with window
+use_spacer right
+use_xft yes
+
+# Update interval in seconds
+update_interval 2.0
+
+# Minimum size of text area
+minimum_size 200 800
+
+# Draw shades?
+draw_shades no
+
+# Text stuff
+draw_outline no # amplifies text if yes
+draw_borders no
+font arial
+uppercase no # set to yes if you want all text to be in uppercase
+
+# Stippled borders?
+stippled_borders 3
+
+# border margins
+# border_margin 9
+
+# border width
+border_width 10
+
+# Default colors and also border colors, grey90 == #e5e5e5
+default_color grey
+
+own_window_colour brown
+own_window_transparent yes
+
+# Text alignment, other possible values are commented
+alignment top_left
+
+# Gap between borders of screen and text
+gap_x 10
+gap_y 10
+
+# number of cpu samples to average
+# set to 1 to disable averaging
+cpu_avg_samples 2
+
+text_buffer_size 1024
+
+# stuff after ‘TEXT’ will be formatted on screen
+
+TEXT
+$color${font arial:size=9}
+$nodename@$sysname $kernel on $machine${font arial:size=8}
+#Battery ${battery_bar 6 BAT0}
+
+${color orange}CPU $color
+${freq}MHz${alignr}Load: ${loadavg}
+${alignr}${loadgraph 20,250 e5e5e5 F1AA0E}
+CPU Total:${color} ${cpu cpu0}% ${color}${alignr}Temp:${color} ${acpitemp}
+${alignr}${cpugraph 0 20,250 e5e5e5 F1AA0E}
+Core one: ${color}${cpu cpu1}% ${alignr} Core two: ${color}${cpu cpu2}%
+${cpugraph 1 20,120 e5e5e5 F1AA0E}${alignr}${cpugraph 2 20,120 e5e5e5 F1AA0E}
+
+NAME${alignr}PID         CPU%        MEM%
+${top name 1}${alignr}${top pid 1}       ${top cpu 1}          ${top mem 1}   
+${top name 2}${alignr}${top pid 2}       ${top cpu 2}          ${top mem 2}   
+${top name 3}${alignr}${top pid 3}       ${top cpu 3}          ${top mem 3}   
+${top name 4}${alignr}${top pid 4}       ${top cpu 4}          ${top mem 4}   
+
+${color orange}MEMORY / DISK $color
+Total: ${color}${memmax} ${alignr} Free: ${color}${memfree}
+RAM: $memperc% ${alignr}Swap: $swapperc% 
+${memgraph 20,120 e5e5e5 F1AA0E} ${alignr} ${swapbar 20,120 }
+root: ${fs_used_perc /}% ${fs_bar 6 /}$color
+home: ${fs_used_perc /home/ryankanno}% ${fs_bar 6 /home/ryankanno}$color
+
+${color orange}WIFI (${addr eth1}) $color
+${wireless_essid eth1} ${wireless_link_bar 6 eth1}
+Down: $color${downspeed eth1} k/s ${alignr}Up: ${upspeed eth1} k/s
+${downspeedgraph eth1 20,120 e5e5e5 F1AA0E} ${alignr}${upspeedgraph eth1 20,120 e5e5e5 F1AA0E}$color
+Total: ${totaldown eth1} ${alignr}Total: ${totalup eth1}
+Inbound: ${tcp_portmon 1 32767 count} Outbound: ${tcp_portmon 32768
+61000 count}${alignr}Total: ${tcp_portmon 1 65535 count}
+
+${color orange}LOGGING $color
+${font arial:size=7}${execi 30 tail -n 10 /var/log/messages | fold -w60
