@@ -1,5 +1,6 @@
 #!/bin/sh
 
-# Returns the uptime of your Mac
+# Returns load
+# uptime | cut -d":" -f5 | sed s/,//g
 
-uptime | awk -F 'averages: ' '{ print $2}'
+w | head -n1 | cut -d":" -f5 | sed s/,//g
