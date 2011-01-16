@@ -64,11 +64,16 @@ function update_symlink() {
         cp -RP "$HOME/${SYMLINK}" $OLD_SYMLINK
         rm -rf "$HOME/${SYMLINK}"
         echo "Found existing ${SYMLINK} symlink, copying to $OLD_SYMLINK, removing original."
+    elif [ -f "$HOME/${SYMLINK}" ]; then
+        EPOCH=`(date +"%s")`
+        OLD_FILE="$HOME/${SYMLINK}_$EPOCH"
+        mv "$HOME/${SYMLINK}" $OLD_FILE
+        echo "Found existing file ${SYMLINK}, renaming to $OLD_FILE."
     fi
 
     ln -s "$DROPBOX_DIR/${SYMLINK}" "$HOME/${SYMLINK}"
 
-    echo "Created ${SYMLINK} symlink"
+    echo "Created symlink from $HOME/${SYMLINK} to $DROPBOX_DIR/${SYMLINK}"
 }
 
 ##############################################################################
