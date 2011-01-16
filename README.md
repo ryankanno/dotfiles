@@ -2,8 +2,8 @@
 
 **install_config** is a Bash script to install configuration files hosted on
 Dropbox to your local machine.  It helps me keep consistency between my various
-OSX/Ubuntu machines.  Currently, it supports my **screen**, **vim**, and
-**conky** configurations.
+OSX/Ubuntu machines.  Currently, it supports my **screen**, **vim**,
+**gitconfig**, and **conky** configurations.
 
 For every application, you need to have a file called ".&lt;app&gt;install" (e.g. .screeninstall)
 that defines the following variables:
@@ -47,6 +47,15 @@ Here are some sample .<app>install files that are loaded on my machine
     function install () { 
         update_symlink ".screen_files"
     }
+
+## gitconfig
+
+    #!/bin/bash
+
+    DROPBOX_DIR=/home/ryankanno/Dropbox/Install/dotfiles
+    GIT_EXEC=/usr/bin/git
+    GIT_REPO=git://github.com/ryankanno/dotfiles.git
+    APP_CONFIG_FILE=.gitconfig
 
 ## conky
 
