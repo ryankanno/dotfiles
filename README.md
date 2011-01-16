@@ -28,7 +28,7 @@ Here are some sample .<app>install files that are loaded on my machine
 
     DROPBOX_DIR=/home/ryankanno/Dropbox/Install/vim
     GIT_EXEC=/usr/bin/git
-    GIT_REPO=git://github.com/ryankanno/dotfiles.git
+    GIT_REPO=git://github.com/ryankanno/vim.git
     APP_CONFIG_FILE=.vimrc
 
     function install () { 
