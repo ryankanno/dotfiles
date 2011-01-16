@@ -37,12 +37,6 @@ backtick 1 5 5 $HOME/.screen_files/get_load
 backtick 2 60 60 $HOME/.screen_files/get_gmail
 
 # Set the caption on the bottom line:
-# window-list <nowplaying> <mm/dd/yy> <HH:MM>am/pm
-hardstatus alwayslastline "%{= kw}%-w%{= BW}%n %t%{-}%+w %-= %1` %2` %m/%d/%y %C:%s%a"
-#hardstatus string '%{= kG}[ %{G}%H %{g}][%= %{= kw}%?%-Lw%?%{r}(%{W}%n*%f%t%?(%u)%?%{r})%{w}%?%+Lw%?%?%= %{g}][%{B} %d/%m %{W}%c %{g}]'
-
-#Working on this one
-#hardstatus alwayslastline
-#hardstatus string '%{= kY}[%{G}%H%{y}][%1`][%{W}%m-%d-%Y%{W}%C %A%{y}]'
+hardstatus alwayslastline "%{= kw}%-w%{= gW}%n %t%{-}%+w %-= %{=b kw}[ %{-b .r}%H%{-} %{+b}|%{-} Load: %{-b}%l %{+b}| Gmail: %{-b}%2` %{+b}| %{-b}%m/%d/%y %C:%s%a %{+b}]"
 
 screen -t 
