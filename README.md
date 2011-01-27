@@ -45,6 +45,7 @@ Here are some sample .<app>install files that are loaded on my machine
     APP_CONFIG_FILE=.screenrc
 
     function install () { 
+        update_symlink ".screenrc_base"
         update_symlink ".screen_files"
     }
 

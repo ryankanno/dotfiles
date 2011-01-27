@@ -1,48 +1,13 @@
-# UTF-8 everywhere
-defutf8 on
+source .screenrc_base
 
-# skip intro
-startup_message off
+# Django windows
+screen -t 'runserver' 0
+stuff "workon blah; python manage.py runserver\015"
 
-# disable Ctrl-S/Ctrl-Q "flow control"
-defflow off
+screen -t 'shell' 1
+stuff "workon blah; python manage.py shell\015"
 
-# default lines is 100, let's do something huge.com
-defscrollback 10000
+screen -t 'mysql' 2
+stuff "mysql5 -u root -p \015"
 
-# detach on disconnect
-autodetach on
-
-# use regular audible bell
-vbell off
-
-# use backtick for prefix key instead of Ctrl-A
-escape ``
-
-# make the shell in every window a login shell
-shell -$SHELL
-
-# connect windows to the display so programs like mplayer can find it when
-# we're inside a screen in a terminal application in a graphical environment
-setenv DISPLAY ':0'
-
-# print wackier status messages
-nethack on
-
-# restore window contents after using (e.g.) vi
-altscreen on
-
-# show MPD info in status bar
-backtick 1 5 5 $HOME/.screen_files/get_load
-backtick 2 60 60 $HOME/.screen_files/get_gmail
-
-# Set the caption on the bottom line:
-# window-list <nowplaying> <mm/dd/yy> <HH:MM>am/pm
-hardstatus alwayslastline "%{= kw}%-w%{= BW}%n %t%{-}%+w %-= %1 %2` %m/%d/%y %C:%s%a"
-#hardstatus string '%{= kG}[ %{G}%H %{g}][%= %{= kw}%?%-Lw%?%{r}(%{W}%n*%f%t%?(%u)%?%{r})%{w}%?%+Lw%?%?%= %{g}][%{B} %d/%m %{W}%c %{g}]'
-
-#Working on this one
-#hardstatus alwayslastline
-#hardstatus string '%{= kY}[%{G}%H%{y}][%1`][%{W}%m-%d-%Y%{W}%C %A%{y}]'
-
-screen -t 
+screen -t
