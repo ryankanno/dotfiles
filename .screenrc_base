@@ -33,8 +33,8 @@ nethack on
 altscreen on
 
 # show MPD info in status bar
-backtick 1 5 5 $HOME/.screen_files/get_load
-backtick 2 60 60 $HOME/.screen_files/get_gmail
+backtick 1 10 10 $HOME/.screen_files/get_load
+backtick 2 600 600 $HOME/.screen_files/get_gmail
 
 # Set the caption on the bottom line:
 hardstatus alwayslastline "%{= kw}%-w%{= gW}%n %t%{-}%+w %-= %{=b kw}[ %{-b .r}%H%{-} %{+b}|%{-} Load: %{-b}%l %{+b}| Gmail: %{-b}%2` %{+b}| %{-b}%m/%d/%y %C:%s%a %{+b}]"
