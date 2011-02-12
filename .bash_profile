@@ -37,9 +37,6 @@ export JEKYLL_FORMATTING="markdown"
 
 export IRC_CLIENT='irssi'
 
-# Set this to the command you use for todo.txt-cli
-export TODO="t"
-
 # Set store directory for handmade commandline history tool 
 export hchtstoredir="$HOME/.hcht"
 
@@ -59,5 +56,5 @@ export SVN_EDITOR="$EDITOR --nofork"
 # Load Bash It
 source $BASH/bash_it.sh
 
-# Load aliases
-source $HOME/.bash_aliases
+# Load local commands
+source $HOME/.bash_local
