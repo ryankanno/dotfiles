@@ -3,9 +3,6 @@
 # Load RVM, if you are using it
 [[ -s $HOME/.rvm/scripts/rvm ]] && source $HOME/.rvm/scripts/rvm
 
-# Add rvm gems 
-export PATH=$PATH:$HOME/.gem/ruby/1.8/bin:$HOME/Projects/libs/google_appengine
-
 # Path to the bash it configuration
 export BASH=$HOME/Projects/github/others/bash-it
 
@@ -14,27 +11,13 @@ export BASH=$HOME/Projects/github/others/bash-it
 export BASH_THEME='minimal'
 
 # Set my editor and git editor
-export EDITOR="/usr/bin/gvim -p"
+export EDITOR="/opt/local/bin/mvim -p"
 export GIT_EDITOR="/usr/bin/vim"
 
 # Don't check mail when opening terminal.
 unset MAILCHECK
 
-# Change this to the path of your local jekyll root to use the jekyll aliases
-
-export JEKYLL_LOCAL_ROOT="$HOME/Sites/jekyllsite"
-
-# And change this to the remote server and root
-
-export JEKYLL_REMOTE_ROOT="user@server:/path/to/jekyll/root"
-
-# And, for the last of the jekyll variables, this is the formatting you use, eg: markdown,
-# textile, etc. Basically whatever you use as the extension for posts, without the preceding dot
-
-export JEKYLL_FORMATTING="markdown"
-
 # Change this to your console based IRC client of choice.
-
 export IRC_CLIENT='irssi'
 
 # Set store directory for handmade commandline history tool 
