@@ -56,5 +56,7 @@ export SVN_EDITOR="$EDITOR --nofork"
 # Load Bash It
 source $BASH/bash_it.sh
 
+set -o vi
+
 # Load local commands
 source $HOME/.bash_local
