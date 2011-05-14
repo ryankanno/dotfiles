@@ -49,6 +49,7 @@ function update_from_git () {
         pushd . > /dev/null
         cd "$DIRECTORY"
         $GIT_EXEC pull origin master
+        $GIT_EXEC submodule init
         $GIT_EXEC submodule update
         popd > /dev/null
     fi
