@@ -41,5 +41,7 @@ source $BASH/bash_it.sh
 
 set -o vi
 
+alias fakesmtp='python -m smtpd -n -c DebuggingServer localhost:1025'
+
 # Load local commands
 source $HOME/.bash_local
