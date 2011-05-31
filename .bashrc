@@ -45,8 +45,44 @@ fi
 
 set -o vi
 
+# General aliases
+alias ll='ls -l'
+alias la='ls -A'
+alias l='ls'
+alias c='clear'
+alias ..='cd ..'
+alias ...='cd ../..'
+alias ....='cd ../../../'
+
+# Custom aliases
 alias gvim=mvim
 alias fakesmtp='python -m smtpd -n -c DebuggingServer localhost:1025'
+
+# Functions from http://github.com/Sirupsen
+function mkcd() {
+    mkdir -p $1
+    cd $1
+}
+
+function extract () {
+    if [ -f $1 ] 
+    then
+        case $1 in
+            *.tar.bz2)  tar -jxvf $1;;
+            *.tar.gz)   tar -zxvf $1;;
+            *.bz2)      bzip2 -d $1;;
+            *.gz)       gunzip -d $1;;
+            *.tar)      tar -xvf $1;;
+            *.tgz)      tar -zxvf $1;;
+            *.zip)      unzip $1;;
+            *.Z)        uncompress $1;;
+            *.rar)      unrar x $1;;
+            *)          echo "'$1' Error. Unsupported filetype.";;
+        esac
+    else
+        echo "'$1' not a valid file"
+  fi
+}
 
 # Load local commands
 source $HOME/.bash_local
