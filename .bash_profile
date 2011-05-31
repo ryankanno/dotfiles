@@ -29,17 +29,25 @@ if [ -f /usr/local/bin/virtualenvwrapper.sh ]; then
 fi
 
 # VirtualEnv exports
-export WORKON_HOME=$HOME/.virtualenvs/
+export WORKON_HOME=$HOME/.virtualenvs
 export PIP_VIRTUALENV_BASE=$WORKON_HOME
 export PIP_REQUIRE_VIRTUALENV=true
 export PIP_RESPECT_VIRTUALENV=true
 
+# SVN editor
 export SVN_EDITOR="$EDITOR --nofork"
 
 # Load Bash It
 source $BASH/bash_it.sh
 
+# Load bash command completion if present
+if [ -f /opt/local/etc/bash_completion ]; then
+    . /opt/local/etc/bash_completion
+fi
+
 set -o vi
+
+alias gvim=mvim
 
 # Load local commands
 source $HOME/.bash_local
