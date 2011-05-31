@@ -11,8 +11,8 @@ export BASH=$HOME/Projects/github/others/bash-it
 export BASH_THEME='minimal'
 
 # Set my editor and git editor
-export EDITOR="/opt/local/bin/mvim -p"
-export GIT_EDITOR="/usr/bin/vim"
+export EDITOR='/opt/local/bin/mvim -p'
+export GIT_EDITOR='/usr/bin/vim'
 
 # Don't check mail when opening terminal.
 unset MAILCHECK
@@ -48,6 +48,7 @@ fi
 set -o vi
 
 alias gvim=mvim
+alias fakesmtp='python -m smtpd -n -c DebuggingServer localhost:1025'
 
 # Load local commands
 source $HOME/.bash_local
