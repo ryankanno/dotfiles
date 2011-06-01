@@ -64,7 +64,7 @@ function mkcd() {
     cd $1
 }
 
-function extract () {
+function extract() {
     if [ -f $1 ] 
     then
         case $1 in
