@@ -6,7 +6,7 @@ export BASH=$HOME/Projects/github/others/bash-it
 
 # Lock and Load a custom theme file
 # location /.bash_it/themes/
-export BASH_THEME='doubletime'
+export BASH_THEME='hawaii50'
 
 # Set my editor and git editor
 export EDITOR='/opt/local/bin/mvim -p'
