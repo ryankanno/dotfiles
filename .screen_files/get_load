@@ -1,6 +1,0 @@
-#!/bin/sh
-
-# Returns load
-# uptime | cut -d":" -f5 | sed s/,//g
-
-w | head -n1 | cut -d":" -f5 | sed s/,//g
