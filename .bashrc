@@ -13,7 +13,7 @@ export BASH_THEME='hawaii50'
 
 # Set my editor and git editor
 export EDITOR='/opt/local/bin/mvim -p'
-export GIT_EDITOR='/usr/bin/vim'
+export GIT_EDITOR='/opt/local/bin/vim'
 
 # Don't check mail when opening terminal.
 unset MAILCHECK
@@ -35,11 +35,11 @@ export PIP_VIRTUALENV_BASE=$WORKON_HOME
 export PIP_REQUIRE_VIRTUALENV=true
 export PIP_RESPECT_VIRTUALENV=true
 
-# SVN editor
-export SVN_EDITOR="$EDITOR --nofork"
-
 # Load Bash It
 source $BASH/bash_it.sh
+
+# Load Bashmarks
+source ~/.local/bin/bashmarks.sh
 
 # Load bash command completion if present
 if [ -f /opt/local/etc/bash_completion ]; then
@@ -51,7 +51,6 @@ set -o vi
 # General aliases
 alias ll='ls -l'
 alias la='ls -A'
-alias l='ls'
 alias c='clear'
 alias ..='cd ..'
 alias ...='cd ../..'
@@ -87,5 +86,12 @@ function extract() {
   fi
 }
 
+pjson () {
+    python -c "import json; import sys; print json.dumps(json.loads(sys.stdin.read()), sort_keys = True, indent = 2)"
+}
+
 # Load local commands
 source $HOME/.bash_local
+
+export LANG=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
