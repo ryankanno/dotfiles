@@ -62,9 +62,9 @@ function update_symlink() {
     if [ -L "$HOME/${SYMLINK}" ]; then
         EPOCH=`(date +"%s")`
         OLD_SYMLINK="$HOME/${SYMLINK}_$EPOCH"
-        cp -RP "$HOME/${SYMLINK}" $OLD_SYMLINK
+        cat "$HOME/${SYMLINK}" >> $OLD_SYMLINK
         rm -rf "$HOME/${SYMLINK}"
-        echo "Found existing ${SYMLINK} symlink, copying to $OLD_SYMLINK, removing original."
+        echo "Found existing ${SYMLINK} symlink, copying contents to $OLD_SYMLINK, removing original."
     elif [ -f "$HOME/${SYMLINK}" ]; then
         EPOCH=`(date +"%s")`
         OLD_FILE="$HOME/${SYMLINK}_$EPOCH"
