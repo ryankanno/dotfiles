@@ -1,14 +1,10 @@
 # Load RVM, if you are using it
 [[ -s $HOME/.rvm/scripts/rvm ]] && source $HOME/.rvm/scripts/rvm
 
-# Load Tmuxinator, if you are using it
-[[ -s $HOME/.tmuxinator/scripts/tmuxinator ]] && source $HOME/.tmuxinator/scripts/tmuxinator
-
 # Path to the bash it configuration
 export BASH=$HOME/Projects/github/others/bash-it
 
-# Lock and Load a custom theme file
-# location /.bash_it/themes/
+# Lock and Load a custom theme file in ~/.bash_it/themes/
 export BASH_THEME='hawaii50'
 
 # Set my editor and git editor
@@ -23,6 +19,15 @@ export IRC_CLIENT='irssi'
 
 # Set store directory for handmade commandline history tool 
 export hchtstoredir="$HOME/.hcht"
+
+# History
+HISTCONTROL=ignoreboth
+shopt -s histappend # append
+HISTSIZE=5000
+HISTFILESIZE=20000
+
+# Inputrc
+[[ -f "${HOME}/.inputrc" ]] && export INPUTRC="${HOME}/.inputrc"
 
 # Load VirtualEnvWrapper into a shell session
 if [ -f /usr/local/bin/virtualenvwrapper.sh ]; then
@@ -46,6 +51,7 @@ if [ -f /opt/local/etc/bash_completion ]; then
     . /opt/local/etc/bash_completion
 fi
 
+# VI mode
 set -o vi
 
 # General aliases
@@ -90,5 +96,12 @@ pjson () {
     python -c "import json; import sys; print json.dumps(json.loads(sys.stdin.read()), sort_keys = True, indent = 2)"
 }
 
+# Load aliases
+if [ -f "${HOME}/.bash_aliases" ]; then
+    source "${HOME}/.bash_aliases"
+fi
+
 # Load local commands
-source $HOME/.bash_local
+if [ -f "${HOME}/.bash_local" ]; then
+    source "${HOME}/.bash_local"
+fi

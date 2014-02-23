@@ -1,0 +1,14 @@
+set meta-flag on
+set input-meta on
+set output-meta on
+set convert-meta off
+
+set editing-mode vi
+set keymap vi
+
+$if mode=vi
+    set keymap vi-command
+    "ii": vi-insertion-mode
+    set keymap vi-insert
+    "jk": vi-movement-mode
+$endif
