@@ -10,9 +10,9 @@ function backup() {
             local dirname=$(basename ${DIR})
             local date=$(date +%Y%m%d-%H%M%S)
             local tarball="${dirname}.${date}.tar.gz"
-            echo "Backing up ${dirname} to ${tarball}"
+            echo "Backing up ${1} to ${tarball}"
             echo ""
-            tar -zcvf ${tarball} ${dirname}
+            tar -zcvf ${tarball} ${1}
         else
             echo "Unable to backup $1. Does it exist?"
         fi
