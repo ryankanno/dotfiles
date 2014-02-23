@@ -44,3 +44,12 @@ function pyserver() {
     open "http://localhost:${port}/"
     python -c $'import SimpleHTTPServer;\nSimpleHTTPServer.SimpleHTTPRequestHandler.extensions_map[""] = "text/plain";\nSimpleHTTPServer.test();' "$port"
 }
+
+function tm() {
+  if [[ $1 ]]; then
+    tmux attach -t $1
+  else
+    tmux list-sessions
+  fi
+}
+
