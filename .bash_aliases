@@ -14,3 +14,7 @@ alias ip="dig +short myip.opendns.com @resolver1.opendns.com"
 # dev
 alias fakesmtp='python -m smtpd -n -c DebuggingServer localhost:1025'
 
+# grep
+alias grep='grep --color=auto'
+alias egrep='egrep --color=auto'
+alias fgrep='fgrep --color=auto'

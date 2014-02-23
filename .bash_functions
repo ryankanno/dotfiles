@@ -1,3 +1,14 @@
+#!/usr/bin/env bash
+
+# https://github.com/necolas/dotfiles/blob/master/shell/functions/datauri
+function datauri() {
+    local mimeType=$(file -b --mime-type "$1")
+    if [[ $mimeType == text/* ]]; then
+        mimeType="${mimeType};charset=utf-8"
+    fi
+    printf "data:${mimeType};base64,$(openssl base64 -in "$1" | tr -d '\n')" | pbcopy | printf "=> data URI copied to pasteboard.\n"
+}
+
 function extract() {
     if [ -f $1 ]
     then
@@ -23,6 +34,13 @@ function mkcd() {
     cd $1
 }
 
-pjson () {
+function pyjson() {
     python -c "import json; import sys; print json.dumps(json.loads(sys.stdin.read()), sort_keys = True, indent = 2)"
+}
+
+# https://github.com/necolas/dotfiles/blob/master/shell/functions/pyserver
+function pyserver() {
+    local port="${1:-8000}"
+    open "http://localhost:${port}/"
+    python -c $'import SimpleHTTPServer;\nSimpleHTTPServer.SimpleHTTPRequestHandler.extensions_map[""] = "text/plain";\nSimpleHTTPServer.test();' "$port"
 }
