@@ -1,5 +1,24 @@
 #!/usr/bin/env bash
 
+# i create a lot of tar backups before i do things :)
+function backup() {
+    if [ -z "$1" ]; then
+        echo "Usage: backup DIRECTORY"
+    else
+        DIR="$( cd $1 && pwd )"
+        if [ $? -eq 0 ]; then
+            local dirname=$(basename ${DIR})
+            local date=$(date +%Y%m%d-%H%M%S)
+            local tarball="${dirname}.${date}.tar.gz"
+            echo "Backing up ${dirname} to ${tarball}"
+            echo ""
+            tar -zcvf ${tarball} ${dirname}
+        else
+            echo "Unable to backup $1. Does it exist?"
+        fi
+    fi
+}
+
 # https://github.com/necolas/dotfiles/blob/master/shell/functions/datauri
 function datauri() {
     local mimeType=$(file -b --mime-type "$1")
@@ -9,24 +28,26 @@ function datauri() {
     printf "data:${mimeType};base64,$(openssl base64 -in "$1" | tr -d '\n')" | pbcopy | printf "=> data URI copied to pasteboard.\n"
 }
 
-function extract() {
-    if [ -f $1 ]
-    then
+# https://github.com/anthonypdawson/dotfiles/blob/master/bash_functions
+function ex() {
+    if [ -f $1 ]; then
         case $1 in
-            *.tar.bz2)  tar -jxvf $1;;
-            *.tar.gz)   tar -zxvf $1;;
-            *.bz2)      bzip2 -d $1;;
-            *.gz)       gunzip -d $1;;
-            *.tar)      tar -xvf $1;;
-            *.tgz)      tar -zxvf $1;;
-            *.zip)      unzip $1;;
-            *.Z)        uncompress $1;;
-            *.rar)      unrar x $1;;
-            *)          echo "'$1' Error. Unsupported filetype.";;
+            *.tar.bz2)   tar xjf $1   ;;
+            *.tar.gz)    tar xzf $1   ;;
+            *.bz2)       bunzip2 $1   ;;
+            *.rar)       rar x $1     ;;
+            *.gz)        gunzip $1    ;;
+            *.tar)       tar xf $1    ;;
+            *.tbz2)      tar xjf $1   ;;
+            *.tgz)       tar xzf $1   ;;
+            *.zip)       unzip $1     ;;
+            *.Z)         uncompress $1;;
+            *.7z)        7z x $1      ;;
+            *)           echo "'$1' cannot be extracted via ex()" ;;
         esac
     else
-        echo "'$1' not a valid file"
-  fi
+        echo "'$1' is not a valid file"
+    fi
 }
 
 function mkcd() {
@@ -46,10 +67,9 @@ function pyserver() {
 }
 
 function tm() {
-  if [[ $1 ]]; then
-    tmux attach -t $1
-  else
-    tmux list-sessions
-  fi
+    if [[ $1 ]]; then
+        tmux attach -t $1
+    else
+        tmux list-sessions
+    fi
 }
-
