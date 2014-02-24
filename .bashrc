@@ -28,6 +28,9 @@ shopt -s histappend # append
 HISTSIZE=5000
 HISTFILESIZE=20000
 
+# grep
+export GREP_OPTIONS='--color=auto'
+
 # inputrc
 [[ -f "${HOME}/.inputrc" ]] && export INPUTRC="${HOME}/.inputrc"
 

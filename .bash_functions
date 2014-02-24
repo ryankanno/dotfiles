@@ -24,6 +24,11 @@ function cd {
     builtin cd "$@" && ls
 }
 
+# https://github.com/michaelkitson/dotfiles/blob/master/bash_functions
+function define() {
+    curl -s "www.thefreedictionary.com/$1" | \grep -Eo '<div class="pseg">.*?<hr>' | sed 's/<div class="pseg">//' | sed -E 's/<div class="etyseg">.*//' | sed 's/<script>.*<\/script>//g' | sed -E 's/<div[^>]*>/@/g' | tr '@' '\n' | sed 's/<[^>]*>//g' | sed 's/^[a-z]\.  /    /g'
+}
+
 # https://github.com/necolas/dotfiles/blob/master/shell/functions/datauri
 function datauri() {
     local mimeType=$(file -b --mime-type "$1")
