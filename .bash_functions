@@ -65,7 +65,7 @@ function newrepo() {
     git init
     git add README.md
     git commit -m "first commit"
-    git remote add origin git@github.com:${HOME}/$1.git
+    git remote add origin git@github.com:${USER}/$1.git
     git push -u origin master
 }
 
