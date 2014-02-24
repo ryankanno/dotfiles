@@ -1,8 +1,5 @@
 function include() { [[ -f "$1" ]] && source "$1"; }
 
-# rvm
-[[ -s $HOME/.rvm/scripts/rvm ]] && source $HOME/.rvm/scripts/rvm
-
 # bash-it
 export BASH=$HOME/Projects/github/others/bash-it
 export BASH_THEME='hawaii50'
@@ -12,15 +9,12 @@ source $BASH/bash_it.sh
 # bashmarks -> https://github.com/huyng/bashmarks
 include "${HOME}/.local/bin/bashmarks.sh"
 
-# editors
+# editors -> TODO: OS detection, duh.
 export EDITOR='/opt/local/bin/mvim -p'
 export GIT_EDITOR='/opt/local/bin/vim'
 
-# unset mail
-unset MAILCHECK
-
-# irc
-export IRC_CLIENT='irssi'
+# grep
+export GREP_OPTIONS='--color=auto'
 
 # history
 HISTCONTROL=ignoreboth
@@ -28,19 +22,20 @@ shopt -s histappend # append
 HISTSIZE=5000
 HISTFILESIZE=20000
 
-# grep
-export GREP_OPTIONS='--color=auto'
-
 # inputrc
 [[ -f "${HOME}/.inputrc" ]] && export INPUTRC="${HOME}/.inputrc"
 
-# virtualenv
-include "/usr/local/bin/virtualenvwrapper.sh"
+# irc
+export IRC_CLIENT='irssi'
 
-export WORKON_HOME=$HOME/.virtualenvs
-export PIP_VIRTUALENV_BASE=$WORKON_HOME
-export PIP_REQUIRE_VIRTUALENV=true
-export PIP_RESPECT_VIRTUALENV=true
+# less++
+[ -x /usr/bin/lesspipe ] && eval "$(SHELL=/bin/sh lesspipe)"
+
+# mail
+unset MAILCHECK
+
+# rvm
+[[ -s $HOME/.rvm/scripts/rvm ]] && source $HOME/.rvm/scripts/rvm
 
 # ssh-agent -> http://mah.everybody.org/docs/ssh
 SSH_ENV="${HOME}/.ssh/environment"
@@ -63,6 +58,14 @@ fi
 
 # vi mode
 set -o vi
+
+# virtualenv
+include "/usr/local/bin/virtualenvwrapper.sh"
+
+export WORKON_HOME=$HOME/.virtualenvs
+export PIP_VIRTUALENV_BASE=$WORKON_HOME
+export PIP_REQUIRE_VIRTUALENV=true
+export PIP_RESPECT_VIRTUALENV=true
 
 # Load bash command completion if present
 include "/opt/local/etc/bash_completion"
