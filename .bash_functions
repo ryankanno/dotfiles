@@ -19,6 +19,11 @@ function backup() {
     fi
 }
 
+# https://unix.stackexchange.com/questions/6/what-are-your-favorite-command-line-features-or-tricks/122#122
+function cd {
+    builtin cd "$@" && ls
+}
+
 # https://github.com/necolas/dotfiles/blob/master/shell/functions/datauri
 function datauri() {
     local mimeType=$(file -b --mime-type "$1")
@@ -53,6 +58,19 @@ function ex() {
 function mkcd() {
     mkdir -p $1
     cd $1
+}
+
+function newrepo() {
+    touch README.md
+    git init
+    git add README.md
+    git commit -m "first commit"
+    git remote add origin git@github.com:${HOME}/$1.git
+    git push -u origin master
+}
+
+function port() {
+    lsof -i:$1
 }
 
 function pyjson() {
