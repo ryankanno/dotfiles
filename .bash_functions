@@ -23,6 +23,10 @@ function bak() {
     cp $1 $1_$(date +%Y%m%d-%H%M%S)
 }
 
+function calc() {
+    echo "$*" | bc;
+}
+
 # https://unix.stackexchange.com/questions/6/what-are-your-favorite-command-line-features-or-tricks/122#122
 function cd {
     builtin cd "$@" && ls
@@ -124,4 +128,9 @@ function tm() {
     else
         tmux list-sessions
     fi
+}
+
+# not sure where i found this one, but queries wikipedia
+function wiki() {
+    dig +short txt $1.wp.dg.cx;
 }
