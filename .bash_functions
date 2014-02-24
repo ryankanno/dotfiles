@@ -5,7 +5,7 @@ function backup() {
     if [ -z "$1" ]; then
         echo "Usage: backup DIRECTORY"
     else
-        DIR="$( cd $1 && pwd )"
+        DIR="$( (cd $1 && pwd) | tail -1 )"
         if [ $? -eq 0 ]; then
             local dirname=$(basename ${DIR})
             local date=$(date +%Y%m%d-%H%M%S)
