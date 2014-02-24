@@ -63,7 +63,6 @@ function mkcd() {
 function newrepo() {
     if [ -d $1 ]; then
         echo "Directory with identical name as repo exists. Please create in another folder."
-        exit 1
     else
         mkdir $1
         pushd . > /dev/null
