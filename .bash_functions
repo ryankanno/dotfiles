@@ -61,12 +61,21 @@ function mkcd() {
 }
 
 function newrepo() {
-    touch README.md
-    git init
-    git add README.md
-    git commit -m "first commit"
-    git remote add origin git@github.com:${USER}/$1.git
-    git push -u origin master
+    if [ -d $1 ]; then
+        echo "Directory with identical name as repo exists. Please create in another folder."
+        exit 1
+    else
+        mkdir $1
+        pushd . > /dev/null
+        cd "$1"
+        touch README.md
+        git init
+        git add README.md
+        git commit -m "first commit"
+        git remote add origin git@github.com:${USER}/$1.git
+        git push -u origin master
+        popd > /dev/null
+    fi
 }
 
 function port() {
