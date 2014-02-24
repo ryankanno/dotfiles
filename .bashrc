@@ -1,4 +1,4 @@
-include () { [[ -f "$1" ]] && source "$1"; }
+function include() { [[ -f "$1" ]] && source "$1"; }
 
 # rvm
 [[ -s $HOME/.rvm/scripts/rvm ]] && source $HOME/.rvm/scripts/rvm
