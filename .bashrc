@@ -28,8 +28,8 @@ HISTFILESIZE=20000
 # irc
 export IRC_CLIENT='irssi'
 
-# less++
-[ -x /usr/bin/lesspipe ] && eval "$(SHELL=/bin/sh lesspipe)"
+# less++ -> TODO: OS detection, duh
+[ -x /opt/local/bin/lesspipe.sh ] && eval "$(SHELL=/bin/sh /opt/local/bin/lesspipe.sh)"
 
 # mail
 unset MAILCHECK
