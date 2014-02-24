@@ -19,6 +19,10 @@ function backup() {
     fi
 }
 
+function bak() {
+    cp $1 $1_$(date +%Y%m%d-%H%M%S)
+}
+
 # https://unix.stackexchange.com/questions/6/what-are-your-favorite-command-line-features-or-tricks/122#122
 function cd {
     builtin cd "$@" && ls
@@ -95,6 +99,23 @@ function pyserver() {
     local port="${1:-8000}"
     open "http://localhost:${port}/"
     python -c $'import SimpleHTTPServer;\nSimpleHTTPServer.SimpleHTTPRequestHandler.extensions_map[""] = "text/plain";\nSimpleHTTPServer.test();' "$port"
+}
+
+# shorten all the things
+function shorten() {
+    if [ -z "${BITLY_USERNAME}" -a -z "${BITLY_API_KEY}" -a -f "${HOME}/.bitly.cfg" ]; then
+        source "${HOME}/.bitly.cfg"
+    fi
+
+    if [ -z "${BITLY_USERNAME}" -o -z "${BITLY_API_KEY}" ]; then
+        echo "Please set BITLY_USERNAME and BITLY_API_KEY env vars"
+    else
+        if [ -n "$1" ]; then
+            curl -s "http://api.bitly.com/v3/shorten?login=${BITLY_USERNAME}&apiKey=${BITLY_API_KEY}&longUrl=${1}&format=txt"
+        else
+            echo "Usage: shorten URL"
+        fi
+    fi
 }
 
 function tm() {
