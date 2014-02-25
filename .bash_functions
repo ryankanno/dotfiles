@@ -130,7 +130,10 @@ function tm() {
     if [ -n "$1" ]; then
         tmux attach -t $1 2>/dev/null || tmux new -s $1
     else
-        tmux list-sessions
+        tmux list-sessions 2> >(grep -q 'failed')
+        if [ "$?" -eq 1 ]; then
+            echo "No available tmux sessions. Please create one."
+        fi
     fi
 }
 
