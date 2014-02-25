@@ -17,10 +17,12 @@ export GIT_EDITOR='/opt/local/bin/vim'
 export GREP_OPTIONS='--color=auto'
 
 # history
-HISTCONTROL=ignoreboth
+export HISTCONTROL=ignoreboth
 shopt -s histappend # append
-HISTSIZE=5000
-HISTFILESIZE=20000
+export HISTSIZE=32768
+export HISTFILESIZE=32768
+export HISTTIMEFORMAT='%F %T '
+export HISTIGNORE="ls:ls *:cd:cd -:pwd;exit:date:* --help"
 
 # inputrc
 [[ -f "${HOME}/.inputrc" ]] && export INPUTRC="${HOME}/.inputrc"

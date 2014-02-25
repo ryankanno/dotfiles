@@ -68,6 +68,10 @@ function ex() {
     fi
 }
 
+function members() {
+    cat /etc/group | grep --regex "^$1:.*" | cut -d: -f4
+}
+
 function mkcd() {
     mkdir -p $1
     cd $1
@@ -123,8 +127,8 @@ function shorten() {
 }
 
 function tm() {
-    if [[ $1 ]]; then
-        tmux attach -t $1
+    if [ -n "$1" ]; then
+        tmux attach -t $1 2>/dev/null || tmux new -s $1
     else
         tmux list-sessions
     fi
