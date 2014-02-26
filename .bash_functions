@@ -109,6 +109,19 @@ function pyserver() {
     python -c $'import SimpleHTTPServer;\nSimpleHTTPServer.SimpleHTTPRequestHandler.extensions_map[""] = "text/plain";\nSimpleHTTPServer.test();' "$port"
 }
 
+# scan local network
+function scan() {
+    if [ -z "$1" ]; then
+        echo "Usage: scan CIDR"
+    else
+        if command -v nmap >/dev/null 2>&1; then
+            nmap -sn $@ -oG - | awk '$4=="Status:" && $5=="Up" {print $2, $3}'
+        else
+            echo "Nmap is not installed. Please install and try again."
+        fi
+    fi
+}
+
 # shorten all the things
 function shorten() {
     if [ -z "${BITLY_USERNAME}" -a -z "${BITLY_API_KEY}" -a -f "${HOME}/.bitly.cfg" ]; then
