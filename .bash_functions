@@ -108,6 +108,14 @@ function port() {
     lsof -i:$1
 }
 
+function prompt_yes_no() {
+    read -p "$@ [y/N] " ans
+    case "$ans" in
+        y|Y|yes|Yes) return 0;;
+        *) return 1;;
+    esac
+}
+
 function pyjson() {
     python -c "import json; import sys; print json.dumps(json.loads(sys.stdin.read()), sort_keys = True, indent = 2)"
 }
