@@ -140,6 +140,11 @@ function scan() {
     fi
 }
 
+# share a file on 8080 using netcat, just redirect (e.g. share < file.txt)
+function share() {
+    sudo nc -v -l "${1:-8080}"
+}
+
 # shorten all the things
 function shorten() {
     if [ -z "${BITLY_USERNAME}" -a -z "${BITLY_API_KEY}" -a -f "${HOME}/.bitly.cfg" ]; then
