@@ -78,6 +78,10 @@ function fe() {
     find . -type f -iname '*'${1:-}'*' -exec ${2:-file} {} \;
 }
 
+function matrix() {
+    LC_ALL=C tr -c "[:print:]" " " < /dev/urandom | dd cbs=$COLUMNS conv=unblock | GREP_COLOR="1;32" grep --color "[^ ]"
+}
+
 function members() {
     cat /etc/group | grep --regex "^$1:.*" | cut -d: -f4
 }
