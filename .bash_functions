@@ -121,7 +121,12 @@ function prompt_yes_no() {
 }
 
 function pyjson() {
-    python -c "import json; import sys; print json.dumps(json.loads(sys.stdin.read()), sort_keys = True, indent = 2)"
+    local cmd='python -c "import json; import sys; print json.dumps(json.loads(sys.stdin.read()), sort_keys = True, indent = 2)"'
+    if command -v pygmentize >/dev/null 2>/dev/null; then
+        eval $cmd | pygmentize -l javascript
+    else
+        eval $cmd
+    fi
 }
 
 # https://github.com/necolas/dotfiles/blob/master/shell/functions/pyserver

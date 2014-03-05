@@ -4,8 +4,9 @@ alias ...='cd ../..'
 alias ....='cd ../../../'
 
 # short
-alias ll='ls -l'
 alias c='clear'
+alias f='find'
+alias ll='ls -l'
 alias m='man'
 
 # network
