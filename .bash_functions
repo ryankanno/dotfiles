@@ -182,6 +182,14 @@ function tm() {
     fi
 }
 
+function uuid() {
+    if command -v uuidgen >/dev/null 2>&1; then
+        uuidgen
+    else
+        python -c 'import uuid; print uuid.uuid1()'
+    fi
+}
+
 # not sure where i found this one, but queries wikipedia
 function wiki() {
     dig +short txt $1.wp.dg.cx;
