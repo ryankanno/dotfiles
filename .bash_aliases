@@ -23,6 +23,7 @@ alias fgrep='fgrep --color=auto'
 # docker
 alias dki='docker images'
 alias dkip='docker inspect --format "{{ .NetworkSettings.IPAddress }}"'
+alias dklatest="docker ps -l | sed -n 2p | awk '{print \$1}'"
 alias dkps='docker ps -a'
 alias dkrm='docker rm $(docker ps -notrunc -a -q)'
 alias dkrmi='docker rmi $(docker images | grep "^<none>" | awk "{print $3}")'
