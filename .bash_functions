@@ -194,3 +194,9 @@ function uuid() {
 function wiki() {
     dig +short txt $1.wp.dg.cx;
 }
+
+# helpers
+function fn_exists() {
+    command -v $1 >/dev/null 2>&1
+    return $?
+}
