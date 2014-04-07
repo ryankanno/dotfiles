@@ -58,6 +58,9 @@ else
      start_agent;
 fi
 
+# teamocil
+complete -W "$(teamocil --list)" teamocil
+
 # vi mode
 set -o vi
 
