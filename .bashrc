@@ -1,7 +1,9 @@
 function include() { [[ -f "$1" ]] && source "$1"; }
 
+export PATH=/opt/local/bin:/opt/local/sbin:$PATH
+
 # bash-it
-export BASH=$HOME/Projects/github/others/bash-it
+export BASH=$HOME/.bash_it
 export BASH_THEME='hawaii50'
 export hchtstoredir="$HOME/.hcht"
 source $BASH/bash_it.sh
@@ -65,21 +67,28 @@ complete -W "$(teamocil --list)" teamocil
 set -o vi
 
 # virtualenv
-include "/usr/local/bin/virtualenvwrapper.sh"
-
 export WORKON_HOME=$HOME/.virtualenvs
 export PIP_VIRTUALENV_BASE=$WORKON_HOME
-export PIP_REQUIRE_VIRTUALENV=true
 export PIP_RESPECT_VIRTUALENV=true
+export PIP_REQUIRE_VIRTUALENV=true
+export VIRTUALENVWRAPPER_PYTHON=/opt/local/bin/python
+export VIRTUALENVWRAPPER_VIRTUALENV=/opt/local/bin/virtualenv-2.7
+export VIRTUALENVWRAPPER_VIRTUALENV_ARGS='--no-site-packages'
+
+if [[ -r /opt/local/bin/virtualenvwrapper.sh-2.7 ]]; then
+	source /opt/local/bin/virtualenvwrapper.sh-2.7
+else
+	echo "WARNING: Can't find virtualenvwrapper.sh"
+fi
 
 # Load bash command completion if present
-include "/opt/local/etc/bash_completion"
+[[ -s "/opt/local/etc/bash_completion" ]] && source "/opt/local/etc/bash_completion"
 
 # Load aliases
-include "${HOME}/.bash_aliases"
+[[ -s "${HOME}/.bash_aliases" ]] && source "${HOME}/.bash_aliases"
 
 # Load functions
-include "${HOME}/.bash_functions"
+[[ -s "${HOME}/.bash_functions" ]] && source "${HOME}/.bash_functions"
 
 # Load private things
-include "${HOME}/.bash_local"
+[[ -s "${HOME}/.bash_local" ]] && source "${HOME}/.bash_local"
