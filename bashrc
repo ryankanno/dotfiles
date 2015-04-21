@@ -11,6 +11,9 @@ eval "$(pyenv virtualenv-init -)"
 # rbenv
 [[ -f "${HOME}/.anyenv/envs/rbenv/.rbenvrc" ]] && include "$HOME/.anyenv/envs/rbenv/.rbenvrc"
 
+# bashmarks
+[[ -f "${HOME}/.local/bin/bashmarks.sh" ]] && source "${HOME}/.local/bin/bashmarks.sh"
+
 # remove annoying you got mail
 unset MAILCHECK
 
