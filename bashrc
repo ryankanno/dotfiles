@@ -3,7 +3,13 @@ function include() { [[ -f "$1" ]] && source "$1"; }
 export PATH=/opt/local/bin:/opt/local/sbin:$PATH
 
 # pyenv
-include "$HOME/.anyenv/envs/pyenv/.pyenvrc"
+[[ -f "${HOME}/.anyenv/envs/pyenv/.pyenvrc" ]] && include "$HOME/.anyenv/envs/pyenv/.pyenvrc"
+
+# pyenv-virtualenv
+eval "$(pyenv virtualenv-init -)"
+
+# rbenv
+[[ -f "${HOME}/.anyenv/envs/rbenv/.rbenvrc" ]] && include "$HOME/.anyenv/envs/rbenv/.rbenvrc"
 
 # inputrc
 [[ -f "${HOME}/.inputrc" ]] && export INPUTRC="${HOME}/.inputrc"
