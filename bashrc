@@ -11,6 +11,9 @@ eval "$(pyenv virtualenv-init -)"
 # rbenv
 [[ -f "${HOME}/.anyenv/envs/rbenv/.rbenvrc" ]] && include "$HOME/.anyenv/envs/rbenv/.rbenvrc"
 
+# remove annoying you got mail
+unset MAILCHECK
+
 # inputrc
 [[ -f "${HOME}/.inputrc" ]] && export INPUTRC="${HOME}/.inputrc"
 
@@ -35,3 +38,9 @@ fi
 
 # vi mode
 set -o vi
+
+# load all the bash things
+[[ -s "/opt/local/etc/bash_completion" ]] && source "/opt/local/etc/bash_completion"
+[[ -s "${HOME}/.bash_aliases" ]] && source "${HOME}/.bash_aliases"
+[[ -s "${HOME}/.bash_functions" ]] && source "${HOME}/.bash_functions"
+[[ -s "${HOME}/.bash_local" ]] && source "${HOME}/.bash_local"
