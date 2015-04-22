@@ -6,7 +6,7 @@ export PATH=/opt/local/bin:/opt/local/sbin:$PATH
 export BASH_IT=$HOME/.bash_it
 export BASH_IT_THEME='hawaii50'
 export TODO="t"
-source $BASH/bash_it.sh
+source $BASH_IT/bash_it.sh
 
 # pyenv
 [[ -f "${HOME}/.anyenv/envs/pyenv/.pyenvrc" ]] && include "$HOME/.anyenv/envs/pyenv/.pyenvrc"
