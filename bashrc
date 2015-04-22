@@ -2,6 +2,12 @@ function include() { [[ -f "$1" ]] && source "$1"; }
 
 export PATH=/opt/local/bin:/opt/local/sbin:$PATH
 
+# bash-it
+export BASH_IT=$HOME/.bash_it
+export BASH_IT_THEME='hawaii50'
+export TODO="t"
+source $BASH/bash_it.sh
+
 # pyenv
 [[ -f "${HOME}/.anyenv/envs/pyenv/.pyenvrc" ]] && include "$HOME/.anyenv/envs/pyenv/.pyenvrc"
 
@@ -13,6 +19,9 @@ eval "$(pyenv virtualenv-init -)"
 
 # bashmarks
 [[ -f "${HOME}/.local/bin/bashmarks.sh" ]] && source "${HOME}/.local/bin/bashmarks.sh"
+
+# grep
+export GREP_OPTIONS='--color=auto'
 
 # remove annoying you got mail
 unset MAILCHECK
@@ -41,6 +50,23 @@ fi
 
 # vi mode
 set -o vi
+
+# history
+export HISTCONTROL=ignoreboth
+shopt -s histappend
+export HISTSIZE=32768
+export HISTFILESIZE=32768
+export HISTTIMEFORMAT='%F %T '
+export HISTIGNORE="ls:ls *:cd:cd -:pwd;exit:date:* --help"
+
+# os specific
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    export EDITOR='/opt/local/bin/mvim -p'
+    export GIT_EDITOR='/opt/local/bin/vim'
+fi
+
+# teamocil
+complete -W "$(teamocil --list)" teamocil
 
 # load all the bash things
 [[ -s "/opt/local/etc/bash_completion" ]] && source "/opt/local/etc/bash_completion"
