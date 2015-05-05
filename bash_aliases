@@ -30,3 +30,18 @@ alias dk-images-remove-all='docker images -a | grep -v ^REPOSITORY | awk "{print
 alias dk-images-remove-orphans='docker images | grep "^<none>" | awk "{print \$3}" | xargs docker rmi'
 alias dkrund='docker run -d -P'
 alias dkruni='docker run -t -i -P'
+
+# rsync
+rsync_cmd='rsync --verbose --progress --human-readable --compress --archive --hard-links --one-file-system'
+
+# http://www.bombich.com/rsync.html
+if [[ "$OSTYPE" == darwin* ]] && grep -q 'file-flags' <(rsync --help 2>&1); then
+  rsync_cmd="${rsync_cmd} --crtimes --acls --xattrs --fileflags --protect-decmpfs --force-change"
+fi
+
+alias rsync-copy="${rsync_cmd}"
+alias rsync-move="${rsync_cmd} --remove-source-files"
+alias rsync-update="${rsync_cmd} --update"
+alias rsync-sync="${rsync_cmd} --update --delete"
+
+unset rsync_cmd
