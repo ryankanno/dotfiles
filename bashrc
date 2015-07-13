@@ -63,6 +63,7 @@ export HISTIGNORE="ls:ls *:cd:cd -:pwd;exit:date:* --help"
 if [[ "$OSTYPE" == "darwin"* ]]; then
     export EDITOR='/opt/local/bin/mvim -p'
     export GIT_EDITOR='/opt/local/bin/vim'
+    eval "$(boot2docker shellinit)"
 fi
 
 # teamocil
