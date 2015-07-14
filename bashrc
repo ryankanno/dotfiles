@@ -74,3 +74,6 @@ complete -W "$(teamocil --list)" teamocil
 [[ -s "${HOME}/.bash_aliases" ]] && source "${HOME}/.bash_aliases"
 [[ -s "${HOME}/.bash_functions" ]] && source "${HOME}/.bash_functions"
 [[ -s "${HOME}/.bash_local" ]] && source "${HOME}/.bash_local"
+
+# PATH fix - removes duplicates, preserves the ordering of paths, and doesn't add a colon at the end. 
+export PATH="$(echo $PATH | perl -e 'print join(":", grep { not $seen{$_}++ } split(/:/, scalar <>))')"
