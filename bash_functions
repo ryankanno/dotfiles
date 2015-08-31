@@ -136,6 +136,10 @@ function pyserver() {
     python -c $'import SimpleHTTPServer;\nSimpleHTTPServer.SimpleHTTPRequestHandler.extensions_map[""] = "text/plain";\nSimpleHTTPServer.test();' "$port"
 }
 
+function python() {
+    test -z "$1" && ipython || command python "$@"
+}
+
 # scan local network
 function scan() {
     if [ -z "$1" ]; then
