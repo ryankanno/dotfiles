@@ -45,3 +45,12 @@ alias rsync-update="${rsync_cmd} --update"
 alias rsync-sync="${rsync_cmd} --update --delete"
 
 unset rsync_cmd
+
+# vagrant
+alias v='vagrant'
+alias vd='vagrant destroy'
+alias vh='vagrant halt'
+alias vk='vagrant destroy'
+alias vp='vagrant provision'
+alias vs='vagrant status'
+alias vu='vagrant up'
