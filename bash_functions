@@ -186,6 +186,14 @@ function tm() {
     fi
 }
 
+function tmk() {
+    if [ -n "$1" ]; then
+        tmux kill-session -t $1 2>/dev/null
+    else
+        echo "Please pass in a named tmux session to kill."
+    fi
+}
+
 function uuid() {
     if command -v uuidgen >/dev/null 2>&1; then
         uuidgen
