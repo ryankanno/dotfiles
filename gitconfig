@@ -1,0 +1,116 @@
+[alias]
+ # basic {{{
+    br = branch
+    ci = commit
+    cl = clone
+    co = checkout
+    cp = cherry-pick
+    gr = grep -Ii
+    pu = pull
+    r = reset
+    st = status -s
+    w  = whatchanged --reverse
+# }}}
+
+    f = "!git ls-files | grep -i"
+    la = "!git config -l | grep alias | cut -c 7-"
+
+# log commands {{{
+    # http://www.jukie.net/bart/blog/pimping-out-git-log
+    ls = log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit --date=relative
+    ll = log --pretty=format:"%C(yellow)%h%Cred%d\\ %Creset%s%Cblue\\ [%cn]" --decorate --numstat
+    lc  = "!f() { git ll "$1"^.."$1"; }; f"
+    lnc = log --pretty=format:"%h\\ %s\\ [%cn]"
+    fl = log -u
+    filelog = log -u
+# }}}
+
+# commit {{{
+    cm = commit -m
+    cma = commit -a -m
+    ca = commit --amend
+    amend = commit --amend
+    caa = commit -a --amend -C HEAD
+# }}}
+
+# diff {{{
+    d = diff --word-diff
+    dc = diff --cached
+
+    # diff last commit
+    dlc = diff --cached HEAD^
+    dr  = "!f() { git diff -w "$1"^.."$1"; }; f"
+    diffr  = "!f() { git diff "$1"^.."$1"; }; f"
+# }}}
+
+# reset commands {{{
+    r1 = reset HEAD^
+    r2 = reset HEAD^^
+    rh = reset --hard
+    rh1 = reset HEAD^ --hard
+    rh2 = reset HEAD^^ --hard
+# }}}
+
+# stash {{{
+    sl = stash list
+    sa = stash apply
+    ss = stash save
+# }}}
+
+[apply]
+    whitespace = nowarn
+
+[color]
+    branch = auto
+    diff = auto
+    interactive = auto
+    status = auto
+    ui = auto
+
+[color "branch"]
+    current = red reverse
+    local = blue
+    remote = green
+
+[color "diff"]
+    meta = yellow
+    frag = magenta
+    old = red bold
+    new = green
+    plain = white
+
+[color "status"]
+    added = yellow
+    changed = green
+    untracked = cyan
+
+[core]
+    excludesfile = ~/.gitignore
+
+# push/pull/diff/options {{{
+[push]
+    default = upstream
+[pull]
+    default = current
+[diff]
+    mnemonicprefix = true
+[branch]
+    autosetuprebase = always
+[apply]
+    whitespace = nowarn
+#}}}
+
+[man]
+    viewer = man
+
+[merge]
+    tool = vimdiff
+
+[rebase]
+  autosquash = true
+
+[user]
+    name = Ryan
+    email = ryankanno@localkinegrinds.com
+    editor = vim
+
