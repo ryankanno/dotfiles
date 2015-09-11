@@ -68,21 +68,36 @@
     ui = auto
 
 [color "branch"]
-    current = red reverse
-    local = blue
-    remote = green
+	current = green
+	local = normal
+	remote = red
+	plain = normal
 
 [color "diff"]
-    meta = yellow
-    frag = magenta
-    old = red bold
-    new = green
-    plain = white
+	plain = normal
+	meta = bold
+	frag = cyan
+	old = red
+	new = green
+	commit = yellow
+	whitespace = normal red
+
+[color "grep"]
+	match = normal
+
+[color "interactive"]
+	prompt = normal
+	header = normal
+	help = normal
+	error = normal
 
 [color "status"]
-    added = yellow
-    changed = green
-    untracked = cyan
+	header = normal
+	added = red
+	updated = green
+	changed = red
+	untracked = red
+	nobranch = red
 
 [core]
     excludesfile = ~/.gitignore
