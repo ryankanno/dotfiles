@@ -49,8 +49,9 @@ unset rsync_cmd
 # vagrant
 alias v='vagrant'
 alias vd='vagrant destroy'
+alias vdf='vagrant destroy --force'
 alias vh='vagrant halt'
-alias vk='vagrant destroy'
 alias vp='vagrant provision'
+alias vssh='vagrant ssh'
 alias vs='vagrant status'
 alias vu='vagrant up'
