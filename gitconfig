@@ -109,6 +109,7 @@
     default = current
 [diff]
     mnemonicprefix = true
+	tool = bc3
 [branch]
     autosetuprebase = always
 [apply]
@@ -119,7 +120,7 @@
     viewer = man
 
 [merge]
-    tool = vimdiff
+	tool = bc3
 
 [rebase]
   autosquash = true
@@ -129,3 +130,5 @@
     email = ryankanno@localkinegrinds.com
     editor = vim
 
+[mergetool]
+	bc3 = trustExitCode
