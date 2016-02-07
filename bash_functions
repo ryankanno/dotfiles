@@ -46,6 +46,14 @@ function datauri() {
     printf "data:${mimeType};base64,$(openssl base64 -in "$1" | tr -d '\n')" | pbcopy | printf "=> data URI copied to pasteboard.\n"
 }
 
+function ed() {
+    find  . -type d -empty
+}
+
+function ef() {
+    find  . -type f -empty
+}
+
 # https://github.com/anthonypdawson/dotfiles/blob/master/bash_functions
 function ex() {
     if [ -f $1 ]; then
