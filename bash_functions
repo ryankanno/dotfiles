@@ -202,6 +202,10 @@ function tmk() {
     fi
 }
 
+function used() {
+    du -x -k | sort -nr | head -$1
+}
+
 function uuid() {
     if command -v uuidgen >/dev/null 2>&1; then
         uuidgen
