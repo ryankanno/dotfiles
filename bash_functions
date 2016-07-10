@@ -37,7 +37,7 @@ function cd {
 }
 
 function cdf {
-    cd -- "$(find . -name $1 -type f -print '%h' -quit)"
+    cd -- "$(gfind . -name "$1" -type f -printf '%h' -quit)"
 }
 
 # https://github.com/michaelkitson/dotfiles/blob/master/bash_functions
