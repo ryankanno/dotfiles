@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+function agvim() {
+    ag -l $@ | mvim -p
+}
+
 # i create a lot of tar backups before i do things :)
 function backup() {
     if [ -z "$1" ]; then
@@ -30,6 +34,10 @@ function calc() {
 # https://unix.stackexchange.com/questions/6/what-are-your-favorite-command-line-features-or-tricks/122#122
 function cd {
     builtin cd "$@" && ls
+}
+
+function cdf {
+    cd -- "$(find . -name $1 -type f -print '%h' -quit)"
 }
 
 # https://github.com/michaelkitson/dotfiles/blob/master/bash_functions
