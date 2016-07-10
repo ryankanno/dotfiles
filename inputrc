@@ -8,7 +8,7 @@ set keymap vi
 
 $if mode=vi
     set keymap vi-command
-    "ii": vi-insertion-mode
+    "i": vi-insertion-mode
     set keymap vi-insert
     "jk": vi-movement-mode
 $endif
