@@ -202,6 +202,16 @@ function tm() {
     fi
 }
 
+function _tm_sessions () {
+    local cur
+    COMPREPLY=()
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    COMPREPLY=( $( compgen -W "$(tmux list-sessions -F '#{session_name}' | cut -d' ' -f1)" -- "${cur}") )
+    return 0
+}
+
+complete -F _tm_sessions tm
+
 function tmk() {
     if [ -n "$1" ]; then
         tmux kill-session -t $1 2>/dev/null
