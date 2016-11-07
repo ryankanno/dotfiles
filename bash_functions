@@ -128,6 +128,10 @@ function port() {
     lsof -i:$1
 }
 
+function port_clean() {
+    sudo port -f clean --all all && sudo port -f uninstall inactive
+}
+
 function prompt_yes_no() {
     read -p "$@ [y/N] " ans
     case "$ans" in
