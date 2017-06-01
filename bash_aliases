@@ -31,6 +31,10 @@ alias dk-images-remove-orphans='docker images | grep "^<none>" | awk "{print \$3
 alias dkrund='docker run -d -P'
 alias dkruni='docker run -t -i -P'
 
+# python
+alias pi='pip install'
+alias pir='pip install -r requirements.txt'
+
 # rsync
 rsync_cmd='rsync --verbose --progress --human-readable --compress --archive --hard-links --one-file-system'
 
@@ -43,6 +47,11 @@ alias rsync-copy="${rsync_cmd}"
 alias rsync-move="${rsync_cmd} --remove-source-files"
 alias rsync-update="${rsync_cmd} --update"
 alias rsync-sync="${rsync_cmd} --update --delete"
+
+alias dry-rsync-copy="${rsync_cmd} --dry-run"
+alias dry-rsync-move="${rsync_cmd} --remove-source-files --dry-run"
+alias dry-rsync-update="${rsync_cmd} --update --dry-run"
+alias dry-rsync-sync="${rsync_cmd} --update --delete --dry-run"
 
 unset rsync_cmd
 
