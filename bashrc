@@ -63,6 +63,9 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
     export GIT_EDITOR='/opt/local/bin/vim'
 fi
 
+# android
+export ANDROID_HVPROTO=ddm
+
 # teamocil
 complete -W "$(teamocil --list)" teamocil
 
