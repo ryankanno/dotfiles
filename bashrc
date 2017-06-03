@@ -1,5 +1,7 @@
 function include() { [[ -f "$1" ]] && source "$1"; }
 
+export PATH=/opt/local/bin:/opt/local/sbin:$PATH
+
 # bash-it
 export BASH_IT=$HOME/.bash_it
 export BASH_IT_THEME='hawaii50'
@@ -68,8 +70,6 @@ export ANDROID_HVPROTO=ddm
 
 # teamocil
 complete -W "$(teamocil --list)" teamocil
-
-export PATH=/opt/local/bin:/opt/local/sbin:$PATH
 
 # load all the bash things
 [[ -s "/opt/local/etc/bash_completion" ]] && source "/opt/local/etc/bash_completion"
