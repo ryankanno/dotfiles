@@ -51,6 +51,11 @@
     rh2 = reset HEAD^^ --hard
 # }}}
 
+# showtool commands {{{
+  showtool = "!f() { git difftool $1^ $1; }; f"
+  added = difftool --cached
+# }}}
+
 # stash {{{
     sl = stash list
     sa = stash apply
