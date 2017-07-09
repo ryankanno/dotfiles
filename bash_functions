@@ -196,14 +196,9 @@ function shorten() {
 }
 
 function tm() {
-    if [ -n "$1" ]; then
-        tmux attach -t $1 2>/dev/null || tmux new -s $1
-    else
-        tmux list-sessions 2> >(grep -q 'failed')
-        if [ "$?" -eq 1 ]; then
-            echo "No available tmux sessions. Please create one."
-        fi
-    fi
+  local session
+  new_session=${1:-new}
+  session=$(tmux list-sessions -F "#{session_name}" | fzf --query="$1" --select-1 --exit-0) && tmux attach-session -t "$session" || tmux new-session -s $new_session
 }
 
 function _tm_sessions () {
