@@ -90,6 +90,13 @@ function fe() {
     find . -type f -iname '*'${1:-}'*' -exec ${2:-file} {} \;
 }
 
+function fzf_log() {
+    local hash
+    hash=$(git log --format="%h%d %s %cr" "$@" |  fzf | awk '{print $1}')
+    echo $hash | pbcopy;
+    git showtool $hash
+}
+
 function matrix() {
     LC_ALL=C tr -c "[:print:]" " " < /dev/urandom | dd cbs=$COLUMNS conv=unblock | GREP_COLOR="1;32" grep --color "[^ ]"
 }
