@@ -1,9 +1,5 @@
 #!/usr/bin/env bash
 
-function agvim() {
-    ag -l $@ | mvim -p
-}
-
 # i create a lot of tar backups before i do things :)
 function backup() {
     if [ -z "$1" ]; then
