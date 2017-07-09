@@ -105,13 +105,24 @@
 # push/pull/diff/options {{{
 [push]
     default = upstream
+
 [pull]
     default = current
+
 [diff]
     mnemonicprefix = true
-	tool = bc3
+	tool = bcomp
+
+[difftool]
+    prompt = false
+
+[difftool "bcomp"]
+    trustExitCode = true
+    cmd = "/usr/local/bin/bcomp" \"$LOCAL\" \"$REMOTE\"
+
 [branch]
     autosetuprebase = always
+
 [apply]
     whitespace = nowarn
 #}}}
@@ -120,10 +131,17 @@
     viewer = man
 
 [merge]
-	tool = bc3
+	tool = bcomp
+
+[mergetool]
+    prompt = false
+
+[mergetool "bcomp"]
+    trustExitCode = true
+    cmd = "/usr/local/bin/bcomp" \"$LOCAL\" \"$REMOTE\" \"$BASE\" \"$MERGED\"
 
 [rebase]
-  autosquash = true
+    autosquash = true
 
 [user]
     name = Ryan
