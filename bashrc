@@ -48,7 +48,6 @@ function start_agent {
      echo succeeded
      chmod 600 "${SSH_ENV}"
      . "${SSH_ENV}" > /dev/null
-     /usr/bin/ssh-add;
 }
 
 if [ -f "${SSH_ENV}" ]; then
@@ -80,6 +79,9 @@ export ANDROID_HVPROTO=ddm
 
 # teamocil
 complete -W "$(teamocil --list)" teamocil
+
+# direnv
+eval "$(direnv hook bash)"
 
 # load all the bash things
 [[ -s "/opt/local/etc/bash_completion" ]] && source "/opt/local/etc/bash_completion"
