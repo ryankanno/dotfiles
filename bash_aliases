@@ -21,15 +21,20 @@ alias egrep='egrep --color=auto'
 alias fgrep='fgrep --color=auto'
 
 # docker
-alias dki='docker images'
-alias dkip='docker inspect --format "{{ .NetworkSettings.IPAddress }}"'
-alias dklatest="docker ps -l | sed -n 2p | awk '{print \$1}'"
-alias dkps='docker ps -a'
-alias dkrm='docker rm $(docker ps -notrunc -a -q)'
-alias dk-images-remove-all='docker images -a | grep -v ^REPOSITORY | awk "{print \$3}" | xargs docker rmi'
-alias dk-images-remove-orphans='docker images | grep "^<none>" | awk "{print \$3}" | xargs docker rmi'
-alias dkrund='docker run -d -P'
-alias dkruni='docker run -t -i -P'
+dalias() { alias | grep 'docker' | sed "s/^\([^=]*\)=\(.*\)/\1 => \2/"| sed "s/['|\']//g" | sort; }
+alias di='docker images'
+alias dip='docker inspect --format "{{ .NetworkSettings.IPAddress }}"'
+alias dlatest="docker ps -l | sed -n 2p | awk '{print \$1}'"
+alias dps='docker ps -a'
+alias drm='docker rm $(docker ps --no-trunc -a -q)'
+alias drmf='docker rm -f $(docker ps -a -q)'
+alias drmi='docker rmi $(docker images -q --filter "dangling=true")'
+alias drm_theworld='docker stop $(docker ps -a -q) && docker rm -f $(docker ps -a -q)'
+alias di-remove-all='docker images -a | grep -v ^REPOSITORY | awk "{print \$3}" | xargs docker rmi'
+alias di-remove-orphans='docker images | grep "^<none>" | awk "{print \$3}" | xargs docker rmi'
+alias drund='docker run -d -P'
+alias druni='docker run -t -i -P'
+dbash() { docker exec -it $(docker ps -aqf "name=$1") bash; }
 
 # python
 alias pi='pip install'
