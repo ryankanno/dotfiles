@@ -23,6 +23,7 @@
     lnc = log --pretty=format:"%h\\ %s\\ [%cn]"
     fl = log -u
     filelog = log -u
+    prior-hash = "!ph() { git log --pretty=format:'%h' -1 --skip=$1 $2; }; ph"
 # }}}
 
 # commit {{{
@@ -41,6 +42,9 @@
     dlc = diff --cached HEAD^
     dr  = "!f() { git diff -w "$1"^.."$1"; }; f"
     diffr  = "!f() { git diff "$1"^.."$1"; }; f"
+
+    diff-prev-easy = "!dp() { git diff $(git prior-hash $1 $2).. $2; }; dp"
+    diff-prev = "!dp() { git diff $(git prior-hash $1 $2)..$(git prior-hash $(($1 - 1)) $2) $2; }; dp"
 # }}}
 
 # reset commands {{{
