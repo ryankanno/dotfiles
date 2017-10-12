@@ -227,11 +227,7 @@ function used() {
 }
 
 function uuid() {
-    if command -v uuidgen >/dev/null 2>&1; then
-        uuidgen
-    else
-        python -c 'import uuid; print uuid.uuid1()'
-    fi
+    python -c 'import uuid; print(str(uuid.uuid1()))'
 }
 
 # not sure where i found this one, but queries wikipedia
