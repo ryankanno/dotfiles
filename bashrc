@@ -66,7 +66,7 @@ shopt -s histappend
 export HISTSIZE=32768
 export HISTFILESIZE=32768
 export HISTTIMEFORMAT='%F %T '
-export HISTIGNORE="ls:ls *:cd:cd -:pwd;exit:date:* --help"
+export HISTIGNORE="cd:cd -:pwd;exit:date:* --help"
 
 # os specific
 if [[ "$OSTYPE" == "darwin"* ]]; then
@@ -82,6 +82,11 @@ complete -W "$(teamocil --list)" teamocil
 
 # direnv
 eval "$(direnv hook bash)"
+
+# golang
+export GOPATH=~/golibs
+export GOBIN=~/golibs/bin
+export PATH=$PATH:$GOBIN
 
 # load all the bash things
 [[ -s "/opt/local/etc/bash_completion" ]] && source "/opt/local/etc/bash_completion"
