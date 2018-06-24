@@ -156,7 +156,7 @@ function pyjson() {
 function pyserver() {
     local port="${1:-8000}"
     open "http://localhost:${port}/"
-    python -c $'import SimpleHTTPServer;\nSimpleHTTPServer.SimpleHTTPRequestHandler.extensions_map[""] = "text/plain";\nSimpleHTTPServer.test();' "$port"
+    python -m http.server "$port"
 }
 
 function python() {
