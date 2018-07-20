@@ -8,7 +8,7 @@
     gr = grep -Ii
     pu = pull
     r = reset
-    st = status -s
+    st = status --ignore-submodules=dirty
     w  = whatchanged --reverse
 # }}}
 
