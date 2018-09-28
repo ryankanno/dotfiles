@@ -45,7 +45,8 @@ rsync_cmd='rsync --verbose --progress --human-readable --compress --archive --ha
 
 # http://www.bombich.com/rsync.html
 if [[ "$OSTYPE" == darwin* ]] && grep -q 'file-flags' <(rsync --help 2>&1); then
-  rsync_cmd="${rsync_cmd} --crtimes --acls --xattrs --fileflags --protect-decmpfs --force-change"
+  # rsync_cmd="${rsync_cmd} --crtimes --acls --xattrs --fileflags --protect-decmpfs --force-change"
+  rsync_cmd="${rsync_cmd} --crtimes --acls --xattrs --fileflags --force-change"
 fi
 
 alias rsync-copy="${rsync_cmd}"
