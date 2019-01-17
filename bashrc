@@ -70,8 +70,9 @@ export HISTIGNORE="cd:cd -:pwd;exit:date:* --help"
 
 # os specific
 if [[ "$OSTYPE" == "darwin"* ]]; then
-    export EDITOR='/opt/local/bin/mvim -p'
-    export GIT_EDITOR='/opt/local/bin/vim'
+    export VISUAL="macvim"
+    export EDITOR="$VISUAL"
+    export GIT_EDITOR="$VISUAL -f"
 fi
 
 # android
