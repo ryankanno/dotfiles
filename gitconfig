@@ -12,7 +12,13 @@
     w  = whatchanged --reverse
 # }}}
 
-    f = "!git ls-files | grep -i"
+    # find files
+    ff = "!git ls-files | grep -i"
+
+    # search commits
+    sc = "log --all --date=format:\"%b %d, %Y\" --pretty=format:\"%Cgreen %h %C(white) %s %C(dim)%an on %cd\" --grep"
+
+    # list aliases
     la = "!git config -l | grep alias | cut -c 7-"
 
 # log commands {{{
@@ -21,8 +27,10 @@
     ll = log --pretty=format:"%C(yellow)%h%Cred%d\\ %Creset%s%Cblue\\ [%cn]" --decorate --numstat
     lc  = "!f() { git ll "$1"^.."$1"; }; f"
     lnc = log --pretty=format:"%h\\ %s\\ [%cn]"
+
+    # file log
     fl = log -u
-    filelog = log -u
+
     prior-hash = "!ph() { git log --pretty=format:'%h' -1 --skip=$1 $2; }; ph"
 # }}}
 
