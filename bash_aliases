@@ -34,8 +34,9 @@ alias di-remove-all='docker images -a | grep -v ^REPOSITORY | awk "{print \$3}" 
 alias di-remove-orphans='docker images | grep "^<none>" | awk "{print \$3}" | xargs docker rmi'
 alias drund='docker run -d -P'
 alias druni='docker run -t -i -P'
-dbash() { docker exec -it $(docker ps -aqf "name=$1") /bin/bash; }
-dbashstart() { docker run -i -t --entrypoint /bin/sh "$1"; }
+dscript() { docker exec -it $(docker ps -aqf "name=$1") /bin/sh -c '"$2"'; }
+dshi() { docker exec -it $(docker ps -aqf "name=$1") /bin/sh; }
+dshc() { docker run -i -t --entrypoint /bin/sh "$1"; }
 
 # python
 alias pi='pip install'
