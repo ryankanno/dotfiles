@@ -70,7 +70,7 @@ export HISTIGNORE="cd:cd -:pwd;exit:date:* --help"
 
 # os specific
 if [[ "$OSTYPE" == "darwin"* ]]; then
-    export VISUAL="macvim"
+    export VISUAL="mvim"
     export EDITOR="$VISUAL"
     export GIT_EDITOR="$VISUAL -f"
 fi
