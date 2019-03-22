@@ -16,7 +16,7 @@ source $BASH_IT/bash_it.sh
 export FZF_DEFAULT_COMMAND='rg --files --no-ignore --hidden --follow -g "!{.git,node_modules}/*" 2> /dev/null'
 export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
 export FZF_ALT_C_COMMAND="bfs -type d -nohidden"
-bind -x '"\C-p": vim $(fzf);'
+bind -x '"\C-p": mvim $(fzf);'
 
 # pyenv
 [[ -f "${HOME}/.anyenv/envs/pyenv/.pyenvrc" ]] && include "$HOME/.anyenv/envs/pyenv/.pyenvrc"
@@ -61,12 +61,14 @@ fi
 set -o vi
 
 # history
-export HISTCONTROL=ignoreboth
+HISTCONTROL=ignorespace:ignoredups
 shopt -s histappend
-export HISTSIZE=32768
-export HISTFILESIZE=32768
-export HISTTIMEFORMAT='%F %T '
-export HISTIGNORE="cd:cd -:pwd;exit:date:* --help"
+HISTSIZE=32768
+HISTFILESIZE=32768
+HISTTIMEFORMAT='%F %T '
+HISTIGNORE="pwd;exit:date:* --help"
+PROMPT_COMMAND="$PROMPT_COMMAND;history -a; history -n"
+
 
 # os specific
 if [[ "$OSTYPE" == "darwin"* ]]; then
