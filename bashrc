@@ -67,7 +67,7 @@ HISTSIZE=32768
 HISTFILESIZE=32768
 HISTTIMEFORMAT='%F %T '
 HISTIGNORE="pwd;exit:date:* --help"
-PROMPT_COMMAND="$PROMPT_COMMAND;history -a; history -n"
+PROMPT_COMMAND="${PROMPT_COMMAND%;};history -a; history -n"
 
 
 # os specific
