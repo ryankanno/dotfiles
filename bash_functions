@@ -97,6 +97,16 @@ function fzf_log() {
     git showtool $hash
 }
 
+function lcm() {
+    local last_commit
+    last_commit=$(git log -1 --format="%H")
+
+    local last_commit_message
+    last_commit_message=$(git log -1 --pretty=%B)
+
+    echo -e "Checked into commmit: ${last_commit}\n\n${last_commit_message}" | pbcopy
+}
+
 function matrix() {
     LC_ALL=C tr -c "[:print:]" " " < /dev/urandom | dd cbs=$COLUMNS conv=unblock | GREP_COLOR="1;32" grep --color "[^ ]"
 }
