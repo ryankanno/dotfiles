@@ -21,22 +21,84 @@ alias egrep='egrep --color=auto'
 alias fgrep='fgrep --color=auto'
 
 # docker
-dalias() { alias | grep 'docker' | sed "s/^\([^=]*\)=\(.*\)/\1 => \2/"| sed "s/['|\']//g" | sort; }
-alias di='docker images'
-alias dip='docker inspect --format "{{ .NetworkSettings.IPAddress }}"'
-alias dlatest="docker ps -l | sed -n 2p | awk '{print \$1}'"
-alias dps='docker ps -a'
-alias drm='docker rm $(docker ps --no-trunc -a -q)'
-alias drmf='docker rm -f $(docker ps -a -q)'
-alias drmi='docker rmi $(docker images -q --filter "dangling=true")'
-alias drm_theworld='docker stop $(docker ps -a -q) && docker rm -f $(docker ps -a -q)'
-alias di-remove-all='docker images -a | grep -v ^REPOSITORY | awk "{print \$3}" | xargs docker rmi'
-alias di-remove-orphans='docker images | grep "^<none>" | awk "{print \$3}" | xargs docker rmi'
-alias drund='docker run -d -P'
-alias druni='docker run -t -i -P'
-dscript() { docker exec -it $(docker ps -aqf "name=$1") /bin/sh -c '"$2"'; }
-dshi() { docker exec -it $(docker ps -aqf "name=$1") /bin/sh; }
-dshc() { docker run -i -t --entrypoint /bin/sh "$1"; }
+
+# print docker aliases
+dkalias() { alias | grep 'docker' | sed "s/^\([^=]*\)=\(.*\)/\1 => \2/"| sed "s/['|\']//g" | sort; }
+
+# docker attach (detach with ctrl-a)
+alias dkatt='docker attach --detach-keys="ctrl-a"'
+
+# get images
+alias dki='docker images'
+
+# inspect
+alias dkin='docker inspect'
+
+# get container ip
+alias dkip='docker inspect --format "{{ .NetworkSettings.IPAddress }}"'
+
+# inspect latest container
+alias dkinlatest='docker inspect $(docker ps -l -q)'
+
+# latest container id
+alias dklatest='docker ps -l -q'
+
+# logs
+alias dklogs='docker logs'
+
+# logs w/follow
+alias dklogsf='docker logs -f'
+
+# get process - including stopped containers
+alias dkps='docker ps -a'
+
+# remove all containers
+alias dkrm='docker rm $(docker ps --no-trunc -a -q)'
+
+# force remove all containers
+alias dkrmf='docker rm -f $(docker ps -a -q)'
+
+# remove all dangling images
+alias dkrmi='docker rmi $(docker images -q --filter "dangling=true")'
+
+# stop and remove all containers
+alias dkrm-the-world='docker stop $(docker ps -a -q) && docker rm -f $(docker ps -a -q)'
+
+# remove all images
+alias dki-remove-all='docker images -a | grep -v ^REPOSITORY | awk "{print \$3}" | xargs docker rmi'
+
+# remove all image orphans
+alias dki-remove-orphans='docker images | grep "^<none>" | awk "{print \$3}" | xargs docker rmi'
+
+# run daemonized container
+alias dkrund='docker run -d -P'
+
+# run interactive container
+alias dkruni='docker run -t -i -P'
+
+# exec latest container id
+alias dkelatest='dkexe $(docker ps -l -q)'
+
+# get stats
+alias dks='docker stats --no-stream'
+
+# stop all containers
+alias dkstop='docker stop $(docker ps -a -q)'
+
+# exec command ($2) in container by id ($1)
+dkexe() { docker exec -it $1 $2; }
+
+# exec command ($2) in container by name ($1)
+dkexcn() { dkexe $(docker ps -aqf "name=$1") /bin/sh -c '"$2"'; }
+
+# shell into container by id
+dkexshc() { dkexe "$1" /bin/sh; }
+
+# shell into container by name
+dkexshcn() { dkexe $(docker ps -aqf "name=$1") /bin/sh; }
+
+# run image
+dkrun() { docker run -it --entrypoint /bin/sh "$1"; }
 
 # python
 alias pi='pip install'
