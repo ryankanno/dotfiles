@@ -28,6 +28,9 @@ dkalias() { alias | grep 'docker' | sed "s/^\([^=]*\)=\(.*\)/\1 => \2/"| sed "s/
 # docker attach (detach with ctrl-a)
 alias dkatt='docker attach --detach-keys="ctrl-a"'
 
+# docker attach latest (detach with ctrl-a)
+alias dkattlatest='dkatt $(docker ps -l -q)'
+
 # get images
 alias dki='docker images'
 
@@ -78,6 +81,9 @@ alias dkruni='docker run -t -i -P'
 
 # exec latest container id
 alias dkelatest='dkexe $(docker ps -l -q)'
+
+# shell latest container id
+alias dkshlatest='dkexshc $(docker ps -l -q)'
 
 # get stats
 alias dks='docker stats --no-stream'
