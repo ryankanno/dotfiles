@@ -1,6 +1,6 @@
 function include() { [[ -f "$1" ]] && source "$1"; }
 
-export PATH=/opt/local/bin:/opt/local/sbin:$PATH
+export PATH=/opt/local/bin:/opt/local/sbin:$HOME/.poetry/bin:$PATH
 
 # bash-it
 export BASH_IT=$HOME/.bash_it
@@ -17,6 +17,10 @@ export FZF_DEFAULT_COMMAND='rg --files --no-ignore --hidden --follow -g "!{.git,
 export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
 export FZF_ALT_C_COMMAND="bfs -type d -nohidden"
 bind -x '"\C-p": mvim $(fzf);'
+
+if [[ -n $(which anyenv) ]]; then
+    eval "$(anyenv init -)"
+fi
 
 # pyenv
 [[ -f "${HOME}/.anyenv/envs/pyenv/.pyenvrc" ]] && include "$HOME/.anyenv/envs/pyenv/.pyenvrc"
@@ -83,6 +87,11 @@ export ANDROID_HVPROTO=ddm
 # teamocil
 complete -W "$(teamocil --list)" teamocil
 
+# tmuxp
+if [[ -n $(which tmuxp) ]]; then
+    eval "$(_TMUXP_COMPLETE=source tmuxp)"
+fi
+
 # direnv
 eval "$(direnv hook bash)"
 
@@ -92,10 +101,10 @@ export GOBIN=~/golibs/bin
 export PATH=$PATH:$GOBIN
 
 # load all the bash things
-[[ -s "/opt/local/etc/bash_completion" ]] && source "/opt/local/etc/bash_completion"
+[[ -s "/opt/local/etc/profile.d/bash_completion.sh" ]] && source "/opt/local/etc/profile.d/bash_completion.sh"
 [[ -s "${HOME}/.bash_aliases" ]] && source "${HOME}/.bash_aliases"
 [[ -s "${HOME}/.bash_functions" ]] && source "${HOME}/.bash_functions"
 [[ -s "${HOME}/.bash_local" ]] && source "${HOME}/.bash_local"
 
-# PATH fix - removes duplicates, preserves the ordering of paths, and doesn't add a colon at the end. 
+# PATH fix - removes duplicates, preserves the ordering of paths, and doesn't add a colon at the end.
 export PATH="$(echo $PATH | perl -e 'print join(":", grep { not $seen{$_}++ } split(/:/, scalar <>))')"
