@@ -1,6 +1,6 @@
 function include() { [[ -f "$1" ]] && source "$1"; }
 
-export PATH=/opt/local/bin:/opt/local/sbin:$HOME/.poetry/bin:$PATH
+export PATH=/opt/local/bin:/opt/local/sbin:/usr/local/sbin:$HOME/.poetry/bin:$PATH
 
 # bash-it
 export BASH_IT=$HOME/.bash_it
