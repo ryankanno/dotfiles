@@ -65,13 +65,13 @@ fi
 set -o vi
 
 # history
-HISTCONTROL=ignorespace:ignoredups
 shopt -s histappend
-HISTSIZE=32768
-HISTFILESIZE=32768
-HISTTIMEFORMAT='%F %T '
+HISTCONTROL=ignorespace:ignoredups
+HISTSIZE=
+HISTFILESIZE=
+HISTTIMEFORMAT='[%F %T] '
 HISTIGNORE="pwd;exit:date:* --help"
-PROMPT_COMMAND="${PROMPT_COMMAND%;};history -a; history -n"
+PROMPT_COMMAND='if [ "$(id -u)" -ne 0 ]; then echo "$(date "+%Y-%m-%d.%H:%M:%S") $(hostname) $(pwd) $(history 1)" >> ~/.logs/bash-history-$(date "+%Y-%m-%d").log; fi; history -a; history -n;'
 
 
 # os specific
