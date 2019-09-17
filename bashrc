@@ -71,8 +71,17 @@ HISTSIZE=
 HISTFILESIZE=
 HISTTIMEFORMAT='[%F %T] '
 HISTIGNORE="pwd;exit:date:* --help"
-PROMPT_COMMAND='if [ "$(id -u)" -ne 0 ]; then echo "$(date "+%Y-%m-%d.%H:%M:%S") $(hostname) $(pwd) $(history 1)" >> ~/.logs/bash-history-$(date "+%Y-%m-%d").log; fi; history -a; history -n;'
 
+share_and_log_history() {
+    if [ "$(id -u)" -ne 0 ]; then
+        echo "$(date "+%Y-%m-%d.%H:%M:%S") $(hostname) $(pwd) $(history 1)" >> ~/.logs/bash-history-$(date "+%Y-%m-%d").log;
+    fi;
+    history -a
+    history -c
+    history -r
+}
+
+safe_append_prompt_command share_and_log_history
 
 # os specific
 if [[ "$OSTYPE" == "darwin"* ]]; then
