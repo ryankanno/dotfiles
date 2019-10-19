@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-
 # i create a lot of tar backups before i do things :)
+
 function backup() {
     if [ -z "$1" ]; then
         echo "Usage: backup DIRECTORY"
@@ -167,10 +167,6 @@ function pyserver() {
     local port="${1:-8000}"
     open "http://localhost:${port}/"
     python -m http.server "$port"
-}
-
-function python() {
-    test -z "$1" && ipython || command python "$@"
 }
 
 # scan local network
