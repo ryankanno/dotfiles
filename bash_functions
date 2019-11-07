@@ -23,6 +23,10 @@ function bak() {
     cp $1 $1_$(date +%Y%m%d-%H%M%S)
 }
 
+function btc() {
+    echo "1 BTC = $(curl -s https://api.coindesk.com/v1/bpi/currentprice/usd.json | grep -o 'rate":"[^"]*' | cut -d\" -f3) USD"
+}
+
 function calc() {
     echo "$*" | bc;
 }
