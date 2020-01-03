@@ -18,15 +18,21 @@ export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
 export FZF_ALT_C_COMMAND="bfs -type d -nohidden"
 bind -x '"\C-p": nvim $(fzf);'
 
+# anyenv
 if [[ -n $(which anyenv) ]]; then
     eval "$(anyenv init -)"
 fi
 
+# fasd
+if [[ -n $(which fasd) ]]; then
+    eval "$(fasd --init auto)"
+fi
+
+# pyenv
+[[ -f "${HOME}/.anyenv/envs/nodenv/.nodenvrc" ]] && include "$HOME/.anyenv/envs/nodenv/.nodenvrc"
+
 # pyenv
 [[ -f "${HOME}/.anyenv/envs/pyenv/.pyenvrc" ]] && include "$HOME/.anyenv/envs/pyenv/.pyenvrc"
-
-# pyenv-virtualenv
-eval "$(pyenv virtualenv-init -)"
 
 # rbenv
 [[ -f "${HOME}/.anyenv/envs/rbenv/.rbenvrc" ]] && include "$HOME/.anyenv/envs/rbenv/.rbenvrc"
@@ -85,16 +91,13 @@ safe_append_prompt_command share_and_log_history
 
 # os specific
 if [[ "$OSTYPE" == "darwin"* ]]; then
-    export VISUAL="mvim"
+    export VISUAL="nvim"
     export EDITOR="$VISUAL"
     export GIT_EDITOR="$VISUAL -f"
 fi
 
 # android
 export ANDROID_HVPROTO=ddm
-
-# teamocil
-complete -W "$(teamocil --list)" teamocil
 
 # tmuxp
 if [[ -n $(which tmuxp) ]]; then
