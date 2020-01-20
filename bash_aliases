@@ -20,6 +20,9 @@ alias grep='grep --color=auto'
 alias egrep='egrep --color=auto'
 alias fgrep='fgrep --color=auto'
 
+# stats
+alias t20="history | awk '{print \$4}' | sort | uniq -c | sort -n | tail -n20 | sort -r"
+
 # docker
 
 # print docker aliases
