@@ -101,6 +101,10 @@ function fzf_log() {
     git showtool $hash
 }
 
+function keel() {
+    sudo kill -9 $(ps ax | grep "$1" | grep -v grep | awk '{print $1}')
+}
+
 function lcm() {
     local last_commit
     last_commit=$(git log -1 --format="%H")
