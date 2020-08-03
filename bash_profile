@@ -8,6 +8,40 @@
 # Enable tracing
 # set -x
 
+function include() { [[ -f "$1" ]] && source "$1"; }
+
+# macports
+export PATH="/opt/local/bin:/opt/local/sbin:/usr/local/sbin:$PATH"
+
+# cargo
+export PATH="$HOME/.cargo/bin:$PATH"
+
+# poetry
+export PATH="$HOME/.poetry/bin:$PATH"
+
+# anyenv
+if [[ -n $(which anyenv) ]]; then
+    eval "$(anyenv init -)"
+fi
+
+# fasd
+if [[ -n $(which fasd) ]]; then
+    eval "$(fasd --init auto)"
+fi
+
+# pyenv
+[[ -f "${HOME}/.anyenv/envs/nodenv/.nodenvrc" ]] && include "$HOME/.anyenv/envs/nodenv/.nodenvrc"
+
+# pyenv
+[[ -f "${HOME}/.anyenv/envs/pyenv/.pyenvrc" ]] && include "$HOME/.anyenv/envs/pyenv/.pyenvrc"
+
+# rbenv
+[[ -f "${HOME}/.anyenv/envs/rbenv/.rbenvrc" ]] && include "$HOME/.anyenv/envs/rbenv/.rbenvrc"
+
+# bashmarks
+[[ -f "${HOME}/.local/bin/bashmarks.sh" ]] && source "${HOME}/.local/bin/bashmarks.sh"
+
+
 if [ -f $HOME/.bashrc ]; then
     source $HOME/.bashrc
 fi

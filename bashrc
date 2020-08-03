@@ -1,7 +1,3 @@
-function include() { [[ -f "$1" ]] && source "$1"; }
-
-export PATH=/opt/local/bin:/opt/local/sbin:/usr/local/sbin:$HOME/.poetry/bin:$PATH
-
 # bash-it
 export BASH_IT=$HOME/.bash_it
 export BASH_IT_THEME='hawaii50'
@@ -13,32 +9,11 @@ source $BASH_IT/bash_it.sh
 
 # fzf
 [[ -f "${HOME}/.fzf.bash" ]] && source "${HOME}/.fzf.bash"
+
 export FZF_DEFAULT_COMMAND='rg --files --no-ignore --hidden --follow -g "!{.git,node_modules}/*" 2> /dev/null'
 export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
 export FZF_ALT_C_COMMAND="bfs -type d -nohidden"
 bind -x '"\C-p": nvim $(fzf);'
-
-# anyenv
-if [[ -n $(which anyenv) ]]; then
-    eval "$(anyenv init -)"
-fi
-
-# fasd
-if [[ -n $(which fasd) ]]; then
-    eval "$(fasd --init auto)"
-fi
-
-# pyenv
-[[ -f "${HOME}/.anyenv/envs/nodenv/.nodenvrc" ]] && include "$HOME/.anyenv/envs/nodenv/.nodenvrc"
-
-# pyenv
-[[ -f "${HOME}/.anyenv/envs/pyenv/.pyenvrc" ]] && include "$HOME/.anyenv/envs/pyenv/.pyenvrc"
-
-# rbenv
-[[ -f "${HOME}/.anyenv/envs/rbenv/.rbenvrc" ]] && include "$HOME/.anyenv/envs/rbenv/.rbenvrc"
-
-# bashmarks
-[[ -f "${HOME}/.local/bin/bashmarks.sh" ]] && source "${HOME}/.local/bin/bashmarks.sh"
 
 # grep
 export GREP_OPTIONS='--color=auto'
@@ -120,3 +95,4 @@ export PATH=$PATH:$GOBIN
 
 # PATH fix - removes duplicates, preserves the ordering of paths, and doesn't add a colon at the end.
 export PATH="$(echo $PATH | perl -e 'print join(":", grep { not $seen{$_}++ } split(/:/, scalar <>))')"
+function gi() { curl -sL https://www.toptal.com/developers/gitignore/api/$@ ;}
