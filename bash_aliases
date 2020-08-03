@@ -92,7 +92,10 @@ alias dkshlatest='dkexshc $(docker ps -l -q)'
 alias dks='docker stats --no-stream'
 
 # stop all containers
-alias dkstop='docker stop $(docker ps -a -q)'
+alias dkstopall='docker stop $(docker ps -a -q)'
+
+# stop all containers by name
+dkstopit() { docker stop $(docker ps -aqf "ancestor=$1"); }
 
 # exec command ($2) in container by id ($1)
 dkexe() { docker exec -it $1 $2; }
