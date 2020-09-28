@@ -29,7 +29,7 @@ if [[ -n $(which fasd) ]]; then
     eval "$(fasd --init auto)"
 fi
 
-# pyenv
+# nodenv
 [[ -f "${HOME}/.anyenv/envs/nodenv/.nodenvrc" ]] && include "$HOME/.anyenv/envs/nodenv/.nodenvrc"
 
 # pyenv
@@ -38,10 +38,12 @@ fi
 # rbenv
 [[ -f "${HOME}/.anyenv/envs/rbenv/.rbenvrc" ]] && include "$HOME/.anyenv/envs/rbenv/.rbenvrc"
 
-# bashmarks
-[[ -f "${HOME}/.local/bin/bashmarks.sh" ]] && source "${HOME}/.local/bin/bashmarks.sh"
-
 
 if [ -f $HOME/.bashrc ]; then
     source $HOME/.bashrc
+fi
+
+# always just bounce into tmux
+if command -v tmux &> /dev/null && [ -z "$TMUX" ]; then
+    tmux attach -t default || tmux new -s default
 fi
