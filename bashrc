@@ -1,3 +1,6 @@
+# bashmarks
+[[ -f "${HOME}/.local/bin/bashmarks.sh" ]] && source "${HOME}/.local/bin/bashmarks.sh"
+
 # bash-it
 export BASH_IT=$HOME/.bash_it
 export BASH_IT_THEME='hawaii50'
