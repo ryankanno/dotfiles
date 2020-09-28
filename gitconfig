@@ -34,6 +34,12 @@
     fl = log -u
 
     prior-hash = "!ph() { git log --pretty=format:'%h' -1 --skip=$1 $2; }; ph"
+
+    # today
+    today = "log --since=midnight"
+
+    # per-day
+    per-day = "!pd() { git log --date=short --pretty=format:%ad | sort | uniq -c; }; pd"
 # }}}
 
 # commit {{{
