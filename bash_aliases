@@ -3,12 +3,6 @@ alias ..='cd ..'
 alias ...='cd ../..'
 alias ....='cd ../../../'
 
-# short
-alias c='clear'
-alias f='find'
-alias ll='ls -l'
-alias m='man'
-
 # network
 alias ip="dig +short myip.opendns.com @resolver1.opendns.com"
 
@@ -137,15 +131,6 @@ alias dry-rsync-sync="${rsync_cmd} --update --delete --dry-run"
 
 unset rsync_cmd
 
-# vagrant
-alias v='vagrant'
-alias vd='vagrant destroy'
-alias vdf='vagrant destroy --force'
-alias vh='vagrant halt'
-alias vp='vagrant provision'
-alias vssh='vagrant ssh'
-alias vs='vagrant status'
-alias vu='vagrant up'
-
-# macvim
-alias macvim='open -a MacVim.app'
+# fasd
+alias j='fasd_cd -d'
+alias v='f -e nvim'

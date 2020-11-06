@@ -24,11 +24,6 @@ if [[ -n $(which anyenv) ]]; then
     eval "$(anyenv init -)"
 fi
 
-# fasd
-if [[ -n $(which fasd) ]]; then
-    eval "$(fasd --init auto)"
-fi
-
 # nodenv
 [[ -f "${HOME}/.anyenv/envs/nodenv/.nodenvrc" ]] && include "$HOME/.anyenv/envs/nodenv/.nodenvrc"
 

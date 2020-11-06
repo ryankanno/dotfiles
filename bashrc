@@ -1,5 +1,7 @@
-# bashmarks
-[[ -f "${HOME}/.local/bin/bashmarks.sh" ]] && source "${HOME}/.local/bin/bashmarks.sh"
+# fasd
+if [[ -n $(which fasd) ]]; then
+    eval "$(fasd --init auto)"
+fi
 
 # bash-it
 export BASH_IT=$HOME/.bash_it
