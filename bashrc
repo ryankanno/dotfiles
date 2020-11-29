@@ -101,3 +101,5 @@ export PATH=$PATH:$GOBIN
 # PATH fix - removes duplicates, preserves the ordering of paths, and doesn't add a colon at the end.
 export PATH="$(echo $PATH | perl -e 'print join(":", grep { not $seen{$_}++ } split(/:/, scalar <>))')"
 function gi() { curl -sL https://www.toptal.com/developers/gitignore/api/$@ ;}
+
+[ -f ~/.fzf.bash ] && source ~/.fzf.bash
