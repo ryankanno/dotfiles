@@ -175,3 +175,5 @@
 
 [mergetool]
 	bc3 = trustExitCode
+[bash-it]
+	hide-status = 0
