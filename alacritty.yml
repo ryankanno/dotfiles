@@ -1,0 +1,153 @@
+# Configuration for Alacritty, the GPU enhanced terminal emulator.
+
+env:
+  TERM: xterm-256color
+  WINIT_X11_SCALE_FACTOR: "1.0"
+
+window:
+  dimensions:
+    columns: 0
+    lines: 0
+
+  padding:
+    x: 2
+    y: 2
+
+  dynamic_padding: false
+  decorations: buttonless
+
+scrolling:
+  history: 50000
+
+  multiplier: 3
+
+font:
+  normal:
+    family: RobotoMono Nerd Font
+    style: Regular
+
+  bold:
+    family: Source Code Pro
+    style: Bold
+
+  italic:
+    family: Source Code Pro
+    style: Italic
+
+  size: 14.0
+
+  offset:
+    x: 0
+    y: 0
+
+  glyph_offset:
+    x: 0
+    y: 0
+
+  use_thin_strokes: true
+
+  debug:
+    persistent_logging: false
+
+draw_bold_text_with_bright_colors: true
+
+bell:
+  animation: EaseOutExpo
+  duration: 100
+  color: "0xffffff"
+
+background_opacity: 0.9
+
+selection:
+  semantic_escape_chars: ',│`|:"'' ()[]{}<>'
+
+  save_to_clipboard: false
+
+window.dynamic_title: true
+
+cursor:
+  style: Block
+  unfocused_hollow: true
+
+live_config_reload: true
+
+shell:
+  program: /bin/bash
+  args:
+    - --login
+
+alt_send_esc: true
+
+schemes:
+  monokai_dark: &dark
+    primary:
+      background: '#272822'
+      foreground: '#F8F8F2'
+    normal:
+      black:   '#272822'
+      red:     '#F92672'
+      green:   '#A6E22E'
+      yellow:  '#F4BF75'
+      blue:    '#66D9EF'
+      magenta: '#AE81FF'
+      cyan:    '#A1EFE4'
+      white:   '#F8F8F2'
+    bright:
+      black:   '#75715E'
+      red:     '#F92672'
+      green:   '#A6E22E'
+      yellow:  '#F4BF75'
+      blue:    '#66D9EF'
+      magenta: '#AE81FF'
+      cyan:    '#A1EFE4'
+      white:   '#F9F8F5'
+  monokai_pro: &light
+    primary:
+      background: '#2D2A2E'
+      foreground: '#FCFCFA'
+    normal:
+      black:   '#403E41'
+      red:     '#FF6188'
+      green:   '#A9DC76'
+      yellow:  '#FFD866'
+      blue:    '#FC9867'
+      magenta: '#AB9DF2'
+      cyan:    '#78DCE8'
+      white:   '#FCFCFA'
+    bright:
+      black:   '#727072'
+      red:     '#FF6188'
+      green:   '#A9DC76'
+      yellow:  '#FFD866'
+      blue:    '#FC9867'
+      magenta: '#AB9DF2'
+      cyan:    '#78DCE8'
+      white:   '#FCFCFA'
+  monokai_soda: &soda
+    primary:
+      background: '#1a1a1a'
+      foreground: '#c4c5b5'
+
+    # Normal colors
+    normal:
+      black:   '#1a1a1a'
+      red:     '#f4005f'
+      green:   '#98e024'
+      yellow:  '#fa8419'
+      blue:    '#9d65ff'
+      magenta: '#f4005f'
+      cyan:    '#58d1eb'
+      white:   '#c4c5b5'
+
+    # Bright colors
+    bright:
+      red:     '#f4005f'
+      black:   '#625e4c'
+      green:   '#98e024'
+      yellow:  '#e0d561'
+      blue:    '#9d65ff'
+      magenta: '#f4005f'
+      cyan:    '#58d1eb'
+      white:   '#f6f6ef'
+
+colors: *soda
