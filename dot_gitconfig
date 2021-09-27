@@ -127,6 +127,9 @@
 [core]
     excludesfile = ~/.gitignore
 
+[init]
+    defaultBranch = main
+
 # push/pull/diff/options {{{
 [push]
     default = upstream
