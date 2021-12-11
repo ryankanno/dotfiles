@@ -16,6 +16,9 @@ function include() { [[ -f "$1" ]] && source "$1"; }
 # macports
 export PATH="/opt/local/bin:/opt/local/sbin:/usr/local/sbin:$PATH"
 
+# brew
+export PATH="/opt/homebrew/bin:$PATH"
+
 # cargo
 export PATH="$HOME/.cargo/bin:$PATH"
 
