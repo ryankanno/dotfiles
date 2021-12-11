@@ -8,6 +8,9 @@
 # Enable tracing
 # set -x
 
+# non-interactive
+[[ $- == *i* ]] || return
+
 function include() { [[ -f "$1" ]] && source "$1"; }
 
 # macports

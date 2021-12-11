@@ -1,3 +1,6 @@
+# non-interactive
+[[ $- == *i* ]] || return
+
 # fasd
 if [[ -n $(which fasd) ]]; then
     eval "$(fasd --init auto)"
