@@ -18,11 +18,6 @@ source $BASH_IT/bash_it.sh
 # fzf
 [[ -f "${HOME}/.fzf.bash" ]] && source "${HOME}/.fzf.bash"
 
-export FZF_DEFAULT_COMMAND='rg --files --no-ignore --hidden --follow -g "!{.git,node_modules,.*cache,__*cache__}/*" 2> /dev/null'
-export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
-export FZF_ALT_C_COMMAND="bfs -type d -nohidden"
-bind -x '"\C-p": nvim $(fzf);'
-
 # grep
 export GREP_OPTIONS='--color=auto'
 
