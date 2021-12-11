@@ -27,11 +27,11 @@ font:
     style: Regular
 
   bold:
-    family: Source Code Pro
+    family: SauceCodePro Nerd Font
     style: Bold
 
   italic:
-    family: Source Code Pro
+    family: SauceCodePro Nerd Font
     style: Italic
 
   size: 14.0
