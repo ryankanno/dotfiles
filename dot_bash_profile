@@ -32,13 +32,13 @@ if [[ -n $(which anyenv) ]]; then
 fi
 
 # nodenv
-[[ -f "${HOME}/.anyenv/envs/nodenv/.nodenvrc" ]] && include "$HOME/.anyenv/envs/nodenv/.nodenvrc"
+include "$HOME/.anyenv/envs/nodenv/.nodenvrc"
 
 # pyenv
-[[ -f "${HOME}/.anyenv/envs/pyenv/.pyenvrc" ]] && include "$HOME/.anyenv/envs/pyenv/.pyenvrc"
+include "$HOME/.anyenv/envs/pyenv/.pyenvrc"
 
 # rbenv
-[[ -f "${HOME}/.anyenv/envs/rbenv/.rbenvrc" ]] && include "$HOME/.anyenv/envs/rbenv/.rbenvrc"
+include "$HOME/.anyenv/envs/rbenv/.rbenvrc"
 
 
 if [ -f $HOME/.bashrc ]; then
