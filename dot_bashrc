@@ -1,5 +1,16 @@
-# non-interactive
-[[ $- == *i* ]] || return
+# Enable tracing
+# set -x
+#
+function include() { [[ -f "$1" ]] && source "$1"; }
+
+# nodenv
+include "$HOME/.anyenv/envs/nodenv/.nodenvrc"
+
+# pyenv
+include "$HOME/.anyenv/envs/pyenv/.pyenvrc"
+
+# rbenv
+include "$HOME/.anyenv/envs/rbenv/.rbenvrc"
 
 # fasd
 if [[ -n $(which fasd) ]]; then
@@ -10,13 +21,14 @@ fi
 export BASH_IT=$HOME/.bash_it
 export BASH_IT_THEME='hawaii50'
 export TODO="t"
-source $BASH_IT/bash_it.sh
+
+include "$BASH_IT/bash_it.sh"
 
 # commacd
-[[ -f "${HOME}/.commacd.bash" ]] && source "${HOME}/.commacd.bash"
+include "${HOME}/.commacd.bash"
 
 # fzf
-[[ -f "${HOME}/.fzf.bash" ]] && source "${HOME}/.fzf.bash"
+include "${HOME}/.fzf.bash"
 
 # grep
 export GREP_OPTIONS='--color=auto'
@@ -27,9 +39,6 @@ unset MAILCHECK
 # inputrc
 [[ -f "${HOME}/.inputrc" ]] && export INPUTRC="${HOME}/.inputrc"
 
-# ssh-agent -> http://mah.everybody.org/docs/ssh
-SSH_ENV="${HOME}/.ssh/environment"
-
 function start_agent {
      echo "Initialising new SSH agent..."
      /usr/bin/ssh-agent | sed 's/^echo/#echo/' > "${SSH_ENV}"
@@ -38,12 +47,17 @@ function start_agent {
      . "${SSH_ENV}" > /dev/null
 }
 
-if [ -f "${SSH_ENV}" ]; then
-     source "${SSH_ENV}" > /dev/null
-     ps -ef | grep ${SSH_AGENT_PID} | grep ssh-agent$ > /dev/null || { start_agent; }
-else
-     start_agent;
-fi
+case $- in *i*)
+    # ssh-agent -> http://mah.everybody.org/docs/ssh
+    SSH_ENV="${HOME}/.ssh/environment"
+
+    if [ -f "${SSH_ENV}" ]; then
+         source "${SSH_ENV}" > /dev/null
+         ps -ef | grep ${SSH_AGENT_PID} | grep ssh-agent$ > /dev/null || { start_agent; }
+    else
+         start_agent;
+    fi
+esac
 
 # vi mode
 set -o vi
@@ -83,7 +97,9 @@ if [[ -n $(which tmuxp) ]]; then
 fi
 
 # direnv
-eval "$(direnv hook bash)"
+if [[ -n $(which direnv) ]]; then
+    eval "$(direnv hook bash)"
+fi
 
 # golang
 export GOPATH=~/golibs
@@ -98,6 +114,3 @@ export PATH=$PATH:$GOBIN
 
 # PATH fix - removes duplicates, preserves the ordering of paths, and doesn't add a colon at the end.
 export PATH="$(echo $PATH | perl -e 'print join(":", grep { not $seen{$_}++ } split(/:/, scalar <>))')"
-function gi() { curl -sL https://www.toptal.com/developers/gitignore/api/$@ ;}
-
-[ -f ~/.fzf.bash ] && source ~/.fzf.bash

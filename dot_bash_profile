@@ -8,11 +8,6 @@
 # Enable tracing
 # set -x
 
-# non-interactive
-[[ $- == *i* ]] || return
-
-function include() { [[ -f "$1" ]] && source "$1"; }
-
 # macports
 export PATH="/opt/local/bin:/opt/local/sbin:/usr/local/sbin:$PATH"
 
@@ -30,16 +25,6 @@ export PATH="$HOME/.anyenv/bin:$PATH"
 if [[ -n $(which anyenv) ]]; then
     eval "$(anyenv init -)"
 fi
-
-# nodenv
-include "$HOME/.anyenv/envs/nodenv/.nodenvrc"
-
-# pyenv
-include "$HOME/.anyenv/envs/pyenv/.pyenvrc"
-
-# rbenv
-include "$HOME/.anyenv/envs/rbenv/.rbenvrc"
-
 
 if [ -f $HOME/.bashrc ]; then
     source $HOME/.bashrc

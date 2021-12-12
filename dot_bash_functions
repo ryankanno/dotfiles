@@ -110,6 +110,10 @@ function fzf_log() {
     git showtool $hash
 }
 
+function gi() {
+    curl -sL https://www.toptal.com/developers/gitignore/api/$@
+}
+
 function keel() {
     sudo kill -9 $(ps ax | grep "$1" | grep -v grep | awk '{print $1}')
 }
