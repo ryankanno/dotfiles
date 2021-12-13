@@ -190,6 +190,18 @@ function pyserver() {
     python -m http.server "$port"
 }
 
+# rg + rglogs
+function rg() {
+    if [ -t 1 ]; then
+        command rg --pretty "$@" \
+            | less --no-init --quit-if-one-screen --RAW-CONTROL-CHARS
+    else
+        command rg "$@"
+    fi
+}
+
+function rglogs() { rg "$@" ~/.logs/*; }
+
 # scan local network
 function scan() {
     if [ -z "$1" ]; then
