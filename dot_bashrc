@@ -1,6 +1,10 @@
 # Enable tracing
 # set -x
-#
+
+# disable annoying messages
+export BASH_SILENCE_DEPRECATION_WARNING=1
+
+# helper include function
 function include() { [[ -f "$1" ]] && source "$1"; }
 
 # nodenv
@@ -86,11 +90,6 @@ fi
 
 # android
 export ANDROID_HVPROTO=ddm
-
-# tmuxp
-if [[ -n $(which tmuxp) ]]; then
-    eval "$(_TMUXP_COMPLETE=source tmuxp)"
-fi
 
 # direnv
 if [[ -n $(which direnv) ]]; then
