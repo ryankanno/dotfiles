@@ -39,23 +39,19 @@ unset MAILCHECK
 # inputrc
 [[ -f "${HOME}/.inputrc" ]] && export INPUTRC="${HOME}/.inputrc"
 
-function start_agent {
-     echo "Initialising new SSH agent..."
-     /usr/bin/ssh-agent | sed 's/^echo/#echo/' > "${SSH_ENV}"
-     echo succeeded
-     chmod 600 "${SSH_ENV}"
-     . "${SSH_ENV}" > /dev/null
-}
-
+# ssh-agent
 case $- in *i*)
-    # ssh-agent -> http://mah.everybody.org/docs/ssh
     SSH_ENV="${HOME}/.ssh/environment"
+    ssh-add -l &>/dev/null
+    if [ "$?" == 2 ]; then
+        test -r "${SSH_ENV}" && \
+            eval "$(<"${SSH_ENV}")" >/dev/null
 
-    if [ -f "${SSH_ENV}" ]; then
-         source "${SSH_ENV}" > /dev/null
-         ps -ef | grep ${SSH_AGENT_PID} | grep ssh-agent$ > /dev/null || { start_agent; }
-    else
-         start_agent;
+        ssh-add -l &>/dev/null
+        if [ "$?" == 2 ]; then
+            (umask 066; ssh-agent > "${SSH_ENV}")
+            eval "$(<"${SSH_ENV}")" >/dev/null
+        fi
     fi
 esac
 
