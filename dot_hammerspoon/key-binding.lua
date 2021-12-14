@@ -14,6 +14,21 @@ local function windowBind(hyper, keyFuncTable)
   end
 end
 
+local currentInput = 18
+local function toggleInput()
+  if currentInput == 17 then
+    currentInput = 18
+  else
+    currentInput = 17
+  end
+  hs.execute('/usr/local/bin/m1ddc display 2 set input ' .. tostring(currentInput))
+end
+
+-- * Set monitor input
+windowBind({"ctrl", "shift"}, {
+  escape = toggleInput
+})
+
 -- * Set window position on current display
 windowBind({"ctrl", "cmd"}, {
   m = wm.maximizeWindow,    -- ⌃⌘ + M
