@@ -262,7 +262,7 @@ function tmk() {
 }
 
 function used() {
-    du -hs * 2>/dev/null | gsort -hr | head -$1
+    du -sch .[!.]* * 2>/dev/null | gsort -hr | head -$1
 }
 
 function uuid() {
