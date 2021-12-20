@@ -9,6 +9,7 @@
     pu = pull
     r = reset
     st = status --ignore-submodules=dirty
+    sti = status --ignored
     w  = whatchanged --reverse
 # }}}
 
