@@ -6,10 +6,9 @@ module.exports = {
   defaultBrowser: "Firefox",
   rewrite: [
     {
-      match: ({urlString}) => {
+      match: ({urlString, opener}) => {
         const matches = urlString.match(regex);
-        finicky.log(JSON.stringify(matches, null, 2))
-        return matches && matches[2];
+        return matches && matches[2] && opener.bundleId !== "com.tapbots.Tweetbot3Mac";
       },
       url: ({ urlString }) => {
         const [_, user, statusId] = urlString.match(regex);
@@ -21,6 +20,6 @@ module.exports = {
     {
       match: ({ url }) => url.protocol === "tweetbot",
       browser: "com.tapbots.Tweetbot3Mac"
-    },
+    }
   ]
 };
