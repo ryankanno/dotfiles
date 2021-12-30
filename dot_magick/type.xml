@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<typemap>
+  <type format="otf" name="NotoSansJP" glyphs="/Users/ryankanno/Library/Fonts/NotoSansJP-Regular.otf" />
+  <type format="otf" name="NotoSansJP-Medium" glyphs="/Users/ryankanno/Library/Fonts/NotoSansJP-Medium.otf" />
+  <type format="otf" name="NotoSansJP-Light" glyphs="/Users/ryankanno/Library/Fonts/NotoSansJP-Light.otf" />
+  <type format="otf" name="NotoSansJP-Black" glyphs="/Users/ryankanno/Library/Fonts/NotoSansJP-Black.otf" />
+  <type format="otf" name="NotoSansJP-Bold" glyphs="/Users/ryankanno/Library/Fonts/NotoSansJP-Bold.otf" />
+  <type format="otf" name="NotoSansJP-Thin" glyphs="/Users/ryankanno/Library/Fonts/NotoSansJP-Thin.otf" />
+</typemap>
