@@ -22,6 +22,10 @@ module.exports = {
       browser: "com.tapbots.Tweetbot3Mac"
     },
     {
+      match: "open.spotify.com/*",
+      browser: "Spotify"
+    },
+    {
       match: finicky.matchHostnames(["meet.jit.si", "meet.google.com", "hangouts.google.com"]),
       browser: "Google Chrome"
     },
