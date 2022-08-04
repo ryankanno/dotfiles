@@ -140,14 +140,10 @@
 
 [diff]
     mnemonicprefix = true
-	tool = bcomp
+	tool = bc
 
 [difftool]
     prompt = false
-
-[difftool "bcomp"]
-    trustExitCode = true
-    cmd = "/usr/local/bin/bcomp" \"$LOCAL\" \"$REMOTE\"
 
 [branch]
     autosetuprebase = always
@@ -160,14 +156,13 @@
     viewer = man
 
 [merge]
-	tool = bcomp
+	tool = bc
 
 [mergetool]
     prompt = false
 
-[mergetool "bcomp"]
+[mergetool "bc"]
     trustExitCode = true
-    cmd = "/usr/local/bin/bcomp" \"$LOCAL\" \"$REMOTE\" \"$BASE\" \"$MERGED\"
 
 [rebase]
     autosquash = true
