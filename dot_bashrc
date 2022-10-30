@@ -34,9 +34,6 @@ include "${HOME}/.commacd.bash"
 # fzf
 include "${HOME}/.fzf.bash"
 
-# grep
-export GREP_OPTIONS='--color=auto'
-
 # remove annoying you got mail
 unset MAILCHECK
 

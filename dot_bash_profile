@@ -7,12 +7,14 @@
 
 # Enable tracing
 # set -x
+#
+if [[ "$OSTYPE" == "darwin"* ]]; then
+  # macports
+  export PATH="/opt/local/bin:/opt/local/sbin:/usr/local/sbin:$PATH"
 
-# macports
-export PATH="/opt/local/bin:/opt/local/sbin:/usr/local/sbin:$PATH"
-
-# brew
-export PATH="/opt/homebrew/bin:$PATH"
+  # brew
+  export PATH="/opt/homebrew/bin:$PATH"
+fi
 
 # cargo
 export PATH="$HOME/.cargo/bin:$PATH"
