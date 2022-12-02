@@ -39,9 +39,23 @@ conky.config = {
 
 conky.text = [[
 
+#========================= TIME ================================
+${alignc}${font RobotoMono Nerd Font:size=64}${color3}${time %R}${font}
+${alignc}${font RobotoMono Nerd Font:size=16}${color3}${execi 300 date +"%x"}${color} ${time %A}${font}
+#===============================================================
+${stippled_hr}
+#======================== WEATHER ==============================
+${color orange}Weather${color}
+${texeci 900 curl -s wttr.in/Tokyo?format=%l:+%C+%t+%w+%p}
+${texeci 900 curl -s wttr.in/New%20York?format=%l:+%C+%t+%w+%p}
+${texeci 900 curl -s wttr.in/Honolulu?format=%l:+%C+%t+%w+%p}
+#===============================================================
+${stippled_hr}
+#======================= MACHINE ==============================
 ${color orange}Hostname: ${color}${nodename}
 ${color orange}Kernel:   ${color}${sysname} ${kernel} on ${machine}
 ${color orange}Uptime:   ${color}${uptime}
+#===============================================================
 ${hr}
 #========================= CPU =================================
 ${color orange}CPU:${color} ${freq_g} GHz
