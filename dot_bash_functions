@@ -200,7 +200,7 @@ function rg() {
     fi
 }
 
-function rglogs() { rg "$@" ~/.logs/*; }
+function rglogs() { rg --sortr created "$@" ~/.logs/; }
 
 # scan local network
 function scan() {
