@@ -130,7 +130,3 @@ alias dry-rsync-update="${rsync_cmd} --update --dry-run"
 alias dry-rsync-sync="${rsync_cmd} --update --delete --dry-run"
 
 unset rsync_cmd
-
-# fasd
-alias j='fasd_cd -d'
-alias v='f -e nvim'

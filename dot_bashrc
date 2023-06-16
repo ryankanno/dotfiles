@@ -16,9 +16,9 @@ include "$HOME/.anyenv/envs/pyenv/.pyenvrc"
 # rbenv
 include "$HOME/.anyenv/envs/rbenv/.rbenvrc"
 
-# fasd
-if [[ -n $(which fasd) ]]; then
-    eval "$(fasd --init auto)"
+# zoxide
+if [[ -n $(which zoxide) ]]; then
+    eval "$(zoxide init --cmd j bash)"
 fi
 
 # bash-it
@@ -27,9 +27,6 @@ export BASH_IT_THEME='hawaii50'
 export TODO="t"
 
 include "$BASH_IT/bash_it.sh"
-
-# commacd
-include "${HOME}/.commacd.bash"
 
 # fzf
 include "${HOME}/.fzf.bash"
@@ -87,11 +84,6 @@ fi
 
 # android
 export ANDROID_HVPROTO=ddm
-
-# direnv
-if [[ -n $(which direnv) ]]; then
-    eval "$(direnv hook bash)"
-fi
 
 # golang
 export GOPATH=~/golibs
