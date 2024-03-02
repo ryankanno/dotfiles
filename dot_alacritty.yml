@@ -44,8 +44,6 @@ font:
     x: 0
     y: 0
 
-  use_thin_strokes: true
-
   debug:
     persistent_logging: false
 
@@ -56,13 +54,12 @@ bell:
   duration: 100
   color: "0xffffff"
 
-background_opacity: 0.9
-
 selection:
   semantic_escape_chars: ',│`|:"'' ()[]{}<>'
 
   save_to_clipboard: false
 
+window.opacity: 0.8
 window.dynamic_title: true
 
 cursor:
@@ -75,8 +72,6 @@ shell:
   program: /bin/bash
   args:
     - --login
-
-alt_send_esc: true
 
 schemes:
   monokai_dark: &dark
