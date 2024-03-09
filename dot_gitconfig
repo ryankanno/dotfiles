@@ -22,6 +22,9 @@
     # list aliases
     la = "!git config -l | grep alias | cut -c 7-"
 
+    # generate comment
+    com = "!git diff --cached | sgpt 'Write concise, informative commit messages: Start with a summary in imperative mood, explain the 'why' behind changes, keep the summary under 50 characters, use bullet points for multiple changes, and reference related issues or tickets. What you write will be passed to git commit -m \"[message]\"'"
+
 # log commands {{{
     # https://stackoverflow.com/a/45757255
     l4date = "!f() { git log --pretty='format:%C(yellow)%h %G? %ad%Cred%d %Creset%s%C(cyan) [%cn]' --decorate --after=\"$1 0:00\" --before=\"$1 23:59\" --author \"`git config user.name`\"; }; f"
@@ -176,3 +179,7 @@
 	bc3 = trustExitCode
 [bash-it]
 	hide-status = 0
+[gpg]
+	format = ssh
+[commit]
+	gpgsign = true
