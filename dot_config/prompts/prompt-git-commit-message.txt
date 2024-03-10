@@ -1,0 +1,23 @@
+Create a Git commit message in the Conventional Commit format.
+
+The first line should be a type, followed by a colon, and then a short 72 charater description of the change.
+The body of the commit message should be a bulleted list of the reasons why the changes were made.
+
+Here are example Git commit messages:
+
+```
+feat: add new login page
+
+- added login page so users can access system
+- used tailwind + alpinejs
+```
+```
+chore: updated tailwind dependency
+
+- updated tailwind to version 2.0.2
+```
+```
+docs: add section about file upload limits
+
+- internal use only
+```
