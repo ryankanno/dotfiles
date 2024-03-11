@@ -1,0 +1,56 @@
+#!/bin/bash
+
+if [ ! -z "$SKIP_LLM_GITHOOK" ]; then
+  exit 0
+fi
+
+# ANSI color codes
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Function to display a spinning animation
+spin_animation() {
+    spinner=("⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏")
+    while true; do
+        for i in "${spinner[@]}"; do
+            tput civis # Hide the cursor
+            tput el1 # Clear the line from the cursor to the beginning
+            printf "\r${YELLOW}%s${NC} Generating LLM commit message..." "$i"
+
+            sleep 0.1
+            tput cub 32 # Move the cursor back 32 columns
+        done
+    done
+}
+
+# Check if the commit is a merge commit
+if [ -n "$2" ]; then
+    exit 0
+fi
+
+# Start the spinning animation
+spin_animation &
+spin_pid=$!
+
+# Generate the commit message using git diff and llm
+commit_msg=$(git diff --cached | llm -s "$(cat ~/.config/prompts/system-prompt-git-commit-message.txt)" "$(cat ~/.config/prompts/prompt-git-commit-message.txt)")
+
+# Stop the spinning animation
+kill $spin_pid
+wait $spin_pid 2>/dev/null
+
+# Move the cursor to the next line and show the cursor
+tput cnorm
+echo
+
+# Display the generated commit message with colors and formatting
+echo "${BLUE}=== Generated Commit Message ===${NC}"
+echo "${GREEN}$commit_msg${NC}"
+echo "${BLUE}=================================${NC}"
+echo
+
+# Write the generated commit message to the commit message file
+echo "$commit_msg" > "$1"

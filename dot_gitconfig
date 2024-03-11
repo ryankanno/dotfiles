@@ -22,9 +22,6 @@
     # list aliases
     la = "!git config -l | grep alias | cut -c 7-"
 
-    # generate comment
-    gpt = "!f() { git diff $1 | llm -s '$(cat ~/.config/prompts/system-prompt-git-commit-message.txt)' '$(cat ~/.config/prompts/prompt-git-commit-message.txt)'; }; f"
-
 # log commands {{{
     # https://stackoverflow.com/a/45757255
     l4date = "!f() { git log --pretty='format:%C(yellow)%h %G? %ad%Cred%d %Creset%s%C(cyan) [%cn]' --decorate --after=\"$1 0:00\" --before=\"$1 23:59\" --author \"`git config user.name`\"; }; f"
