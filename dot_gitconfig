@@ -127,6 +127,8 @@
 
 [core]
     excludesfile = ~/.gitignore
+    hooksPath = ~/.githooks
+    editor = vim
 
 [init]
     defaultBranch = main
