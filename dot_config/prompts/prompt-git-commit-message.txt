@@ -1,4 +1,18 @@
-Create a Git commit message in the Conventional Commit format.
+Write a concise, informative commit message in Conventional Commit format for these changes:
+
+- Review the whole context of the diff carefully to see what effect the change would have on the rest of the code and explain that. Be specific about the effect.
+- Do not guess about intent.
+- The goal of this commit message is that someone familiar with the codebase, but not with these changes would understand why the changes were made and what was changed.
+- The first line should be a short summary of the intent of the changes
+- Remember to mention the files that were changed, and what was changed
+- Keep the summary under 50 characters
+- Use bullet points for multiple changes
+- Reference related issues or tickets, but only if you are 100% sure the ticket numbers are correct.
+- If there are no changes, or the input is blank - then return a blank string
+
+Think carefully about what would be most helpful to someone trying to understand the intent of this commit before you write your commit message. Your commit message will be used as an example to train other team members about the content of a good commit message. 
+
+The format should be:
 
 The first line should be a type, followed by a colon, and then a short 72 charater description of the change.
 The body of the commit message should be a bulleted list of the reasons why the changes were made.
@@ -6,18 +20,17 @@ The body of the commit message should be a bulleted list of the reasons why the 
 Here are example Git commit messages:
 
 ```
-feat: add new login page
+feat: added google analytics to the login page
 
-- added login page so users can access system
-- used tailwind + alpinejs
-```
-```
-chore: updated tailwind dependency
-
-- updated tailwind to version 2.0.2
+- added analytics to be able to predict user behavior, most notably around
+  login form usage
 ```
 ```
 docs: add section about file upload limits
 
-- internal use only
+- added a section about file upload limits to explain the new limits and why
+  they were put in place
+```
+
+What you write will be passed to git commit -m "[message]"
 ```
