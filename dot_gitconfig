@@ -22,6 +22,9 @@
     # list aliases
     la = "!git config -l | grep alias | cut -c 7-"
 
+    # pre-commit
+    pre = "!git diff --cached --name-only --diff-filter=d | xargs pre-commit run --files"
+
 # log commands {{{
     # https://stackoverflow.com/a/45757255
     l4date = "!f() { git log --pretty='format:%C(yellow)%h %G? %ad%Cred%d %Creset%s%C(cyan) [%cn]' --decorate --after=\"$1 0:00\" --before=\"$1 23:59\" --author \"`git config user.name`\"; }; f"
