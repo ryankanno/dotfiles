@@ -28,13 +28,13 @@ if [[ -n $(which anyenv) ]]; then
     eval "$(anyenv init -)"
 fi
 
+if [ -f $HOME/.bashrc ]; then
+    source $HOME/.bashrc
+fi
+
 # atuin
 if [[ -n $(which atuin) ]]; then
     eval "$(atuin init bash)"
-fi
-
-if [ -f $HOME/.bashrc ]; then
-    source $HOME/.bashrc
 fi
 
 # always just bounce into tmux
