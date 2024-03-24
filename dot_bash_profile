@@ -32,11 +32,6 @@ if [ -f $HOME/.bashrc ]; then
     source $HOME/.bashrc
 fi
 
-# atuin
-if [[ -n $(which atuin) ]]; then
-    eval "$(atuin init bash)"
-fi
-
 # always just bounce into tmux
 if command -v tmux &> /dev/null && [ -z "$TMUX" ]; then
     tmux attach -t default || tmux new -s default

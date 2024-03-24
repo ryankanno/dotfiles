@@ -71,6 +71,12 @@ export GOPATH=~/golibs
 export GOBIN=~/golibs/bin
 export PATH=$PATH:$GOBIN
 
+# atuin
+command -v atuin &>/dev/null && eval "$(atuin init bash)"
+
+# direnv
+command -v direnv &>/dev/null && eval "$(direnv hook bash)"
+
 # load all the bash things
 [[ -s "/opt/local/etc/profile.d/bash_completion.sh" ]] && source "/opt/local/etc/profile.d/bash_completion.sh"
 [[ -s "${HOME}/.bash_aliases" ]] && source "${HOME}/.bash_aliases"
