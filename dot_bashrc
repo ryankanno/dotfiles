@@ -17,9 +17,7 @@ include "$HOME/.anyenv/envs/pyenv/.pyenvrc"
 include "$HOME/.anyenv/envs/rbenv/.rbenvrc"
 
 # zoxide
-if [[ -n $(which zoxide) ]]; then
-    eval "$(zoxide init --cmd j bash)"
-fi
+command -v zoxide &>/dev/null && eval "$(zoxide init --cmd j bash)"
 
 # bash-it
 export BASH_IT=$HOME/.bash_it
