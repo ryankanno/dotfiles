@@ -17,4 +17,8 @@ fi
 export FZF_DEFAULT_COMMAND='rg --files --no-ignore --hidden --follow -g "!{.git,.tox,node_modules,.*cache,__*cache__}/*" 2> /dev/null'
 export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
 export FZF_ALT_C_COMMAND="bfs -type d -nohidden"
-bind -x '"\C-p": nvim $(fzf);'
+
+if [ -t 1 ]
+then
+    bind -x '"\C-p": nvim $(fzf);'
+fi
