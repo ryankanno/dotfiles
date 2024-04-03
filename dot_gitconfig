@@ -1,3 +1,9 @@
+[user]
+    name = Ryan
+    editor = vim
+[include]
+    path = .gitconfig.local
+
 [alias]
  # basic {{{
     br = branch
@@ -29,6 +35,7 @@
     # https://stackoverflow.com/a/45757255
     l4date = "!f() { git log --pretty='format:%C(yellow)%h %G? %ad%Cred%d %Creset%s%C(cyan) [%cn]' --decorate --after=\"$1 0:00\" --before=\"$1 23:59\" --author \"`git config user.name`\"; }; f"
     # http://www.jukie.net/bart/blog/pimping-out-git-log
+
     ls = log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit --date=relative
     ll = log --pretty=format:"%C(yellow)%h%Cred%d\\ %Creset%s%Cblue\\ [%cn]" --decorate --numstat
     lc  = "!f() { git ll "$1"^.."$1"; }; f"
@@ -39,11 +46,25 @@
 
     prior-hash = "!ph() { git log --pretty=format:'%h' -1 --skip=$1 $2; }; ph"
 
-    # today
-    today = "log --since=midnight"
-
-    # per-day
+    # days
     per-day = "!pd() { git log --date=short --pretty=format:%ad | sort | uniq -c; }; pd"
+
+    today = log --since=midnight --color --graph \
+        --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(blue)[%an]%Creset' \
+        --abbrev-commit
+
+    yesterday = log --since=yesterday --until=midnight --color --graph \
+        --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(blue)[%an]%Creset' \
+        --abbrev-commit
+
+    # graph
+    graph = log --graph --abbrev-commit --decorate --all \
+        --format=format:'%C(bold blue)%h%C(reset) - %C(bold cyan)%aD%C(dim white) \
+        %an%C(reset) %C(bold green)(%ar)%C(reset)%C(bold yellow)%d%C(reset)%n %C(white)%s%C(reset)'
+
+    history = log --graph --pretty=format:'%C(yellow)%h%Creset \
+        -%C(yellow)%d%Creset %s %Cgreen(%ar) %C(bold blue)<%an>%Creset' \
+        --abbrev-commit --date=short --date-order -n30
 # }}}
 
 # commit {{{
@@ -84,6 +105,21 @@
     sl = stash list
     sa = stash apply
     ss = stash save
+# }}}
+
+# cleanup {{{
+    ls-gone = "!ls_gone() { git fetch -p && git for-each-ref --format '%(refname:short) %(upstream:track)' | awk '$2 == \"[gone]\" {print $1}'; }; ls_gone;"
+    gone = "!gone() { git ls-gone | xargs -n 1 git branch -D; }; gone;"
+# }}}
+
+# stats {{{
+    contributors = shortlog --summary --numbered
+# }}}
+
+# gh {{{
+    checkout-pr = "!f() { gh pr checkout $1 }; f;"
+    fork = !"gh repo fork --remote"
+    pr = !"gh pr create --fill"
 # }}}
 
 [apply]
@@ -171,11 +207,6 @@
 
 [rebase]
     autosquash = true
-
-[user]
-    name = Ryan
-    email = ryankanno@localkinegrinds.com
-    editor = vim
 
 [mergetool]
 	bc3 = trustExitCode
