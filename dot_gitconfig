@@ -112,8 +112,14 @@
     gone = "!gone() { git ls-gone | xargs -n 1 git branch -D; }; gone;"
 # }}}
 
-# stats {{{
+# stats / analytics {{{
     contributors = shortlog --summary --numbered
+    author-count-commit = !git log --format="%aE" $@ | tr "[:upper:]" "[:lower:]" | sort | uniq -c | sort -nr
+    author-count-lines = !git ls-files -z | xargs -0n1 git blame --line-porcelain | grep '^author-mail' | cut -d ' ' -f 2 | tr "[:upper:]" "[:lower:]" | sort | uniq -c | sort -nr
+    author-latest-commit = !git log --branches --format='%ad %aN' --date=iso --no-merges | sort -k4,4 -u
+    filetrail = log --follow -p -w
+    mergetrail = log --ancestry-path --merges
+    bigfiles = !git rev-list --objects --all | git cat-file --batch-check='%(objecttype) %(objectname) %(objectsize) %(rest)' | sed -n 's/^blob //p' | sort --numeric-sort --key=2 | tail -n 10 | cut -c 2-12,41- | $(command -v gnumfmt || echo numfmt) --field=2 --to=iec-i --suffix=B --padding=7 --round=nearest
 # }}}
 
 # gh {{{
