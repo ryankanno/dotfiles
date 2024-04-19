@@ -7,7 +7,12 @@
 
 # Enable tracing
 # set -x
-#
+
+# home-manager
+if [ -f $HOME/.nix-profile/etc/profile.d/hm-session-vars.sh ]; then
+    source $HOME/.nix-profile/etc/profile.d/hm-session-vars.sh
+fi
+
 if [[ "$OSTYPE" == "darwin"* ]]; then
   # macports
   export PATH="/opt/local/bin:/opt/local/sbin:/usr/local/sbin:$PATH"
@@ -36,6 +41,3 @@ fi
 if command -v tmux &> /dev/null && [ -z "$TMUX" ]; then
     tmux attach -t default || tmux new -s default
 fi
-
-# home-manager
-source $HOME/.nix-profile/etc/profile.d/hm-session-vars.sh
