@@ -5,29 +5,48 @@
 unstable-packages = with unstable; [
     bat
     bottom
+    btop
+    cloc
     coreutils
     curl
+    delta
+    difftastic
     du-dust
+    eza
     fd
     findutils
+    fq
     fx
     git
     git-crypt
     htop
+    hyperfine
     jq
     killall
-    lunarvim
+    miller
     mosh
+    ncdu
     neovim
+    onefetch
     procs
+    restic
     ripgrep
     sd
+    tealdeer
     tmux
+    tokei
+    trash-cli
     tree
+    tree-sitter
     unzip
     vim
     wget
     zip
+    zoxide
+
+    # funsies
+    figlet
+    toilet
 ];
 
 stable-packages = with pkgs; [
