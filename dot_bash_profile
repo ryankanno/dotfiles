@@ -36,3 +36,6 @@ fi
 if command -v tmux &> /dev/null && [ -z "$TMUX" ]; then
     tmux attach -t default || tmux new -s default
 fi
+
+# home-manager
+source $HOME/.nix-profile/etc/profile.d/hm-session-vars.sh
