@@ -174,9 +174,17 @@
     excludesfile = ~/.gitignore
     hooksPath = ~/.githooks
     editor = vim
+    pager = delta
 
 [init]
     defaultBranch = main
+
+[interactive]
+    diffFilter = delta --color-only
+
+[delta]
+    navigate = true
+    dark = true
 
 # push/pull/diff/options {{{
 [push]
@@ -187,7 +195,8 @@
 
 [diff]
     mnemonicprefix = true
-	tool = bc
+    tool = bc
+    colorMoved = default
 
 [difftool]
     prompt = false
@@ -203,7 +212,8 @@
     viewer = man
 
 [merge]
-	tool = bc
+    tool = bc
+    conflictstyle = diff3
 
 [mergetool]
     prompt = false
