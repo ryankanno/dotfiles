@@ -3,16 +3,19 @@
 }: let
 
 unstable-packages = with unstable; [
+    atuin
+    bandwhich
     bat
-    bottom
     btop
     cloc
     coreutils
     curl
     delta
     difftastic
+    diskonaut
     duc
     du-dust
+    erdtree
     eza
     fd
     findutils
@@ -21,17 +24,19 @@ unstable-packages = with unstable; [
     git
     git-crypt
     glow
-    htop
     hyperfine
     jq
     killall
     miller
     mosh
     ncdu
+    neofetch
     neovim
     onefetch
     parallel
+    prettyping
     procs
+    progress
     restic
     ripgrep
     sd
