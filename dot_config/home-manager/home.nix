@@ -11,6 +11,7 @@ unstable-packages = with unstable; [
     curl
     delta
     difftastic
+    duc
     du-dust
     eza
     fd
@@ -19,6 +20,7 @@ unstable-packages = with unstable; [
     fx
     git
     git-crypt
+    glow
     htop
     hyperfine
     jq
@@ -28,10 +30,12 @@ unstable-packages = with unstable; [
     ncdu
     neovim
     onefetch
+    parallel
     procs
     restic
     ripgrep
     sd
+    taplo
     tealdeer
     tmux
     tokei
