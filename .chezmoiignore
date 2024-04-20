@@ -2,5 +2,6 @@ LICENSE
 README.md
 HISTORY.md
 {{- if eq .chezmoi.os "linux" }}
-.hammerspoon  # ignore macos
+.hammerspoon
+.finicky.js
 {{- end }}
