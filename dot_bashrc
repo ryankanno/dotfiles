@@ -26,6 +26,9 @@ export TODO="t"
 
 include "$BASH_IT/bash_it.sh"
 
+# bat
+export BAT_THEME='Monokai Extended'
+
 # fzf
 include "${HOME}/.fzf.bash"
 
