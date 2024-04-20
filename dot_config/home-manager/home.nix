@@ -7,7 +7,6 @@ unstable-packages = with unstable; [
     bandwhich
     bat
     btop
-    cloc
     coreutils
     curl
     delta
