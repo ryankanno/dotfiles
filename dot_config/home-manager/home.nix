@@ -13,7 +13,6 @@ unstable-packages = with unstable; [
     difftastic     # structural diff (https://github.com/Wilfred/difftastic)
     diskonaut      # disk usage (https://github.com/imsnif/diskonaut)
     dua            # disk usage (https://github.com/Byron/dua-cli)
-    duc            # disk usage (https://duc.zevv.nl/)
     du-dust        # disk usage (https://github.com/bootandy/dust)
     erdtree        # fs + disk usage (https://github.com/solidiquis/erdtree)
     eza            # ls alternative (https://github.com/eza-community/eza)
