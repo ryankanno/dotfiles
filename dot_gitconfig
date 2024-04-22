@@ -86,6 +86,9 @@
 
     diff-prev-easy = "!dp() { git diff $(git prior-hash $1 $2).. $2; }; dp"
     diff-prev = "!dp() { git diff $(git prior-hash $1 $2)..$(git prior-hash $(($1 - 1)) $2) $2; }; dp"
+
+    # difftastic
+    dft = "!difftastic() { DFT_DISPLAY=side-by-side-show-both GIT_EXTERNAL_DIFF=difft git diff $1; }; difftastic"
 # }}}
 
 # reset commands {{{
@@ -174,31 +177,9 @@
     excludesfile = ~/.gitignore
     hooksPath = ~/.githooks
     editor = vim
-    pager = delta
 
 [init]
     defaultBranch = main
-
-[interactive]
-    diffFilter = delta --color-only --features=interactive
-
-[delta]
-    features = decorations
-    navigate = true
-    line-numbers = true
-    side-by-side = true
-
-[delta "interactive"]
-    keep-plus-minus-markers = false
-
-[delta "decorations"]
-    commit-decoration-style = blue ol
-    commit-style = raw
-    file-style = omit
-    hunk-header-decoration-style = blue box
-    hunk-header-file-style = red
-    hunk-header-line-number-style = "#067a00"
-    hunk-header-style = file line-number syntax
 
 # push/pull/diff/options {{{
 [push]
