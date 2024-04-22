@@ -22,6 +22,7 @@ unstable-packages = with unstable; [
     fx             # terminal json (https://github.com/antonmedv/fx)
     git
     git-crypt
+    git-open       # https://github.com/paulirish/git-open
     glow           # terminal markdown (https://github.com/charmbracelet/glow)
     hyperfine      # benchmarking (https://github.com/sharkdp/hyperfine)
     jq             # json processor (https://github.com/jqlang/jq)
@@ -42,6 +43,7 @@ unstable-packages = with unstable; [
     taplo          # toml (https://github.com/tamasfe/taplo)
     tealdeer       # tldr (https://github.com/dbrgn/tealdeer)
     tmux
+    tmuxp          # session manager (https://github.com/tmux-python/tmuxp)
     tokei          # cloc alternative (https://github.com/XAMPPRocky/tokei)
     trash-cli      # trash cli (https://github.com/andreafrancia/trash-cli)
     tree
