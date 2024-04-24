@@ -28,11 +28,12 @@ unstable-packages = with unstable; [
     jq             # json processor (https://github.com/jqlang/jq)
     killall
     miller         # https://github.com/johnkerl/miller
+    moreutils      # https://joeyh.name/code/moreutils/
     mosh           # mobile shell (https://github.com/mobile-shell/mosh)
     neofetch       # system info tool (https://github.com/dylanaraps/neofetch)
     neovim
     onefetch       # git info tool (https://github.com/o2sh/onefetch)
-    parallel
+    (lib.hiPrio parallel)
     prettyping     # ping wrapper (https://github.com/denilsonsa/prettyping)
     procs          # ps alternative (https://github.com/dalance/procs)
     progress       # show progress (https://github.com/Xfennec/progress)
