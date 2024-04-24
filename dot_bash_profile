@@ -8,15 +8,14 @@
 # Enable tracing
 # set -x
 
+# helper include function
+function include() { [[ -f "$1" ]] && source "$1"; }
+
 # nix single user
-if [ -f $HOME/.nix-profile/etc/profile.d/nix.sh ]; then
-    source $HOME/.nix-profile/etc/profile.d/nix.sh
-fi
+include "$HOME/.nix-profile/etc/profile.d/nix.sh"
 
 # home-manager
-if [ -f $HOME/.nix-profile/etc/profile.d/hm-session-vars.sh ]; then
-    source $HOME/.nix-profile/etc/profile.d/hm-session-vars.sh
-fi
+include "$HOME/.nix-profile/etc/profile.d/hm-session-vars.sh"
 
 if [[ "$OSTYPE" == "darwin"* ]]; then
   # macports
@@ -38,9 +37,17 @@ if [[ -n $(which anyenv) ]]; then
     eval "$(anyenv init -)"
 fi
 
-if [ -f $HOME/.bashrc ]; then
-    source $HOME/.bashrc
-fi
+# nodenv
+include "$HOME/.anyenv/envs/nodenv/.nodenvrc"
+
+# pyenv
+include "$HOME/.anyenv/envs/pyenv/.pyenvrc"
+
+# rbenv
+include "$HOME/.anyenv/envs/rbenv/.rbenvrc"
+
+# bashrc
+include "$HOME/.bashrc"
 
 # always just bounce into tmux
 if command -v tmux &> /dev/null && [ -z "$TMUX" ]; then

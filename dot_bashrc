@@ -7,15 +7,6 @@ export BASH_SILENCE_DEPRECATION_WARNING=1
 # helper include function
 function include() { [[ -f "$1" ]] && source "$1"; }
 
-# nodenv
-include "$HOME/.anyenv/envs/nodenv/.nodenvrc"
-
-# pyenv
-include "$HOME/.anyenv/envs/pyenv/.pyenvrc"
-
-# rbenv
-include "$HOME/.anyenv/envs/rbenv/.rbenvrc"
-
 # zoxide
 command -v zoxide &>/dev/null && eval "$(zoxide init --cmd j bash)"
 
