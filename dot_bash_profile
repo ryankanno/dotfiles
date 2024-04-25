@@ -25,6 +25,10 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
   export PATH="/opt/homebrew/bin:$PATH"
 fi
 
+# golang
+export GOPATH=~/golibs
+export PATH="$GOPATH/bin:$PATH"
+
 # cargo
 export PATH="$HOME/.cargo/bin:$PATH"
 

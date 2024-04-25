@@ -58,11 +58,6 @@ fi
 # android
 export ANDROID_HVPROTO=ddm
 
-# golang
-export GOPATH=~/golibs
-export GOBIN=~/golibs/bin
-export PATH=$PATH:$GOBIN
-
 # atuin
 command -v atuin &>/dev/null && eval "$(atuin init bash)"
 
