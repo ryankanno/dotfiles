@@ -1,6 +1,6 @@
 # open file descriptor 5 such that anything written to /dev/fd/5
 # is piped through ts and then to /tmp/bash_timestamps
-# exec 5> >(/usr/local/bin/ts -i "%.s" >> /tmp/bash_timestamps)
+# exec 5> >(ts -i "%.s" >> /tmp/bash_timestamps.$(date +"%Y%m%d%H%M%S").log)
 
 # https://www.gnu.org/software/bash/manual/html_node/Bash-Variables.html
 # export BASH_XTRACEFD=5
