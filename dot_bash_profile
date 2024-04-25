@@ -37,15 +37,6 @@ if [[ -n $(which anyenv) ]]; then
     eval "$(anyenv init -)"
 fi
 
-# nodenv
-include "$HOME/.anyenv/envs/nodenv/.nodenvrc"
-
-# pyenv
-include "$HOME/.anyenv/envs/pyenv/.pyenvrc"
-
-# rbenv
-include "$HOME/.anyenv/envs/rbenv/.rbenvrc"
-
 # bashrc
 include "$HOME/.bashrc"
 

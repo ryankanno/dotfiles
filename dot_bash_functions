@@ -279,3 +279,37 @@ function fn_exists() {
     command -v $1 >/dev/null 2>&1
     return $?
 }
+
+# lazy loaders
+function _lazy_load_pyenv() {
+    include "$HOME/.anyenv/envs/pyenv/.pyenvrc"
+    LAZY_LOADED_PYENV=1
+}
+
+function _lazy_load_nodenv() {
+    include "$HOME/.anyenv/envs/nodenv/.nodenvrc"
+    LAZY_LOADED_NODENV=1
+}
+
+function _lazy_load_rbenv() {
+    include "$HOME/.anyenv/envs/rbenv/.rbenvrc"
+    LAZY_LOADED_RBENV=1
+}
+
+function pyenv() {
+    unset -f pyenv
+    [[ ! -v LAZY_LOADED_PYENV ]] && _lazy_load_pyenv
+    command pyenv $@
+}
+
+function nodenv() {
+    unset -f nodenv
+    [[ ! -v LAZY_LOADED_NODENV ]] && _lazy_load_nodenv
+    command nodenv $@
+}
+
+function rbenv() {
+    unset -f rbenv
+    [[ ! -v LAZY_LOADED_RBENV ]] && _lazy_load_rbenv
+    command rbenv $@
+}
