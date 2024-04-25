@@ -4,9 +4,6 @@
 # disable annoying messages
 export BASH_SILENCE_DEPRECATION_WARNING=1
 
-# helper include function
-function include() { [[ -f "$1" ]] && source "$1"; }
-
 # zoxide
 command -v zoxide &>/dev/null && eval "$(zoxide init --cmd j bash)"
 
@@ -15,13 +12,11 @@ export BASH_IT=$HOME/.bash_it
 export BASH_IT_THEME='hawaii50'
 export TODO="t"
 
-include "$BASH_IT/bash_it.sh"
-
 # bat
 export BAT_THEME='Monokai Extended'
 
 # fzf
-include "${HOME}/.fzf.bash"
+[[ -f "${HOME}/.fzf.bash" ]] && source "${HOME}/.fzf.bash"
 
 # remove annoying you got mail
 unset MAILCHECK
@@ -66,6 +61,24 @@ command -v direnv &>/dev/null && eval "$(direnv hook bash)"
 
 # procs
 command -v procs &>/dev/null && source <(procs --gen-completion-out bash)
+
+# lazy loaders
+function pyenv() {
+    unset -f pyenv
+    [[ -f "$HOME/.anyenv/envs/pyenv/.pyenvrc" ]] && source "$HOME/.anyenv/envs/pyenv/.pyenvrc"
+    command pyenv $@
+}
+
+function nodenv() {
+    unset -f nodenv
+    [[ -f "$HOME/.anyenv/envs/nodenv/.nodenvrc" ]] && source "$HOME/.anyenv/envs/nodenv/.nodenvrc"
+    command nodenv $@
+}
+
+# load directly (because of PS1)
+[[ -f "$HOME/.anyenv/envs/rbenv/.rbenvrc" ]] && source "$HOME/.anyenv/envs/rbenv/.rbenvrc"
+
+[[ -f "${BASH_IT}/bash_it.sh" ]] && source "$BASH_IT/bash_it.sh"
 
 # load all the bash things
 [[ -s "/opt/local/etc/profile.d/bash_completion.sh" ]] && source "/opt/local/etc/profile.d/bash_completion.sh"
