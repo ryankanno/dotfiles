@@ -45,7 +45,6 @@ unstable-packages = with unstable; [
     taplo          # toml (https://github.com/tamasfe/taplo)
     tealdeer       # tldr (https://github.com/dbrgn/tealdeer)
     tmux
-    tmuxp          # session manager (https://github.com/tmux-python/tmuxp)
     tokei          # cloc alternative (https://github.com/XAMPPRocky/tokei)
     trash-cli      # trash cli (https://github.com/andreafrancia/trash-cli)
     tree
