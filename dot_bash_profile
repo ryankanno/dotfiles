@@ -15,6 +15,7 @@ function include() { [[ -f "$1" ]] && source "$1"; }
 
 # nix single user
 [[ -f "/nix/var/nix/profiles/default/etc/profile.d/nix.sh" ]] && source "/nix/var/nix/profiles/default/etc/profile.d/nix.sh"
+[[ -f "$HOME/.nix-profile/etc/profile.d/nix.sh" ]] && source "$HOME/.nix-profile/etc/profile.d/nix.sh"
 
 # home-manager
 [[ -f "$HOME/.nix-profile/etc/profile.d/hm-session-vars.sh" ]] && source "$HOME/.nix-profile/etc/profile.d/hm-session-vars.sh"
