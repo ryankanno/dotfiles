@@ -7,6 +7,8 @@ unstable-packages = with unstable; [
     bandwhich      # terminal bandwidth (https://github.com/imsnif/bandwhich)
     bat            # cat alternative (https://github.com/sharkdp/bat)
     btop           # resource monitor (https://github.com/aristocratos/btop)
+    clipboard-jh   # clipboard (https://github.com/Slackadays/Clipboard)
+    colima         # container runtime (https://github.com/abiosoft/colima)
     coreutils
     curl
     delta          # pager (https://github.com/dandavison/delta)
