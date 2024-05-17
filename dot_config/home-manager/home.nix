@@ -42,6 +42,7 @@ unstable-packages = with unstable; [
     pv
     restic         # backup (https://github.com/restic/restic)
     ripgrep
+    ripgrep-all    # https://github.com/phiresky/ripgrep-all
     sd             # sed alternative (https://github.com/chmln/sd)
     shellcheck
     taplo          # toml (https://github.com/tamasfe/taplo)

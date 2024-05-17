@@ -18,7 +18,19 @@ export FZF_DEFAULT_COMMAND='rg --files --no-ignore --hidden --follow -g "!{.git,
 export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
 export FZF_ALT_C_COMMAND="bfs -type d -nohidden"
 
+rga-fzf() {
+    RG_PREFIX="rga --files-with-matches"
+    echo "$(
+        FZF_DEFAULT_COMMAND="$RG_PREFIX '$1'" \
+            fzf --sort --preview="[[ ! -z {} ]] && rga --pretty --context 5 {q} {}" \
+				--phony -q "$1" \
+				--bind "change:reload:$RG_PREFIX {q}" \
+				--preview-window="70%:wrap"
+	)"
+}
+
 if [ -t 1 ]
 then
     bind -x '"\C-p": nvim $(fzf);'
+    bind -x '"\C-f": nvim $(rga-fzf);'
 fi
