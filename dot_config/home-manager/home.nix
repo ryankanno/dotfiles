@@ -2,7 +2,7 @@
     config, pkgs, unstable, ...
 }: let
 
-unstable-packages = with unstable; [
+unstable-tools-packages = with unstable; [
     atuin          # shell history (https://github.com/atuinsh/atuin)
     bandwhich      # terminal bandwidth (https://github.com/imsnif/bandwhich)
     bat            # cat alternative (https://github.com/sharkdp/bat)
@@ -63,17 +63,23 @@ unstable-packages = with unstable; [
     toilet         # https://github.com/cacalabs/toilet
 ];
 
+unstable-language-packages = with unstable; [
+    cargo
+    rustc
+];
+
 stable-packages = with pkgs; [
     gh
     cargo-cache
     cargo-expand
 ];
+
 in
 {
     home.username = "ryankanno";
     home.homeDirectory = "/home/ryankanno";
     home.stateVersion = "23.11"; # Please read the comment before changing.
-    home.packages = stable-packages ++ unstable-packages ++ [];
+    home.packages = stable-packages ++ unstable-tools-packages ++ unstable-language-packages ++ [];
     home.file = {};
     home.sessionVariables = {};
     programs.home-manager.enable = true;
