@@ -54,6 +54,7 @@ unstable-tools-packages = with unstable; [
     tree-sitter    # parser generator (https://github.com/tree-sitter/tree-sitter)
     unzip
     vim
+    watchexec      # runs commands on modification (https://github.com/watchexec/watchexec)
     wget
     zip
     zoxide         # smarter cd (https://github.com/ajeetdsouza/zoxide)
