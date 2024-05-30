@@ -69,7 +69,7 @@
 
 # commit {{{
     cm = commit -m
-    cma = commit -a -m
+    cma = commit -m -a
     ca = commit --amend
     amend = commit --amend
     caa = commit -a --amend -C HEAD
@@ -78,6 +78,7 @@
 # diff {{{
     d = diff --word-diff
     dc = diff --cached
+    ds = diff --staged
 
     # diff last commit
     dlc = diff --cached HEAD^
@@ -89,6 +90,15 @@
 
     # difftastic
     dft = "!difftastic() { DFT_DISPLAY=side-by-side-show-both GIT_EXTERNAL_DIFF=difft git diff $1; }; difftastic"
+
+    # diff stash local
+    dsl = dft stash@{0}
+
+    # diff stash head
+    dsh = dft stash@{0}..HEAD
+
+    # diff stash parent
+    dsp = dft stash@{0}^..stash@{0}
 # }}}
 
 # reset commands {{{
