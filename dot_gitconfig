@@ -115,7 +115,7 @@
 # }}}
 
 # stash {{{
-    sl = stash list
+    stashes = stash list
     sa = stash apply
     ss = stash save
 # }}}
@@ -194,6 +194,7 @@
 # push/pull/diff/options {{{
 [push]
     default = upstream
+    autoSetupRemote = true
 
 [pull]
     default = current
