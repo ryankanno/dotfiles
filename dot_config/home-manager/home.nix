@@ -28,6 +28,7 @@ unstable-tools-packages = with unstable; [
     glow           # terminal markdown (https://github.com/charmbracelet/glow)
     hyperfine      # benchmarking (https://github.com/sharkdp/hyperfine)
     jq             # json processor (https://github.com/jqlang/jq)
+    just           # command runner (https://github.com/casey/just)
     killall
     miller         # https://github.com/johnkerl/miller
     moreutils      # https://joeyh.name/code/moreutils/
@@ -48,6 +49,7 @@ unstable-tools-packages = with unstable; [
     taplo          # toml (https://github.com/tamasfe/taplo)
     tealdeer       # tldr (https://github.com/dbrgn/tealdeer)
     tmux
+    toastify       # command line tool using notify-rust (https://github.com/hoodie/toastify)
     tokei          # cloc alternative (https://github.com/XAMPPRocky/tokei)
     trash-cli      # trash cli (https://github.com/andreafrancia/trash-cli)
     tree
