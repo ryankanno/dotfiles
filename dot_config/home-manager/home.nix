@@ -55,6 +55,7 @@ unstable-tools-packages = with unstable; [
     tree
     tree-sitter    # parser generator (https://github.com/tree-sitter/tree-sitter)
     unzip
+    upterm         # terminal sharing (https://github.com/owenthereal/upterm)
     vim
     watchexec      # runs commands on modification (https://github.com/watchexec/watchexec)
     wget
