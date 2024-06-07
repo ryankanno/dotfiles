@@ -7,6 +7,7 @@
 [alias]
  # basic {{{
     br = branch
+    branches = branch -a
     ci = commit
     cl = clone
     co = checkout
@@ -115,7 +116,7 @@
 # }}}
 
 # stash {{{
-    sl = stash list
+    stashes = stash list
     sa = stash apply
     ss = stash save
 # }}}
@@ -194,6 +195,7 @@
 # push/pull/diff/options {{{
 [push]
     default = upstream
+    autoSetupRemote = true
 
 [pull]
     default = current
