@@ -7,6 +7,7 @@
 [alias]
  # basic {{{
     br = branch
+    branches = branch -a
     ci = commit
     cl = clone
     co = checkout
