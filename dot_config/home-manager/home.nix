@@ -3,6 +3,7 @@
 }: let
 
 unstable-tools-packages = with unstable; [
+    age            # encryption tool (https://github.com/FiloSottile/age)
     atuin          # shell history (https://github.com/atuinsh/atuin)
     bandwhich      # terminal bandwidth (https://github.com/imsnif/bandwhich)
     bat            # cat alternative (https://github.com/sharkdp/bat)
@@ -30,6 +31,7 @@ unstable-tools-packages = with unstable; [
     jq             # json processor (https://github.com/jqlang/jq)
     just           # command runner (https://github.com/casey/just)
     killall
+    litestream     # https://github.com/benbjohnson/litestream
     miller         # https://github.com/johnkerl/miller
     moreutils      # https://joeyh.name/code/moreutils/
     mosh           # mobile shell (https://github.com/mobile-shell/mosh)
