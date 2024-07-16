@@ -1,10 +1,10 @@
 {
   description = "NixOS configuration";
 
-  inputs.nixpkgs.url = "github:nixos/nixpkgs/nixos-23.11";
+  inputs.nixpkgs.url = "github:nixos/nixpkgs/nixos-24.05";
   inputs.nixpkgs-unstable.url = "github:nixos/nixpkgs/nixos-unstable";
 
-  inputs.home-manager.url = "github:nix-community/home-manager/release-23.11";
+  inputs.home-manager.url = "github:nix-community/home-manager/release-24.05";
   inputs.home-manager.inputs.nixpkgs.follows = "nixpkgs";
 
   outputs = inputs @ { nixpkgs, nixpkgs-unstable, home-manager, ... }:
