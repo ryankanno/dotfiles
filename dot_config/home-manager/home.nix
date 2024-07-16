@@ -36,7 +36,6 @@ unstable-tools-packages = with unstable; [
     moreutils      # https://joeyh.name/code/moreutils/
     mosh           # mobile shell (https://github.com/mobile-shell/mosh)
     neofetch       # system info tool (https://github.com/dylanaraps/neofetch)
-    neovim
     onefetch       # git info tool (https://github.com/o2sh/onefetch)
     (lib.hiPrio parallel)
     prettyping     # ping wrapper (https://github.com/denilsonsa/prettyping)
