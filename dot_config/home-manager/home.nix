@@ -45,6 +45,7 @@ unstable-tools-packages = with unstable; [
     restic         # backup (https://github.com/restic/restic)
     ripgrep
     ripgrep-all    # https://github.com/phiresky/ripgrep-all
+    rofi           # https://github.com/davatorium/rofi
     sd             # sed alternative (https://github.com/chmln/sd)
     shellcheck
     taplo          # toml (https://github.com/tamasfe/taplo)
