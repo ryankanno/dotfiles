@@ -59,8 +59,9 @@ selection:
 
   save_to_clipboard: false
 
-window.opacity: 0.8
-window.dynamic_title: true
+window:
+  opacity: 0.7
+  dynamic_title: true
 
 cursor:
   style: Block
