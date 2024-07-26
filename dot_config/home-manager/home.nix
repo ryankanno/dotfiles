@@ -5,6 +5,7 @@
 unstable-tools-packages = with unstable; [
     age            # encryption tool (https://github.com/FiloSottile/age)
     atuin          # shell history (https://github.com/atuinsh/atuin)
+    awscli2
     bandwhich      # terminal bandwidth (https://github.com/imsnif/bandwhich)
     bat            # cat alternative (https://github.com/sharkdp/bat)
     btop           # resource monitor (https://github.com/aristocratos/btop)
