@@ -144,4 +144,4 @@ alias dry-rsync-sync="${rsync_cmd} --update --delete --dry-run"
 unset rsync_cmd
 
 alias pbcopy="xclip -selection clipboard"
-alias pbpaste="xclip -o"
+alias pbpaste="xclip -selection clipboard -o"
