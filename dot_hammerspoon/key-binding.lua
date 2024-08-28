@@ -21,7 +21,7 @@ local function toggleInput()
   else
     currentInput = 17
   end
-  hs.execute('/usr/local/bin/m1ddc display 2 set input ' .. tostring(currentInput))
+  hs.execute('/usr/local/bin/m1ddc display 1 set input ' .. tostring(currentInput))
 end
 
 -- * Set monitor input
