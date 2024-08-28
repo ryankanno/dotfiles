@@ -1,4 +1,4 @@
-# !/usr/bin/env bash
+#!/usr/bin/env bash
 #
 # Enable tracing
 # set -x
@@ -52,6 +52,11 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
     export GIT_EDITOR="$VISUAL -f"
 fi
 
+if [[ "$OSTYPE" == "linux"* ]]; then
+    # procs
+    command -v procs &>/dev/null && source <(procs --gen-completion-out bash)
+fi
+
 # android
 export ANDROID_HVPROTO=ddm
 
@@ -60,9 +65,6 @@ command -v atuin &>/dev/null && eval "$(atuin init bash)"
 
 # direnv
 command -v direnv &>/dev/null && eval "$(direnv hook bash)"
-
-# procs
-command -v procs &>/dev/null && source <(procs --gen-completion-out bash)
 
 # lazy loaders
 function pyenv() {
