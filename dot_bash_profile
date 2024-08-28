@@ -39,9 +39,15 @@ export PATH="$HOME/.cargo/bin:$PATH"
 export PATH="$HOME/.local/bin:$PATH"
 
 # anyenv
-export PATH="$HOME/.anyenv/bin:$PATH"
-if [[ -n $(which anyenv) ]]; then
-    eval "$(anyenv init -)"
+if [[ ":$PATH:" != *":$HOME/.anyenv/bin:"* ]]; then
+    export PATH="$HOME/.anyenv/bin:$PATH"
+fi
+
+if [[ -z "${ANYENV_INITIALIZED}" ]]; then
+    if command -v anyenv >/dev/null 2>&1; then
+        eval "$(anyenv init -)"
+        export ANYENV_INITIALIZED=1
+    fi
 fi
 
 # bashrc
