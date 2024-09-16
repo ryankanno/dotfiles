@@ -13,8 +13,10 @@ window:
     x: 2
     y: 2
 
-  dynamic_padding: false
   decorations: Full
+  dynamic_padding: false
+  dynamic_title: true
+  opacity: 0.7
 
 scrolling:
   history: 50000
@@ -58,10 +60,6 @@ selection:
   semantic_escape_chars: ',│`|:"'' ()[]{}<>'
 
   save_to_clipboard: false
-
-window:
-  opacity: 0.7
-  dynamic_title: true
 
 cursor:
   style: Block
