@@ -72,6 +72,7 @@ unstable-tools-packages = with unstable; [
 unstable-language-packages = with unstable; [
     cargo
     rustc
+    go
 ];
 
 stable-packages = with pkgs; [
