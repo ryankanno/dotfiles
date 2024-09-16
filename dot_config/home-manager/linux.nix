@@ -4,6 +4,7 @@
 
 unstable-tools-packages = with unstable; [
     age            # encryption tool (https://github.com/FiloSottile/age)
+    alacritty      # shell (https://github.com/alacritty/alacritty)
     atuin          # shell history (https://github.com/atuinsh/atuin)
     awscli2
     bandwhich      # terminal bandwidth (https://github.com/imsnif/bandwhich)
