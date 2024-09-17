@@ -44,7 +44,7 @@ WINIT_X11_SCALE_FACTOR = "1.0"
 size = 20.0
 
 [font.bold]
-family = "Monaspace Neon Var"
+family = "MonaspiceNe Nerd Font Propo"
 style = "Bold"
 
 [font.glyph_offset]
@@ -52,11 +52,11 @@ x = 0
 y = 0
 
 [font.italic]
-family = "Monaspace Neon Var"
+family = "MonaspiceNe Nerd Font Propo"
 style = "Italic"
 
 [font.normal]
-family = "Monaspace Neon Var"
+family = "MonaspiceNe Nerd Font Propo"
 style = "Regular"
 
 [font.offset]
