@@ -10,6 +10,7 @@ unstable-tools-packages = with unstable; [
     bandwhich      # terminal bandwidth (https://github.com/imsnif/bandwhich)
     bat            # cat alternative (https://github.com/sharkdp/bat)
     btop           # resource monitor (https://github.com/aristocratos/btop)
+    calibre        # ebook manager (https://github.com/kovidgoyal/calibre)
     clipboard-jh   # clipboard (https://github.com/Slackadays/Clipboard)
     colima         # container runtime (https://github.com/abiosoft/colima)
     coreutils
