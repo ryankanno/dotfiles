@@ -26,22 +26,6 @@ unset MAILCHECK
 # inputrc
 [[ -f "${HOME}/.inputrc" ]] && export INPUTRC="${HOME}/.inputrc"
 
-# ssh-agent
-case $- in *i*)
-    SSH_ENV="${HOME}/.ssh/environment"
-    ssh-add -l &>/dev/null
-    if [ "$?" == 2 ]; then
-        test -r "${SSH_ENV}" && \
-            eval "$(<"${SSH_ENV}")" >/dev/null
-
-        ssh-add -l &>/dev/null
-        if [ "$?" == 2 ]; then
-            (umask 066; ssh-agent > "${SSH_ENV}")
-            eval "$(<"${SSH_ENV}")" >/dev/null
-        fi
-    fi
-esac
-
 # vi mode
 set -o vi
 
