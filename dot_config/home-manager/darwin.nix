@@ -10,7 +10,6 @@ unstable-tools-packages = with unstable; [
     bat            # cat alternative (https://github.com/sharkdp/bat)
     btop           # resource monitor (https://github.com/aristocratos/btop)
     clipboard-jh   # clipboard (https://github.com/Slackadays/Clipboard)
-    calibre        # ebook manager (https://github.com/kovidgoyal/calibre)
     colima         # container runtime (https://github.com/abiosoft/colima)
     coreutils
     curl
@@ -33,10 +32,8 @@ unstable-tools-packages = with unstable; [
     jq             # json processor (https://github.com/jqlang/jq)
     just           # command runner (https://github.com/casey/just)
     killall
-    litestream     # https://github.com/benbjohnson/litestream
     miller         # https://github.com/johnkerl/miller
     moreutils      # https://joeyh.name/code/moreutils/
-    mosh           # mobile shell (https://github.com/mobile-shell/mosh)
     neofetch       # system info tool (https://github.com/dylanaraps/neofetch)
     onefetch       # git info tool (https://github.com/o2sh/onefetch)
     (lib.hiPrio parallel)
