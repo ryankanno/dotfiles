@@ -14,12 +14,12 @@ if [[ "$OSTYPE" == "linux-gnu" ]]; then
 fi
 
 # w/ modifications
-export FZF_DEFAULT_COMMAND='rg --files --no-ignore --hidden --follow -g "!{.git,.tox,node_modules,.*cache,__*cache__}/*" 2> /dev/null'
+export FZF_DEFAULT_COMMAND='rg --files --no-ignore --hidden --follow -g "!{.git,node_modules,.direnv,.tox,.*cache,**/__*cache__}/*" -g "!{*.pyi,*.pyc}" 2> /dev/null'
 export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
-export FZF_ALT_C_COMMAND="bfs -type d -nohidden"
+export FZF_ALT_C_COMMAND='bfs -type d -nohidden'
 
 rga-fzf() {
-    RG_PREFIX="rga --files-with-matches --no-ignore --hidden --follow -g '!{.git,.tox,node_modules,.*cache,__*cache__}/*' 2> /dev/null"
+    RG_PREFIX='rga --files-with-matches --no-ignore --hidden --follow -g "!{.git,node_modules,.direnv,.tox,.*cache,**/__*cache__}/*" -g "!{*.pyi,*.pyc}" 2> /dev/null'
     echo "$(
         FZF_DEFAULT_COMMAND="$RG_PREFIX '$1'" \
             fzf --sort --preview="[[ ! -z {} ]] && rga --pretty --context 5 {q} {}" \
