@@ -15,14 +15,13 @@ fi
 
 # w/ modifications
 if hash fd 2> /dev/null; then
-    export FZF_DEFAULT_COMMAND="fd --color=never --hidden --exclude .git --exclude .tox --exclude .direnv --exclude node_modules --exclude .*cache --exclude __*cache*__ --type f"
+    export FZF_DEFAULT_COMMAND="fd --color=never --hidden --exclude .git --exclude .tox --exclude .direnv --exclude node_modules --type f"
     export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
     export FZF_ALT_C_COMMAND="fd --color=never --hidden --exclude .git --type d"
 fi
 
 rga-fzf() {
-    RG_PREFIX='rga --files-with-matches --no-ignore --hidden --follow -g "!{.git,node_modules,.direnv,.tox,.*cache,**/__*cache__}/*" -g "!{*.pyi,*.pyc}" 2> /dev/null'
-    echo "$(
+    RG_PREFIX='rga --files-with-matches --no-ignore --hidden --follow -g "!{.git,.tox,.direnv,node_modules}/*" -g "!{*.pyi,*.pyc}" 2> /dev/null'
         FZF_DEFAULT_COMMAND="$RG_PREFIX '$1'" \
             fzf --sort --preview="[[ ! -z {} ]] && rga --pretty --context 5 {q} {}" \
 				--phony -q "$1" \
