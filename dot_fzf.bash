@@ -14,9 +14,11 @@ if [[ "$OSTYPE" == "linux-gnu" ]]; then
 fi
 
 # w/ modifications
-export FZF_DEFAULT_COMMAND='rg --files --no-ignore --hidden --follow -g "!{.git,node_modules,.direnv,.tox,.*cache,**/__*cache__}/*" -g "!{*.pyi,*.pyc}" 2> /dev/null'
-export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
-export FZF_ALT_C_COMMAND='bfs -type d -nohidden'
+if hash fd 2> /dev/null; then
+    export FZF_DEFAULT_COMMAND="fd --color=never --hidden --exclude .git --exclude .tox --exclude .direnv --exclude node_modules --exclude .*cache --exclude __*cache*__ --type f"
+    export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
+    export FZF_ALT_C_COMMAND="fd --color=never --hidden --exclude .git --type d"
+fi
 
 rga-fzf() {
     RG_PREFIX='rga --files-with-matches --no-ignore --hidden --follow -g "!{.git,node_modules,.direnv,.tox,.*cache,**/__*cache__}/*" -g "!{*.pyi,*.pyc}" 2> /dev/null'
