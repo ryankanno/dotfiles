@@ -25,7 +25,6 @@ unstable-tools-packages = with unstable; [
     findutils
     fq             # jq for binary (https://github.com/wader/fq)
     fx             # terminal json (https://github.com/antonmedv/fx)
-    git
     git-crypt
     git-lfs
     git-open       # https://github.com/paulirish/git-open
@@ -94,4 +93,8 @@ in
     home.file = {};
     home.sessionVariables = {};
     programs.home-manager.enable = true;
+    programs.git = {
+        enable = true;
+        lfs.enable = true;
+    };
 }
