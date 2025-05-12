@@ -22,6 +22,7 @@ fi
 
 rga-fzf() {
     RG_PREFIX='rga --files-with-matches --no-ignore --hidden --follow -g "!{.git,.tox,.direnv,node_modules}/*" -g "!{*.pyi,*.pyc}" 2> /dev/null'
+    echo "$(
         FZF_DEFAULT_COMMAND="$RG_PREFIX '$1'" \
             fzf --sort --preview="[[ ! -z {} ]] && rga --pretty --context 5 {q} {}" \
 				--phony -q "$1" \
