@@ -3,38 +3,17 @@ realpath() {
     [[ $1 = /* ]] && echo "$1" || echo "$PWD/${1#./}"
 }
 
+# Function to setup a venv and activate (will create one if it doesn't exist)
+use_venv() {
+    uv venv
+    source .venv/bin/activate
+}
+
 # Function to set up a Python virtual environment using uv
-layout_python_uv() {
-    local python=${1:-python}
-    [[ $# -gt 0 ]] && shift
-
-    # Unset PYTHONHOME to avoid conflicts
-    unset PYTHONHOME
-
-    # Find Python path and version
-    local python_path=$(uv python find "$python")
-    local python_version=$("$python_path" -V | cut -d' ' -f 2 | cut -d. -f 1-2)
-
-    if [[ -z $python_version ]]; then
-        log_error "Could not find Python's version"
-        return 1
-    fi
-
-    # Set up virtual environment path
-    if [[ -n "${VIRTUAL_ENV:-}" ]]; then
-        VIRTUAL_ENV=$(realpath "$VIRTUAL_ENV")
-    else
-        VIRTUAL_ENV=$(direnv_layout_dir)/python-$python_version
-    fi
-
-    export UV_PROJECT_ENVIRONMENT=$VIRTUAL_ENV
-
-    # Create virtual environment if it doesn't exist
-    if [[ ! -d $VIRTUAL_ENV ]]; then
-        log_status "No virtual environment exists. Executing 'uv venv' to create one."
-        uv venv -p "$python" "$@" "$VIRTUAL_ENV"
-    fi
-
-    export VIRTUAL_ENV
-    PATH_add "$VIRTUAL_ENV/bin"
+use_uv() {
+    watch_file uv.lock pyproject.toml
+    dotenv_if_exists
+    source_env_if_exists .envrc.local
+    use venv
+    uv sync
 }
