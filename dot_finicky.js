@@ -1,7 +1,7 @@
 // ~/.finicky.js
 
 module.exports = {
-  defaultBrowser: "Firefox",
+  defaultBrowser: "Microsoft Edge",
   handlers: [
     {
       match: "open.spotify.com/*",
