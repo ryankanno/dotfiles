@@ -15,7 +15,6 @@ unstable-tools-packages = with unstable; [
     curl
     delta          # pager (https://github.com/dandavison/delta)
     difftastic     # structural diff (https://github.com/Wilfred/difftastic)
-    diskonaut      # disk usage (https://github.com/imsnif/diskonaut)
     dua            # disk usage (https://github.com/Byron/dua-cli)
     du-dust        # disk usage (https://github.com/bootandy/dust)
     erdtree        # fs + disk usage (https://github.com/solidiquis/erdtree)

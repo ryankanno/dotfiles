@@ -16,7 +16,6 @@ unstable-tools-packages = with unstable; [
     curl
     delta          # pager (https://github.com/dandavison/delta)
     difftastic     # structural diff (https://github.com/Wilfred/difftastic)
-    diskonaut      # disk usage (https://github.com/imsnif/diskonaut)
     dua            # disk usage (https://github.com/Byron/dua-cli)
     du-dust        # disk usage (https://github.com/bootandy/dust)
     erdtree        # fs + disk usage (https://github.com/solidiquis/erdtree)
@@ -60,7 +59,6 @@ unstable-tools-packages = with unstable; [
     tree-sitter    # parser generator (https://github.com/tree-sitter/tree-sitter)
     unzip
     upterm         # terminal sharing (https://github.com/owenthereal/upterm)
-    uv             # python all-in-one (https://github.com/astral-sh/uv)
     vim-full
     watchexec      # runs commands on modification (https://github.com/watchexec/watchexec)
     wget
