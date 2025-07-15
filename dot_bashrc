@@ -75,5 +75,7 @@ function nodenv() {
 [[ -s "${HOME}/.bash_local" ]] && source "${HOME}/.bash_local"
 [[ -s "${HOME}/.config/op/plugins.sh" ]] && source "${HOME}/.config/op/plugins.sh"
 
+export PATH="$(npm config get prefix)/bin:$PATH"
+
 # PATH fix - removes duplicates, preserves the ordering of paths, and doesn't add a colon at the end.
 export PATH="$(echo $PATH | perl -e 'print join(":", grep { not $seen{$_}++ } split(/:/, scalar <>))')"
