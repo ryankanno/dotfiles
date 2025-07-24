@@ -14,12 +14,17 @@
       "Bash(find:*)",
       "Bash(fd:*)",
       "Bash(jq:*)",
+      "Bash(cargo check:*)",
+      "Bash(cargo clippy:*)",
+      "Bash(cargo doc:*)",
       "Bash(just:*)",
       "Bash(pnpm:build)",
       "TodoRead(**)",
       "TodoWrite(**)",
       "Task(**)",
+      "WebFetch(domain:crates.io)",
       "WebFetch(domain:github.com)",
+      "WebFetch(domain:v2.tauri.app)",
       "WebSearch"
     ],
     "deny": [
