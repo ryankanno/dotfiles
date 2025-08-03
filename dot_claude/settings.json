@@ -68,7 +68,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "curl -H \"Title: Claude Code\" -d \"Task in $(basename $(pwd)) on $(git branch --show-current 2>/dev/null || echo 'no git') is pau! 🎆\" $NTFY_SERVER_URL/cc"
+            "command": "curl -H \"Title: Claude Code\" -d \"Task completed for $(git remote get-url origin 2>/dev/null | sed 's/.*[/:]\\([^/]*\\)\\/\\([^/]*\\)$/\\1\\/\\2/' || echo 'unknown') ($(pwd)) on branch $(git branch --show-current 2>/dev/null || echo 'no git') 🎆\" $NTFY_SERVER_URL/cc"
           }
         ]
       }
