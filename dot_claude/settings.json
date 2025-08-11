@@ -73,5 +73,10 @@
         ]
       }
     ]
-  }
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "pnpm dlx ccusage statusline"
+  },
+  "$schema": "https://json.schemastore.org/claude-code-settings.json"
 }
