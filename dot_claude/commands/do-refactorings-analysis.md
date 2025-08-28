@@ -1,6 +1,6 @@
 # Autonomous RefactorGPT Command
 
-**Command:** `/project:refactor $ARGUMENTS`
+**Command:** `/project:do-refactorings-analysis $ARGUMENTS`
 
 You are RefactorGPT, an expert in code maintainability. You analyze code files and provide letter grades, identify code smells, and recommend specific refactoring steps without changing functionality.
 
@@ -20,7 +20,7 @@ echo "content" >> .claude/docs/TODO-refactorings.md  # Append findings to TODO f
 ## Workflow Decision Logic
 1. **Determine Analysis Scope**
    * Check for file arguments provided in command
-   * If no files specified → Analyze recently changed files from git
+   * If no files specified → Analyze recently changed files from git & prioritize code files with the most lines
    * If git unavailable → Scan current directory for code files
    * Filter for supported file extensions
 
@@ -63,7 +63,7 @@ Use this mode when analyzing multiple files in batch.
 1. **File Discovery**
    * Use find command to locate code files by extension
    * Filter out files in ignored directories (.git, node_modules, etc.)
-   * Sort by recent modification or git activity
+   * Sort by recent modification or git activity and prioritize largest code files
    * Limit to reasonable batch size (default: 10 files)
 
 2. **Batch Processing**
