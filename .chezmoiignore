@@ -1,6 +1,7 @@
 LICENSE
 README.md
 HISTORY.md
+.gitignore
 {{- if eq .chezmoi.os "linux" }}
 .hammerspoon
 .finicky.js
