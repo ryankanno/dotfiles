@@ -20,6 +20,8 @@ if hash fd 2> /dev/null; then
     export FZF_ALT_C_COMMAND="fd --color=never --hidden --exclude .git --type d"
 fi
 
+export FZF_DEFAULT_OPTS="--preview 'bat --color=always --style=numbers --line-range=:500 {} 2>/dev/null || cat {}'"
+
 rga-fzf() {
     RG_PREFIX='rga --files-with-matches --no-ignore --hidden --follow -g "!{.git,.tox,.direnv,node_modules}/*" -g "!{*.pyi,*.pyc}" 2> /dev/null'
     echo "$(
