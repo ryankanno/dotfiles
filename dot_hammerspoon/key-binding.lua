@@ -14,13 +14,20 @@ local function windowBind(hyper, keyFuncTable)
   end
 end
 
-local function toggleInput(toInput)
-  hs.execute('/usr/local/bin/m1ddc display 1 set input ' .. tostring(toInput))
+local function toggleInput(display, toInput)
+  local cmd = '/usr/local/bin/m1ddc display ' .. tostring(display) .. ' set input ' .. tostring(toInput)
+  hs.execute(cmd, true)
 end
 
 -- * Set monitor input
-hk.bind({"ctrl", "shift"}, '1', function() toggleInput(17) end)
-hk.bind({"ctrl", "shift"}, '2', function() toggleInput(18) end)
+hk.bind({"ctrl", "shift"}, '1', function()
+  toggleInput(2, 17)
+  hs.timer.doAfter(0.5, function()
+    toggleInput(1, 16)
+  end)
+end)
+hk.bind({"ctrl", "shift"}, '2', function() toggleInput(1, 17) end)
+hk.bind({"ctrl", "shift"}, '3', function() toggleInput(2, 17) end)
 
 -- * Set window position on current display
 windowBind({"ctrl", "cmd"}, {
