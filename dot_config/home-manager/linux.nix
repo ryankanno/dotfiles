@@ -25,7 +25,6 @@ unstable-tools-packages = with unstable; [
     fq             # jq for binary (https://github.com/wader/fq)
     fx             # terminal json (https://github.com/antonmedv/fx)
     git-crypt
-    git-lfs
     git-open       # https://github.com/paulirish/git-open
     glow           # terminal markdown (https://github.com/charmbracelet/glow)
     hyperfine      # benchmarking (https://github.com/sharkdp/hyperfine)
