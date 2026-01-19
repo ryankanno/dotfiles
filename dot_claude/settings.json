@@ -1,4 +1,5 @@
 {
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "permissions": {
     "allow": [
       "Bash(cargo check:*)",
@@ -20,6 +21,7 @@
       "Bash(tail:*)",
       "Bash(tree:*)",
       "Bash(wc:*)",
+      "Skill(dev-browser:dev-browser)",
       "Task(**)",
       "TodoRead(**)",
       "TodoWrite(**)",
@@ -79,5 +81,14 @@
     "type": "command",
     "command": "pnpm dlx ccusage statusline"
   },
-  "$schema": "https://json.schemastore.org/claude-code-settings.json"
+  "enabledPlugins": {
+    "context7@claude-plugins-official": true,
+    "frontend-design@claude-plugins-official": true,
+    "github@claude-plugins-official": true,
+    "code-review@claude-plugins-official": true,
+    "pr-review-toolkit@claude-plugins-official": true,
+    "pyright-lsp@claude-plugins-official": true,
+    "dev-browser@dev-browser-marketplace": true
+  },
+  "alwaysThinkingEnabled": true
 }
