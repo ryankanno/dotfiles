@@ -5,7 +5,7 @@ realpath() {
 
 # Function to setup a venv and activate (will create one if it doesn't exist)
 use_venv() {
-    uv venv
+    uv venv --allow-existing
     source .venv/bin/activate
 }
 
@@ -15,5 +15,5 @@ use_uv() {
     dotenv_if_exists
     source_env_if_exists .envrc.local
     use venv
-    uv sync
+    uv sync --quiet
 }
