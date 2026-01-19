@@ -210,9 +210,6 @@
 
 [branch]
     autosetuprebase = always
-
-[apply]
-    whitespace = nowarn
 #}}}
 
 [man]

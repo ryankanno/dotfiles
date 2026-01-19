@@ -24,7 +24,7 @@ command -v eza &>/dev/null && alias ld='ll -D' || alias ld='ll --directory'
 command -v eza &>/dev/null && alias lk='ll -s=size' || alias lk='ll -r --sort=size'
 command -v eza &>/dev/null && alias lm='ll -s=modified' || alias lm='ll -r --sort=time'
 command -v eza &>/dev/null && alias lak='la -s=size' || alias lak='la -r --sort=size'
-command -v eza &>/dev/null && alias lam='la -s=modified' || alias lm='la -r --sort=time'
+command -v eza &>/dev/null && alias lam='la -s=modified' || alias lam='la -r --sort=time'
 command -v rg &>/dev/null && alias rg='rg --hidden --follow --smart-case 2>/dev/null' || alias rg='grep --color=auto --exclude-dir=.git -R'
 
 # stats
