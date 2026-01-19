@@ -458,7 +458,11 @@ semantic_escape_chars = ",│`|:\"' ()[]{}<>"
 
 [shell]
 args = ["--login"]
+{{- if eq .chezmoi.os "darwin" }}
+program = "/opt/homebrew/bin/bash"
+{{- else if eq .chezmoi.os "linux" }}
 program = "/bin/bash"
+{{- end }}
 
 [window]
 decorations = "Full"
