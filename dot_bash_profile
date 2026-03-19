@@ -22,7 +22,7 @@ function include() { [[ -f "$1" ]] && source "$1"; }
 
 if [[ "$OSTYPE" == "darwin"* ]]; then
   # brew
-  export PATH="$PATH:/opt/homebrew/bin"
+  export PATH="/opt/homebrew/bin:$PATH"
 
   # macports
   export PATH="$PATH:/opt/local/bin:/opt/local/sbin:/usr/local/sbin"
