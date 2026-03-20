@@ -6,6 +6,7 @@ set -euo pipefail
 
 INTERACTIVE=false
 REPO_NAME=""
+ORG=""
 
 # Color output
 GREEN='\033[0;32m'
@@ -32,11 +33,13 @@ Usage: $(basename "$0") [OPTIONS] [REPO_NAME]
 Create a GitHub repository with consistent settings.
 
 OPTIONS:
+    -o, --org ORG       Create repository under an organization
     -i, --interactive    Interactive mode (prompts for name and confirmation)
     -h, --help          Show this help message
 
 EXAMPLES:
     $(basename "$0") my-new-project        Create repo immediately
+    $(basename "$0") -o my-org my-project  Create repo under an organization
     $(basename "$0") -i                    Interactive mode
 
 SETTINGS APPLIED:
@@ -102,15 +105,23 @@ EOF
 
 create_repository() {
     local repo_name="$1"
+    local org="$2"
     local owner
 
-    # Get authenticated user
-    owner=$(gh api user --jq .login)
+    if [[ -n "$org" ]]; then
+        owner="$org"
+    else
+        owner=$(gh api user --jq .login)
+    fi
 
-    echo "Creating repository '$repo_name'..."
+    echo "Creating repository '$repo_name' under '$owner'..."
 
     # Create private repository
-    if ! gh repo create "$repo_name" --private 2>/dev/null; then
+    local create_args=("$repo_name" --private)
+    if [[ -n "$org" ]]; then
+        create_args=("$org/$repo_name" --private)
+    fi
+    if ! gh repo create "${create_args[@]}" 2>/dev/null; then
         print_error "Repository creation failed"
         exit 2
     fi
@@ -203,6 +214,9 @@ interactive_mode() {
     echo "GitHub Repository Creator (Interactive Mode)"
     echo ""
 
+    # Prompt for organization (optional)
+    read -r -p "Organization (leave empty for personal): " ORG
+
     # Prompt for repository name
     read -r -p "Repository name: " REPO_NAME
 
@@ -227,12 +241,16 @@ interactive_mode() {
     fi
 
     echo ""
-    create_repository "$REPO_NAME"
+    create_repository "$REPO_NAME" "$ORG"
 }
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
+        -o|--org)
+            ORG="$2"
+            shift 2
+            ;;
         -i|--interactive)
             INTERACTIVE=true
             shift
@@ -271,5 +289,5 @@ else
     fi
 
     # Create
-    create_repository "$REPO_NAME"
+    create_repository "$REPO_NAME" "$ORG"
 fi
