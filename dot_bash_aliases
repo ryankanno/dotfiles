@@ -119,6 +119,13 @@ dkexshcn() { dkexe $(docker ps -aqf "name=$1") /bin/sh; }
 # run image
 dkrun() { docker run -it --entrypoint /bin/sh "$1"; }
 
+# procs
+alias topcpu='procs --watch --sortd cpu'
+alias topmem='procs --watch --sortd mem'
+alias psg='procs'
+alias zombies='procs --watch zombie'
+alias myprocs='procs --watch $USER'
+
 # python
 alias pi='pip install'
 alias pir='pip install -r requirements.txt'
