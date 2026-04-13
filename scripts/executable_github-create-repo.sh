@@ -48,6 +48,32 @@ SETTINGS APPLIED:
     - Features: issues, wiki, projects (discussions disabled)
     - Actions: enabled (all actions allowed)
     - Branch ruleset: main (signatures, linear history, PR reviews)
+
+PREREQUISITES:
+    - gh CLI installed and authenticated (gh auth login)
+    - For org repos: caller must have repo-create permission in the org
+    - Branch ruleset on private repos requires GitHub Pro (skipped with a
+      warning otherwise; public repos and orgs typically support rulesets)
+
+EXIT CODES:
+    0  Success (ruleset may have been skipped — check stderr for warnings)
+    1  Preflight or validation failure (missing gh, not authed, bad name)
+    2  Repository creation failed (e.g. name already exists)
+    3  Post-create configuration failed (settings, features, or ruleset)
+
+NON-INTERACTIVE USE (for agents/automation):
+    - Always pass REPO_NAME as a positional arg; do NOT use -i
+    - Pass -o ORG to target an organization; omit for personal account
+    - Script is idempotent-unsafe: re-running with the same name exits 2
+    - Output is informational; parse exit code, not stdout, for success
+    - All errors (including gh API responses) are printed to stderr
+
+EXAMPLES FOR AGENTS:
+    # Personal repo
+    $(basename "$0") my-project || handle_failure \$?
+
+    # Org repo
+    $(basename "$0") -o my-org my-project
 EOF
     exit 0
 }
