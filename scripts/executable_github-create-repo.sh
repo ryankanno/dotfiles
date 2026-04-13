@@ -128,42 +128,47 @@ create_repository() {
     print_success "Repository created"
 
     # Apply merge settings and features
-    if ! gh api -X PATCH "repos/$owner/$repo_name" \
-        -f allow_squash_merge=true \
-        -f allow_merge_commit=true \
-        -f allow_rebase_merge=true \
-        -f allow_auto_merge=true \
-        -f delete_branch_on_merge=true \
+    local patch_output
+    if ! patch_output=$(gh api -X PATCH "repos/$owner/$repo_name" \
+        -F allow_squash_merge=true \
+        -F allow_merge_commit=true \
+        -F allow_rebase_merge=true \
+        -F allow_auto_merge=true \
+        -F delete_branch_on_merge=true \
         -f squash_merge_commit_title=PR_TITLE \
         -f squash_merge_commit_message=COMMIT_MESSAGES \
         -f merge_commit_title=MERGE_MESSAGE \
         -f merge_commit_message=PR_TITLE \
-        -f has_issues=true \
-        -f has_projects=true \
-        -f has_wiki=true \
-        -F has_discussions=false >/dev/null 2>&1; then
-        print_error "Failed to apply merge settings and features"
+        -F has_issues=true \
+        -F has_projects=true \
+        -F has_wiki=true \
+        -F has_discussions=false 2>&1); then
+        print_error "Failed to apply merge settings and features:"
+        echo "$patch_output" >&2
         exit 3
     fi
     print_success "Merge settings applied"
     print_success "Features configured"
 
     # Set GitHub Actions permissions (non-fatal if already configured)
-    if gh api -X PUT "repos/$owner/$repo_name/actions/permissions" \
-        -f enabled=true \
-        -f allowed_actions=all >/dev/null 2>&1; then
+    local actions_output
+    if actions_output=$(gh api -X PUT "repos/$owner/$repo_name/actions/permissions" \
+        -F enabled=true \
+        -f allowed_actions=all 2>&1); then
         print_success "Actions permissions set"
     else
         # Actions may already be configured correctly, verify
         if gh api "repos/$owner/$repo_name/actions/permissions" --jq '.enabled' 2>/dev/null | grep -q true; then
             print_success "Actions permissions verified"
         else
-            print_warning "Could not verify Actions permissions"
+            print_warning "Could not verify Actions permissions:"
+            echo "$actions_output" >&2
         fi
     fi
 
-    # Create branch ruleset
-    if ! gh api -X POST "repos/$owner/$repo_name/rulesets" --input - >/dev/null 2>&1 <<'EOF'
+    # Create branch ruleset (requires GitHub Pro for private repos)
+    local ruleset_output
+    if ruleset_output=$(gh api -X POST "repos/$owner/$repo_name/rulesets" --input - 2>&1 <<'EOF'
 {
   "name": "main",
   "target": "branch",
@@ -200,11 +205,17 @@ create_repository() {
   ]
 }
 EOF
-    then
-        print_error "Failed to create branch ruleset"
-        exit 3
+    ); then
+        print_success "Branch ruleset 'main' created"
+    else
+        if echo "$ruleset_output" | grep -qi "upgrade to github pro\|enable this feature"; then
+            print_warning "Branch ruleset skipped (requires GitHub Pro for private repos)"
+        else
+            print_error "Failed to create branch ruleset:"
+            echo "$ruleset_output" >&2
+            exit 3
+        fi
     fi
-    print_success "Branch ruleset 'main' created"
 
     echo ""
     echo "Done! https://github.com/$owner/$repo_name"
