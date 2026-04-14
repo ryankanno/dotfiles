@@ -1,0 +1,135 @@
+{
+  "skill_name": "diataxis-standards",
+  "_docs": "See docs/how-to-run-evals.md for instructions on running these evals",
+  "description": "Evaluates whether the diataxis-standards skill produces documentation that follows the Diataxis framework — one quadrant per page, correct quadrant-specific patterns, cross-references between quadrants, and no mixing.",
+  "evals": [
+    {
+      "id": 1,
+      "name": "tutorial-getting-started",
+      "prompt": "Write a getting-started tutorial for a Python CLI tool called 'datapipe' that processes CSV files. The tool is installed with pip and has a single command: datapipe run input.csv output.csv",
+      "expected_output": "A tutorial with numbered steps, expected output blocks after each command, no choices offered, no architectural explanation, and a concrete achievement at the end.",
+      "assertions": [
+        "The output contains numbered steps (Step 1, Step 2, etc. or 1., 2., etc.)",
+        "At least 3 steps include an 'expected output' or 'you should see' code block",
+        "The output does NOT offer choices like 'you could also' or 'alternatively'",
+        "The output does NOT explain why the tool was designed a certain way",
+        "The output ends with a concrete achievement statement (what the reader accomplished)",
+        "The output includes a 'Next steps' section linking to other doc types"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "howto-deploy",
+      "prompt": "Write a how-to guide for deploying a FastAPI application to Kubernetes using Helm. The reader already knows FastAPI, Docker, and Kubernetes basics.",
+      "expected_output": "A how-to guide that is goal-oriented, assumes competence, includes variations (dev vs prod), has a verification step, and ends with a troubleshooting table.",
+      "assertions": [
+        "The title starts with 'How to'",
+        "The output does NOT explain what Kubernetes or Helm is (assumes competence)",
+        "The output includes at least 2 variations or paths (e.g., dev vs prod, local vs CI)",
+        "The output includes a verification step showing how to confirm the deployment succeeded",
+        "The output includes a troubleshooting table with Problem/Cause/Fix columns",
+        "The output does NOT include a tutorial-style learning objective or achievement"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "reference-api",
+      "prompt": "Write a reference document for a REST API with these endpoints: GET /users, GET /users/:id, POST /users, PUT /users/:id, DELETE /users/:id. Each endpoint accepts/returns JSON with fields: id (uuid), name (string), email (string), created_at (datetime).",
+      "expected_output": "A reference document with tables for every endpoint, parameter, and response field. Neutral tone, no guidance, complete coverage.",
+      "assertions": [
+        "Every endpoint (GET /users, GET /users/:id, POST /users, PUT /users/:id, DELETE /users/:id) is documented",
+        "The output uses tables for parameters, fields, or response schemas",
+        "The output does NOT include phrases like 'you should' or 'we recommend'",
+        "The output does NOT include step-by-step instructions",
+        "All 4 fields (id, name, email, created_at) are documented with their types",
+        "The output is organized by endpoint or resource, mirroring the API structure"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "explanation-architecture",
+      "prompt": "Write an explanation document for why a chat application uses WebSockets instead of HTTP polling for real-time messages. The system also uses Redis pub/sub for horizontal scaling.",
+      "expected_output": "An explanation document that answers WHY, discusses trade-offs, uses Mermaid diagrams, and takes a perspective. Not a tutorial, not a reference.",
+      "assertions": [
+        "The output explains WHY WebSockets were chosen, not just what they are",
+        "The output discusses trade-offs or alternatives (HTTP polling, SSE, etc.)",
+        "The output includes at least one Mermaid diagram",
+        "The output does NOT include step-by-step setup or installation instructions",
+        "The output does NOT include a complete configuration reference table",
+        "The output connects WebSockets to the Redis pub/sub design decision"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "detect-mixing-violation",
+      "prompt": "Review this documentation page and tell me if it follows Diataxis:\n\n# Getting Started with Auth\n\nThis tutorial teaches you how to set up authentication.\n\n## Step 1: Install the library\n```bash\npip install authlib\n```\n\n## Step 2: Configure OAuth\n```python\noauth = OAuth(app)\n```\n\n## Why We Chose OAuth Over SAML\n\nOAuth was chosen because it provides better developer experience and wider ecosystem support. SAML requires XML parsing and complex certificate management.\n\n## Configuration Reference\n\n| Field | Type | Default |\n|-------|------|---------|\n| client_id | string | required |\n| client_secret | string | required |\n| redirect_uri | string | /callback |\n\n## Step 3: Test the login\n```bash\ncurl http://localhost:8000/login\n```",
+      "expected_output": "The review should identify that this page mixes THREE quadrants: tutorial (steps 1-3), explanation (why OAuth over SAML), and reference (configuration table). It should recommend splitting into separate pages.",
+      "assertions": [
+        "The review identifies quadrant mixing as the primary issue",
+        "The review identifies the 'Why We Chose OAuth' section as explanation content in a tutorial",
+        "The review identifies the configuration reference table as reference content in a tutorial",
+        "The review recommends splitting into separate pages (at least 2 separate pages suggested)",
+        "The review recommends replacing mixed content with cross-reference links"
+      ]
+    },
+    {
+      "id": 6,
+      "name": "cross-references",
+      "prompt": "Write a how-to guide for adding a new database migration. After writing, make sure it includes proper Diataxis cross-references to other quadrants.",
+      "expected_output": "A how-to guide with a 'See also' section at the end that links to at least 2 other quadrant types (e.g., reference for schema docs, explanation for migration strategy).",
+      "assertions": [
+        "The output includes a 'See also' or 'Related' or 'Next steps' section",
+        "The cross-references link to at least 2 different Diataxis quadrants",
+        "At least one cross-reference points to a reference document",
+        "At least one cross-reference points to an explanation or tutorial",
+        "Cross-references use relative Markdown links (not absolute URLs)"
+      ]
+    },
+    {
+      "id": 7,
+      "name": "documentation-guide-generation",
+      "prompt": "Generate a DOCUMENTATION_GUIDE.md for a project called 'invoice-processor' that has these existing docs: getting-started.md, how-to-deploy.md, how-to-add-provider.md, architecture.md, design-decisions.md, configuration.md, data-models.md, pipeline-stages.md. The project processes medical invoices using QR codes and AI extraction.",
+      "expected_output": "A meta-reference document that assigns every file to a Diataxis quadrant, includes a quadrant chart, has per-file specs, and includes project-specific anti-patterns.",
+      "assertions": [
+        "Every listed file is assigned to exactly one Diataxis quadrant",
+        "The output includes a Mermaid quadrantChart or equivalent visual",
+        "The output includes per-file specifications (sections, must-include, must-not-include)",
+        "The output includes project-specific anti-patterns (not just generic ones)",
+        "getting-started.md is classified as Tutorial",
+        "how-to-deploy.md and how-to-add-provider.md are classified as How-To Guide",
+        "architecture.md and design-decisions.md are classified as Explanation",
+        "configuration.md, data-models.md, and pipeline-stages.md are classified as Reference"
+      ]
+    },
+    {
+      "id": 8,
+      "name": "negative-control-coding-task",
+      "prompt": "Write a Python function that sorts a list of dictionaries by a specified key.",
+      "expected_output": "The diataxis-standards skill should NOT trigger for this prompt. This is a coding task, not a documentation task.",
+      "should_trigger": false,
+      "assertions": [
+        "The skill should not activate for a pure coding request"
+      ]
+    },
+    {
+      "id": 9,
+      "name": "negative-control-git-question",
+      "prompt": "How do I rebase my branch onto main?",
+      "expected_output": "The diataxis-standards skill should NOT trigger for this prompt. This is a git question, not a documentation structure question.",
+      "should_trigger": false,
+      "assertions": [
+        "The skill should not activate for a git workflow question"
+      ]
+    },
+    {
+      "id": 10,
+      "name": "negative-control-design-doc",
+      "prompt": "Write a design doc for a new authentication service.",
+      "expected_output": "The diataxis-standards skill should NOT trigger. Design docs are engineering planning artifacts (design-doc-standards), not user-facing documentation (diataxis-standards).",
+      "should_trigger": false,
+      "assertions": [
+        "The diataxis-standards skill should not activate for design doc requests (that is design-doc-standards)"
+      ]
+    }
+  ]
+}
