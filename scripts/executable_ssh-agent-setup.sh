@@ -8,11 +8,13 @@ start_agent() {
     echo "Starting new ssh-agent..."
     ssh-agent | sed 's/^echo/#echo/' > "${SSH_ENV}"
     chmod 600 "${SSH_ENV}"
+    # shellcheck source=/dev/null
     . "${SSH_ENV}" > /dev/null
     ssh-add
 }
 
 if [ -f "${SSH_ENV}" ]; then
+    # shellcheck source=/dev/null
     . "${SSH_ENV}" > /dev/null
     if ! ssh-add -l >/dev/null 2>&1; then
         # Agent is dead or has no keys, start new one
