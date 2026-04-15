@@ -4,3 +4,4 @@ repos:
     hooks:
       - id: shellcheck
         files: ^scripts/executable_.*$
+        args: [--severity=warning, --shell=bash]

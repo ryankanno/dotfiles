@@ -4,7 +4,6 @@ HISTORY.md
 .gitignore
 .github
 .pre-commit-config.yaml
-.shellcheckrc
 CLAUDE.md
 .claude
 {{- if eq .chezmoi.os "linux" }}
