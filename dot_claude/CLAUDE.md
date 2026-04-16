@@ -25,6 +25,7 @@
 - Debug from the entrypoint where the symptom surfaced, not from whichever file is easiest to edit.
 - Before renaming or deleting any symbol, grep all callers and confirm the ripple.
 - After two failures with the same tool or approach, change strategy. Do not attempt a third time.
+- Do not start dev servers or long-running watchers. Assume one is already running.
 
 ## Tools
 - Python: `uv` + `just`. Node: `pnpm`.
@@ -32,6 +33,8 @@
 - Use absolute paths in every tool call; never `~` or relative paths.
 - One command per Bash call; no `&&` chains.
 - Multi-line scripts go to `/tmp/` and run from there. No `python -c`, `node -e`, or inline heredoc shell snippets.
+- Prefer stdlib. Any new dependency requires a written justification: what it does that stdlib can't, its maintenance status, transitive count, and known CVEs.
+- Do not modify `package.json`, `tsconfig.json`, `pyproject.toml`, or lockfiles without explicit request. Dep bumps and compiler-flag tweaks are their own task.
 
 ## Commits
 - Use conventional commit messages: `type(scope): description`. The `prepare-commit-msg` hook is bypassed by the pre-commit framework, so the format is manual discipline.
