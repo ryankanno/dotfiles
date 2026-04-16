@@ -32,7 +32,13 @@ home-manager switch --flake .#ryankanno@macmini --impure
 ### Directory Structure
 - `dot_*` - Files deployed to `~/.*` (bash configs, gitconfig, tmux.conf, etc.)
 - `dot_config/` - Files deployed to `~/.config/` (home-manager, nvim, btop, direnv)
-- `dot_claude/` - Claude Code configuration (slash commands in `commands/`)
+- `dot_claude/` - Claude Code global configuration:
+  - `CLAUDE.md` - global instructions loaded every session
+  - `settings.json` - permissions, hooks, plugins, env vars, status line
+  - `agents/` - subagent definitions (e.g. `diataxis-expert`)
+  - `skills/` - model-invoked skills (`preflight`, `bootstrap-python-project`, `diataxis-knowledge`)
+  - `scripts/` - shared hook helpers (`ntfy-notify.sh` for push notifications)
+  - `commands/` - slash commands (currently empty; built-ins and skills cover common workflows)
 - `dot_hammerspoon/` - macOS window management and key bindings
 - `dot_githooks/` - Git hooks (prepare-commit-msg for conventional commits)
 - `scripts/` - Utility scripts (git workflows, ssh setup)

@@ -4,6 +4,18 @@
 
 I have some serious dotfiles.  Here they are.
 
+## claude code
+
+Global config under `dot_claude/` (deploys to `~/.claude/`):
+
+- `CLAUDE.md` — global instructions
+- `settings.json` — permissions, hooks, plugins, env, status line
+- `skills/` — `preflight`, `bootstrap-python-project`, `diataxis-knowledge`
+- `agents/` — `diataxis-expert`
+- `scripts/` — `ntfy-notify.sh` (push notifications via ntfy)
+
+Notifications require `NTFY_SERVER_URL` in the shell environment; without it, hooks silently no-op.
+
 ## home-manager (linux/macmini)
 
 ### Switching configurations
