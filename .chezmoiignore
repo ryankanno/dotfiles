@@ -5,7 +5,6 @@ HISTORY.md
 .github
 .pre-commit-config.yaml
 CLAUDE.md
-.claude
 {{- if eq .chezmoi.os "linux" }}
 .hammerspoon
 .finicky.js
