@@ -136,12 +136,22 @@
   "hooks": {
     "Notification": [
       {
-        "matcher": "",
+        "matcher": "idle_prompt",
         "hooks": [
           {
             "type": "command",
             "timeout": 10,
-            "command": "$HOME/.claude/scripts/ntfy-notify.sh notification"
+            "command": "$HOME/.claude/scripts/ntfy-notify.sh notification-idle"
+          }
+        ]
+      },
+      {
+        "matcher": "permission_prompt",
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 10,
+            "command": "$HOME/.claude/scripts/ntfy-notify.sh notification-permission"
           }
         ]
       }
