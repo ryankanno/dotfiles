@@ -2,25 +2,75 @@
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "permissions": {
     "allow": [
-      "Bash(cargo check:*)",
-      "Bash(cargo clippy:*)",
-      "Bash(cargo doc:*)",
+      "Bash(awk:*)",
+      "Bash(basename:*)",
+      "Bash(brew:*)",
+      "Bash(cargo:*)",
       "Bash(cat:*)",
-      "Bash(curl:*)",
+      "Bash(chezmoi:*)",
+      "Bash(chmod +x:*)",
+      "Bash(cp:*)",
+      "Bash(curl https://api.github.com/*)",
+      "Bash(curl https://crates.io/*)",
+      "Bash(curl https://github.com/*)",
+      "Bash(curl https://objects.githubusercontent.com/*)",
+      "Bash(curl https://raw.githubusercontent.com/*)",
+      "Bash(curl https://registry.npmjs.org/*)",
+      "Bash(curl https://sh.rustup.rs/*)",
+      "Bash(curl https://v2.tauri.app/*)",
+      "Bash(cut:*)",
+      "Bash(date:*)",
+      "Bash(diff:*)",
+      "Bash(dirname:*)",
+      "Bash(docker:*)",
+      "Bash(echo:*)",
+      "Bash(env)",
+      "Bash(false)",
       "Bash(fd:*)",
       "Bash(file:*)",
       "Bash(find:*)",
+      "Bash(gh:*)",
+      "Bash(git:*)",
+      "Bash(git config --global --get:*)",
+      "Bash(git config --global --list)",
+      "Bash(git config --global -l)",
+      "Bash(go:*)",
       "Bash(grep:*)",
       "Bash(head:*)",
+      "Bash(home-manager:*)",
       "Bash(jq:*)",
       "Bash(just:*)",
+      "Bash(ln:*)",
       "Bash(ls:*)",
-      "Bash(pnpm:build)",
+      "Bash(make:*)",
+      "Bash(mkdir:*)",
+      "Bash(mv:*)",
+      "Bash(nix:*)",
+      "Bash(node:*)",
+      "Bash(npm:*)",
+      "Bash(npx:*)",
+      "Bash(pip:*)",
+      "Bash(pnpm:*)",
+      "Bash(printf:*)",
       "Bash(pwd)",
+      "Bash(python:*)",
+      "Bash(python3:*)",
+      "Bash(realpath:*)",
       "Bash(rg:*)",
+      "Bash(rm:*)",
+      "Bash(sed:*)",
+      "Bash(sort:*)",
+      "Bash(stat:*)",
       "Bash(tail:*)",
+      "Bash(test:*)",
+      "Bash(touch:*)",
       "Bash(tree:*)",
+      "Bash(true)",
+      "Bash(uname:*)",
+      "Bash(uniq:*)",
+      "Bash(uv:*)",
       "Bash(wc:*)",
+      "Bash(which:*)",
       "Skill(dev-browser:dev-browser)",
       "Task(**)",
       "TodoRead(**)",
@@ -31,25 +81,52 @@
       "WebSearch"
     ],
     "deny": [
+      "Bash(chmod 777:*)",
+      "Bash(chown:*)",
       "Bash(curl:*)",
       "Bash(dd:*)",
+      "Bash(defaults write:*)",
       "Bash(fdisk:*)",
-      "Bash(git commit:*)",
-      "Bash(git push:*)",
-      "Bash(git rebase:*)",
-      "Bash(git reset:*)",
+      "Bash(git branch -D:*)",
+      "Bash(git checkout -- .)",
+      "Bash(git clean -fd:*)",
+      "Bash(git clean -fx:*)",
+      "Bash(git config --global:*)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(git restore .)",
+      "Bash(halt:*)",
+      "Bash(killall:*)",
+      "Bash(launchctl:*)",
       "Bash(mkfs:*)",
       "Bash(mysql:*)",
       "Bash(nc:*)",
+      "Bash(pkill:*)",
+      "Bash(poweroff:*)",
       "Bash(psql:*)",
-      "Bash(rm:*)",
+      "Bash(reboot:*)",
+      "Bash(rm -fr:*)",
+      "Bash(rm -rf:*)",
+      "Bash(shutdown:*)",
       "Bash(su:*)",
       "Bash(sudo:*)",
       "Bash(wget:*)",
-      "Read(.env.*)",
-      "Read(id_ed25519)",
-      "Read(id_rsa)",
-      "Write(.env*)",
+      "Read(**/.aws/config)",
+      "Read(**/.aws/credentials)",
+      "Read(**/.config/gh/hosts.yml)",
+      "Read(**/.docker/config.json)",
+      "Read(**/.env.*)",
+      "Read(**/.gnupg/**)",
+      "Read(**/.kube/config)",
+      "Read(**/.netrc)",
+      "Read(**/.ssh/**)",
+      "Read(**/id_ed25519)",
+      "Read(**/id_rsa)",
+      "Write(**/.aws/**)",
+      "Write(**/.env*)",
+      "Write(**/.gnupg/**)",
+      "Write(**/.ssh/**)",
       "Write(**/secrets/**)"
     ]
   },
@@ -60,7 +137,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "jq -r '\"\\(.title // Claude Code)\" as $title | \"\\(.message // No message)\" as $msg | @sh \"curl -H \\\"Title: \\($title)\\\" -d \\($msg) $NTFY_SERVER_URL/cc\"' | sh"
+            "timeout": 10,
+            "command": "$HOME/.claude/scripts/ntfy-notify.sh notification"
           }
         ]
       }
@@ -71,7 +149,20 @@
         "hooks": [
           {
             "type": "command",
-            "command": "curl -H \"Title: Claude Code\" -d \"Task completed for $(git remote get-url origin 2>/dev/null | sed 's/.*[/:]\\([^/]*\\)\\/\\([^/]*\\)$/\\1\\/\\2/' || echo 'unknown') ($(pwd)) on branch $(git branch --show-current 2>/dev/null || echo 'no git') 🎆\" $NTFY_SERVER_URL/cc"
+            "timeout": 10,
+            "command": "$HOME/.claude/scripts/ntfy-notify.sh stop"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 10,
+            "command": "$HOME/.claude/scripts/ntfy-notify.sh subagent-stop"
           }
         ]
       }
@@ -90,5 +181,9 @@
     "pyright-lsp@claude-plugins-official": true,
     "dev-browser@dev-browser-marketplace": true
   },
-  "alwaysThinkingEnabled": true
+  "includeCoAuthoredBy": false,
+  "cleanupPeriodDays": 36500,
+  "env": {
+    "BASH_DEFAULT_TIMEOUT_MS": "120000"
+  }
 }

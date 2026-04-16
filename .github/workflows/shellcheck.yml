@@ -8,11 +8,14 @@ on:
 jobs:
   shellcheck:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        scandir: ['./scripts', './dot_claude/scripts']
     steps:
       - uses: actions/checkout@v4
-      - name: Run shellcheck
+      - name: Run shellcheck on ${{ matrix.scandir }}
         uses: ludeeus/action-shellcheck@master
         env:
           SHELLCHECK_OPTS: --severity=warning --shell=bash
         with:
-          scandir: ./scripts
+          scandir: ${{ matrix.scandir }}

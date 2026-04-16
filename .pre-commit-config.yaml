@@ -3,5 +3,5 @@ repos:
     rev: v0.10.0.1
     hooks:
       - id: shellcheck
-        files: ^scripts/executable_.*$
+        files: ^(scripts|dot_claude/scripts)/executable_.*$
         args: [--severity=warning, --shell=bash]
