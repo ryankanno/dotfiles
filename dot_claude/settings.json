@@ -192,7 +192,24 @@
     "code-review@claude-plugins-official": true,
     "pr-review-toolkit@claude-plugins-official": true,
     "pyright-lsp@claude-plugins-official": true,
-    "dev-browser@dev-browser-marketplace": true
+    "dev-browser@dev-browser-marketplace": true,
+    "skill-creator@claude-plugins-official": true,
+    "autoresearch@autoresearch": true,
+    "linear-cli@linear-cli": true
+  },
+  "extraKnownMarketplaces": {
+    "autoresearch": {
+      "source": {
+        "source": "github",
+        "repo": "uditgoenka/autoresearch"
+      }
+    },
+    "linear-cli": {
+      "source": {
+        "source": "github",
+        "repo": "schpet/linear-cli"
+      }
+    }
   },
   "includeCoAuthoredBy": false,
   "cleanupPeriodDays": 36500,
