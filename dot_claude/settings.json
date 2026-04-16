@@ -183,7 +183,7 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "pnpm dlx ccusage statusline"
+    "command": "bunx ccusage statusline"
   },
   "enabledPlugins": {
     "context7@claude-plugins-official": true,
