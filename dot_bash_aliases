@@ -151,7 +151,10 @@ alias dry-rsync-sync="${rsync_cmd} --update --delete --dry-run"
 
 unset rsync_cmd
 
-if [[ "$OSTYPE" != darwin* ]]; then
+if grep -qE 'Microsoft|WSL' /proc/sys/kernel/osrelease 2>/dev/null; then
+  alias pbcopy="clip.exe"
+  alias pbpaste="powershell.exe -command 'Get-Clipboard' | tr -d '\r'"
+elif [[ "$OSTYPE" != darwin* ]]; then
   alias pbcopy="xclip -selection clipboard"
   alias pbpaste="xclip -selection clipboard -o"
 fi
