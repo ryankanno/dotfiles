@@ -33,6 +33,7 @@ unstable-tools-packages = with unstable; [
     killall
     litestream     # https://github.com/benbjohnson/litestream
     miller         # https://github.com/johnkerl/miller
+    mise           # dev tools version manager (https://github.com/jdx/mise)
     moreutils      # https://joeyh.name/code/moreutils/
     mosh           # mobile shell (https://github.com/mobile-shell/mosh)
     neofetch       # system info tool (https://github.com/dylanaraps/neofetch)

@@ -51,6 +51,13 @@ The `.chezmoiignore` file uses chezmoi templating to exclude macOS-specific file
 - `dot_config/home-manager/darwin.nix` - macOS-specific packages and settings
 - `dot_config/home-manager/linux.nix` - Linux-specific packages and settings
 
+### Runtime Version Management
+- [mise](https://mise.jdx.dev/) manages Python, Node, Ruby, and other runtimes (replaces anyenv/pyenv/nodenv/rbenv)
+- Activated via `mise activate bash` in `dot_bashrc`
+- Global tool versions live in `~/.config/mise/config.toml` (not versioned here)
+- Per-project versions declared in `.mise.toml` under `[tools]`; env vars under `[env]` (e.g. `UV_PYTHON`)
+- direnv integration: `use_mise()` in `dot_config/direnv/direnvrc` enables `use mise` in `.envrc` files, which loads mise's environment into direnv's context before other layout commands (e.g. `use uv`)
+
 ### Git Configuration
 - Uses `~/.githooks` for custom hooks (set via `core.hooksPath`)
 - Includes `.gitconfig.local` for machine-specific settings (email, signing key)

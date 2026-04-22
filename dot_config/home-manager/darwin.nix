@@ -33,6 +33,7 @@ unstable-tools-packages = with unstable; [
     just           # command runner (https://github.com/casey/just)
     killall
     miller         # https://github.com/johnkerl/miller
+    mise           # dev tools version manager (https://github.com/jdx/mise)
     moreutils      # https://joeyh.name/code/moreutils/
     neofetch       # system info tool (https://github.com/dylanaraps/neofetch)
     onefetch       # git info tool (https://github.com/o2sh/onefetch)

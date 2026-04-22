@@ -25,7 +25,7 @@ command -v eza &>/dev/null && alias lk='ll -s=size' || alias lk='ll -r --sort=si
 command -v eza &>/dev/null && alias lm='ll -s=modified' || alias lm='ll -r --sort=time'
 command -v eza &>/dev/null && alias lak='la -s=size' || alias lak='la -r --sort=size'
 command -v eza &>/dev/null && alias lam='la -s=modified' || alias lam='la -r --sort=time'
-command -v rg &>/dev/null && alias rg='rg --hidden --follow --smart-case --heading --line-number --pager "less --no-init --quit-if-one-screen --RAW-CONTROL-CHARS" 2>/dev/null' || alias rg='grep --color=auto --exclude-dir=.git -R'
+command -v rg &>/dev/null && alias rg='rg --hidden --follow --smart-case --heading --line-number 2>/dev/null' || alias rg='grep --color=auto --exclude-dir=.git -R'
 
 # stats
 alias t20="history | awk '{print \$4}' | sort | uniq -c | sort -n | tail -n20 | sort -r"

@@ -3,6 +3,11 @@ realpath() {
     [[ $1 = /* ]] && echo "$1" || echo "$PWD/${1#./}"
 }
 
+# mise integration — use `use mise` in .envrc to activate mise-managed runtimes
+use_mise() {
+    direnv_load mise direnv exec
+}
+
 # Function to setup a venv and activate (will create one if it doesn't exist)
 use_venv() {
     uv venv --allow-existing

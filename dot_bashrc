@@ -47,24 +47,11 @@ export ANDROID_HVPROTO=ddm
 # atuin
 command -v atuin &>/dev/null && eval "$(atuin init bash)"
 
+# mise
+command -v mise &>/dev/null && eval "$(mise activate bash)"
+
 # direnv
 command -v direnv &>/dev/null && eval "$(direnv hook bash)"
-
-# lazy loaders
-function pyenv() {
-    unset -f pyenv
-    [[ -f "$HOME/.anyenv/envs/pyenv/.pyenvrc" ]] && source "$HOME/.anyenv/envs/pyenv/.pyenvrc"
-    command pyenv $@
-}
-
-function nodenv() {
-    unset -f nodenv
-    [[ -f "$HOME/.anyenv/envs/nodenv/.nodenvrc" ]] && source "$HOME/.anyenv/envs/nodenv/.nodenvrc"
-    command nodenv $@
-}
-
-# load directly (because of PS1)
-[[ -f "$HOME/.anyenv/envs/rbenv/.rbenvrc" ]] && source "$HOME/.anyenv/envs/rbenv/.rbenvrc"
 
 [[ -f "${BASH_IT}/bash_it.sh" ]] && source "$BASH_IT/bash_it.sh"
 

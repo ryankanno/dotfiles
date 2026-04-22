@@ -16,6 +16,47 @@ Global config under `dot_claude/` (deploys to `~/.claude/`):
 
 Notifications require `NTFY_SERVER_URL` in the shell environment; without it, hooks silently no-op.
 
+## mise (runtime version management)
+
+mise manages Python, Node, Ruby, and other runtimes. It replaces anyenv/pyenv/nodenv/rbenv and is installed via home-manager.
+
+### Setting global tool versions
+
+After a fresh install, set your global defaults:
+
+```bash
+mise use --global python@3.11 node@22 ruby@3.3
+```
+
+This writes to `~/.config/mise/config.toml`.
+
+### Per-project setup
+
+Create a `.mise.toml` in the project root:
+
+```toml
+[tools]
+python = "3.11"
+node = "22"
+
+[env]
+UV_PYTHON = "3.11"   # pins uv to the mise-managed Python
+```
+
+Then run `mise install` to download any missing versions.
+
+### direnv integration
+
+Projects using direnv should call `use mise` before any layout commands:
+
+```bash
+# .envrc
+use mise      # loads mise runtimes + [env] vars into direnv context
+use uv        # now sees mise's Python via UV_PYTHON
+```
+
+`use_venv` (create/activate venv only) and `use_uv` (venv + uv sync, requires pyproject.toml) are defined in `dot_config/direnv/direnvrc`.
+
 ## home-manager (linux/macmini)
 
 ### Switching configurations
