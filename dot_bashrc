@@ -26,16 +26,18 @@ unset MAILCHECK
 # vi mode
 set -o vi
 
-# os specific
-if [[ "$OSTYPE" == "darwin"* ]]; then
+# editor - nvim > vim > vi
+if command -v nvim &>/dev/null; then
     export VISUAL="nvim"
-    export EDITOR="$VISUAL"
-    export GIT_EDITOR="$VISUAL -f"
+elif command -v vim &>/dev/null; then
+    export VISUAL="vim"
+else
+    export VISUAL="vi"
 fi
+export EDITOR="$VISUAL"
 
+# os specific
 if [[ "$OSTYPE" == "linux"* ]]; then
-    export VISUAL="nvim"
-    export EDITOR="$VISUAL"
     # procs
     command -v procs &>/dev/null && source <(procs --gen-completion-out bash)
 fi
