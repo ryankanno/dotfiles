@@ -66,33 +66,56 @@ export NIXPKGS_ALLOW_INSECURE=1
 home-manager switch --flake .#ryankanno@{linux,macmini} --impure
 ```
 
+### Updating packages (within current channel)
+
+To pull newer package versions without changing the nixpkgs channel:
+
+1. Update the flake lock:
+   ```bash
+   cd ~/.config/home-manager
+   nix flake update
+   ```
+
+2. Apply:
+   ```bash
+   export NIXPKGS_ALLOW_INSECURE=1
+   home-manager switch --flake ~/.config/home-manager#ryankanno@linux --impure
+   ```
+
+3. Pull the updated lock back into the chezmoi source and commit:
+   ```bash
+   chezmoi add ~/.config/home-manager/flake.lock
+   cd ~/.local/share/chezmoi/dotfiles
+   git commit -m "chore: update flake.lock"
+   ```
+
 ### Upgrading nix channels
 
-To upgrade to a newer nixpkgs version (e.g., from 24.05 to 24.11):
+To upgrade to a newer nixpkgs version:
 
-1. Update the channel versions in `dot_config/home-manager/flake.nix`:
+1. Edit `~/.config/home-manager/flake.nix` with the new channel versions:
    ```nix
-   inputs.nixpkgs.url = "github:nixos/nixpkgs/nixos-24.11";
-   inputs.nixpkgs-darwin.url = "github:nixos/nixpkgs/nixpkgs-24.11-darwin";
-   inputs.home-manager.url = "github:nix-community/home-manager/release-24.11";
+   inputs.nixpkgs.url = "github:nixos/nixpkgs/nixos-25.11";
+   inputs.nixpkgs-darwin.url = "github:nixos/nixpkgs/nixpkgs-25.11-darwin";
+   inputs.home-manager.url = "github:nix-community/home-manager/release-25.11";
    ```
 
 2. Update the flake lock:
    ```bash
-   cd ~/.local/share/chezmoi/dot_config/home-manager
+   cd ~/.config/home-manager
    nix flake update
    ```
 
-3. Apply the changes:
+3. Apply:
    ```bash
    export NIXPKGS_ALLOW_INSECURE=1
-   home-manager switch --flake .#ryankanno@{linux,macmini} --impure
+   home-manager switch --flake ~/.config/home-manager#ryankanno@linux --impure
    ```
 
-4. Commit the updated `flake.nix` and `flake.lock`:
+4. Pull the changes back into the chezmoi source and commit:
    ```bash
-   cd ~/.local/share/chezmoi
    chezmoi add ~/.config/home-manager/flake.nix
    chezmoi add ~/.config/home-manager/flake.lock
-   git commit -m "chore: upgrade nixpkgs to 24.11"
+   cd ~/.local/share/chezmoi/dotfiles
+   git commit -m "chore: upgrade nixpkgs to 25.11"
    ```

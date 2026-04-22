@@ -17,7 +17,7 @@ unstable-tools-packages = with unstable; [
     delta          # pager (https://github.com/dandavison/delta)
     difftastic     # structural diff (https://github.com/Wilfred/difftastic)
     dua            # disk usage (https://github.com/Byron/dua-cli)
-    du-dust        # disk usage (https://github.com/bootandy/dust)
+    dust           # disk usage (https://github.com/bootandy/dust)
     erdtree        # fs + disk usage (https://github.com/solidiquis/erdtree)
     eza            # ls alternative (https://github.com/eza-community/eza)
     fd             # find alternative (https://github.com/sharkdp/fd)
@@ -36,7 +36,7 @@ unstable-tools-packages = with unstable; [
     mise           # dev tools version manager (https://github.com/jdx/mise)
     moreutils      # https://joeyh.name/code/moreutils/
     mosh           # mobile shell (https://github.com/mobile-shell/mosh)
-    neofetch       # system info tool (https://github.com/dylanaraps/neofetch)
+    fastfetch      # system info tool (https://github.com/fastfetch-cli/fastfetch)
     onefetch       # git info tool (https://github.com/o2sh/onefetch)
     (lib.hiPrio parallel)
     prettyping     # ping wrapper (https://github.com/denilsonsa/prettyping)
