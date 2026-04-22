@@ -43,14 +43,14 @@ fi
 # android
 export ANDROID_HVPROTO=ddm
 
-# atuin
-command -v atuin &>/dev/null && eval "$(atuin init bash)"
-
 # mise
 command -v mise &>/dev/null && eval "$(mise activate bash)"
 
 # fzf
 [[ -f "${HOME}/.fzf.bash" ]] && source "${HOME}/.fzf.bash"
+
+# atuin (must come after fzf to own ctrl-r)
+command -v atuin &>/dev/null && eval "$(atuin init bash)"
 
 # direnv
 command -v direnv &>/dev/null && eval "$(direnv hook bash)"
