@@ -17,9 +17,6 @@ export TODO="t"
 # bat
 export BAT_THEME='Monokai Extended'
 
-# fzf
-[[ -f "${HOME}/.fzf.bash" ]] && source "${HOME}/.fzf.bash"
-
 # remove annoying you got mail
 unset MAILCHECK
 
@@ -51,6 +48,9 @@ command -v atuin &>/dev/null && eval "$(atuin init bash)"
 
 # mise
 command -v mise &>/dev/null && eval "$(mise activate bash)"
+
+# fzf
+[[ -f "${HOME}/.fzf.bash" ]] && source "${HOME}/.fzf.bash"
 
 # direnv
 command -v direnv &>/dev/null && eval "$(direnv hook bash)"
