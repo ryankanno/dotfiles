@@ -156,6 +156,15 @@ elif [[ "$OSTYPE" != darwin* ]]; then
   alias pbpaste="xclip -selection clipboard -o"
 fi
 
+# git hooks
+git-install-llm-hook() {
+    local git_dir
+    git_dir=$(git rev-parse --git-dir 2>/dev/null) || { echo "Not a git repository"; return 1; }
+    mkdir -p "${git_dir}/hooks"
+    ln -sf "${HOME}/.githooks/prepare-commit-msg" "${git_dir}/hooks/prepare-commit-msg"
+    echo "Installed prepare-commit-msg hook"
+}
+
 # uuidgen lower
 if [[ "$OSTYPE" == darwin* ]]; then
   alias uuidgen='uuidgen | tr "[:upper:]" "[:lower:]"'

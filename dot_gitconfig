@@ -184,8 +184,6 @@
 	nobranch = red
 
 [core]
-    excludesfile = ~/.gitignore
-    hooksPath = ~/.githooks
     autocrlf = input
 
 [includeIf "gitdir:C:/"]
