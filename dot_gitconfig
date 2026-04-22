@@ -186,8 +186,10 @@
 [core]
     excludesfile = ~/.gitignore
     hooksPath = ~/.githooks
-    editor = vim
-    autocrlf = true
+    autocrlf = input
+
+[includeIf "gitdir:C:/"]
+    path = ~/.config/git/config.windows
 
 [init]
     defaultBranch = main
