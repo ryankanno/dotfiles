@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -uo pipefail
 ancestor_decrypted="$1__decrypt"
 current_decrypted="$2__decrypt"
 other_decrypted="$3__decrypt"
@@ -17,8 +18,8 @@ cat $3 | git-crypt smudge > "${other_decrypted}"
 echo ""
 
 echo "Merging ..."
-git merge-file -L "current branch" -L "ancestor branch" -L "other branch" "${current_decrypted}" "${ancestor_decrypted}" "${other_decrypted}"
-exit_code=$?
+exit_code=0
+git merge-file -L "current branch" -L "ancestor branch" -L "other branch" "${current_decrypted}" "${ancestor_decrypted}" "${other_decrypted}" || exit_code=$?
 cat "${current_decrypted}" | git-crypt clean > $2
 
 echo "Removing temporary files..."

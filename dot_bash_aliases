@@ -4,17 +4,17 @@ alias ...='cd ../..'
 alias ....='cd ../../../'
 
 # network
-alias ip="dig +short myip.opendns.com @resolver1.opendns.com"
+alias myip="dig +short myip.opendns.com @resolver1.opendns.com"
 
 # dev
-alias fakesmtp='python -m smtpd -n -c DebuggingServer localhost:1025'
+alias fakesmtp='python3 -m aiosmtpd -n -l localhost:1025'
 
 # pretties
 command -v bat &>/dev/null && alias cat='bat'
 command -v curlie &>/dev/null && alias curl='curlie'
 command -v dust &>/dev/null && alias du='dust'
-command -v fd &>/dev/null && alias find='fd --hidden --follow --no-ignore'
-command -v eza &>/dev/null && alias ls='eza --group --git --group-directories-first --long --icons' || alias ls='ls --color=auto --group-directories-first -hl'
+command -v fd &>/dev/null && alias f='fd --hidden --follow --no-ignore'
+command -v eza &>/dev/null && alias ll='eza --group --git --group-directories-first --long --icons' || alias ll='ls -hl --color=auto --group-directories-first'
 command -v eza &>/dev/null && alias tree='eza --tree --icons'
 command -v eza &>/dev/null && alias la='ll -a' || alias la='ll -A'
 command -v eza &>/dev/null && alias ld='ll -D' || alias ld='ll --directory'
@@ -22,7 +22,7 @@ command -v eza &>/dev/null && alias lk='ll -s=size' || alias lk='ll -r --sort=si
 command -v eza &>/dev/null && alias lm='ll -s=modified' || alias lm='ll -r --sort=time'
 command -v eza &>/dev/null && alias lak='la -s=size' || alias lak='la -r --sort=size'
 command -v eza &>/dev/null && alias lam='la -s=modified' || alias lam='la -r --sort=time'
-command -v rg &>/dev/null && alias rg='rg --hidden --follow --smart-case --heading --line-number 2>/dev/null' || alias rg='grep --color=auto --exclude-dir=.git -R'
+command -v rg &>/dev/null && alias rg='rg --hidden --follow --smart-case --heading --line-number' || alias rg='grep --color=auto --exclude-dir=.git -R'
 
 # stats
 alias t20="history | awk '{print \$4}' | sort | uniq -c | sort -n | tail -n20 | sort -r"

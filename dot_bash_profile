@@ -1,4 +1,4 @@
-# !/usr/bin/env bash
+#!/usr/bin/env bash
 #
 # open file descriptor 5 such that anything written to /dev/fd/5
 # is piped through ts and then to /tmp/bash_timestamps
@@ -42,5 +42,5 @@ export PATH="$HOME/.local/bin:$PATH"
 # always just bounce into tmux
 if command -v tmux &>/dev/null && [[ -z "$TMUX" ]] && [[ -t 0 ]] && [[ $- == *i* ]]; then
     tmux has-session -t default 2>/dev/null || tmux new-session -d -s default 2>/dev/null
-    tmux attach-session -t default 2>/dev/null
+    tmux attach-session -t default
 fi

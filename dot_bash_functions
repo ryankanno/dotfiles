@@ -28,7 +28,7 @@ function calc() {
 }
 
 # https://unix.stackexchange.com/questions/6/what-are-your-favorite-command-line-features-or-tricks/122#122
-function cd {
+function cd() {
     builtin cd "$@" && ls
 }
 
@@ -49,7 +49,7 @@ function datauri() {
     if [[ $mimeType == text/* ]]; then
         mimeType="${mimeType};charset=utf-8"
     fi
-    printf "data:${mimeType};base64,$(openssl base64 -in "$1" | tr -d '\n')" | pbcopy | printf "=> data URI copied to pasteboard.\n"
+    printf '%s' "data:${mimeType};base64,$(openssl base64 -in "$1" | tr -d '\n')" | pbcopy && printf "=> data URI copied to pasteboard.\n"
 }
 
 function dirty_repos() {
@@ -114,7 +114,7 @@ function gi() {
 }
 
 function keel() {
-    sudo kill -9 $(ps ax | grep "$1" | grep -v grep | awk '{print $1}')
+    sudo pkill -9 -f "$1"
 }
 
 function lcm() {
@@ -245,7 +245,7 @@ function tmk() {
 }
 
 function used() {
-    du -sch .[!.]* * 2>/dev/null | gsort -hr | head -$1
+    du -sch .[!.]* * 2>/dev/null | (command -v gsort &>/dev/null && gsort -hr || sort -hr) | head -$1
 }
 
 # not sure where i found this one, but queries wikipedia

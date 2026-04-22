@@ -14,7 +14,7 @@ module.exports = {
     {
       match: [
         "zoom.us/*",
-        finicky.matchDomains(/.*\zoom.us/),
+        finicky.matchDomains(/.*\.zoom\.us/),
         /zoom.us\/j\//,
       ],
       browser: "us.zoom.xos"

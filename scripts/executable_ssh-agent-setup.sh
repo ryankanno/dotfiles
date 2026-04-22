@@ -25,5 +25,3 @@ if [ -f "${SSH_ENV}" ]; then
 else
     start_agent
 fi
-
-alias git='git -c gpg.ssh.program=/usr/bin/ssh-keygen'

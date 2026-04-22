@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
 
 TODO=$(rofi -dmenu -l 0 -yoffset -300 -p "todo" -theme-str 'entry { placeholder: "what do you need todo?"; } inputbar { children: [prompt, textbox-prompt-colon, entry];}')
 

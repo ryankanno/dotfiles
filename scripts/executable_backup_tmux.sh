@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
 BACKUP_DIR="$HOME/.tmux-backups"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Parallel GitHub Issues Processor
 # Fetches GitHub issues, creates worktrees, and runs Claude for each issue in parallel

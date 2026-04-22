@@ -164,7 +164,7 @@
 	old = red
 	new = green
 	commit = yellow
-	whitespace = normal red
+	whitespace = default red
 
 [color "grep"]
 	match = normal
@@ -187,6 +187,7 @@
     excludesfile = ~/.gitignore
     hooksPath = ~/.githooks
     editor = vim
+    autocrlf = true
 
 [init]
     defaultBranch = main
@@ -198,6 +199,9 @@
 
 [pull]
     rebase = true
+
+[fetch]
+    prune = true
 
 [diff]
     mnemonicprefix = true
@@ -216,7 +220,7 @@
 
 [merge]
     tool = bc
-    conflictstyle = diff3
+    conflictstyle = zdiff3
 
 [mergetool]
     prompt = false
@@ -226,6 +230,9 @@
 
 [rebase]
     autosquash = true
+
+[rerere]
+    enabled = true
 
 [bash-it]
 	hide-status = 0

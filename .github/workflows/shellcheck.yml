@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run shellcheck on ${{ matrix.scandir }}
-        uses: ludeeus/action-shellcheck@master
+        uses: ludeeus/action-shellcheck@00b27aa7cb85167568cb48a3838b75f4265f2bca
         env:
           SHELLCHECK_OPTS: --severity=warning --shell=bash
         with:

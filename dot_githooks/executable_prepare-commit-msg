@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Exit if the `SKIP_LLM_GITHOOK` environment variable is set
 if [ ! -z "$SKIP_LLM_GITHOOK" ]; then
@@ -55,7 +55,9 @@ if ! commit_msg=$(git diff -U999999 --cached | llm -s "$(cat ~/.config/prompts/s
     tput cnorm  # Show the cursor again
     echo
 
-    printf "${RED}Error: 'llm' command failed to generate the commit message:\\n${commit_msg}${NC}\\n\\nPlease manually set the commit message via git -m or SKIP_LLM_GITHOOK.\\n"
+    printf '%s\n' "${RED}Error: 'llm' command failed to generate the commit message:"
+    printf '%s\n' "${commit_msg}${NC}"
+    printf '%s\n' "Please manually set the commit message via git -m or SKIP_LLM_GITHOOK."
     exit 1
 fi
 
@@ -69,7 +71,7 @@ echo
 
 # Display the generated commit message with color-coded headings
 printf "${BLUE}=== Generated Commit Message ===${NC}\\n"
-printf "${GREEN}$commit_msg${NC}\\n"
+printf '%s\n' "${GREEN}${commit_msg}${NC}"
 printf "${BLUE}=================================${NC}\\n"
 
 echo

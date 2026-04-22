@@ -4,7 +4,7 @@
 
 linux-packages = with unstable; [
     calibre        # ebook manager (https://github.com/kovidgoyal/calibre)
-    dust           # disk usage (https://github.com/bootandy/dust)
+    du-dust        # disk usage (https://github.com/bootandy/dust)
     fastfetch      # system info tool (https://github.com/fastfetch-cli/fastfetch)
     litestream     # https://github.com/benbjohnson/litestream
     mosh           # mobile shell (https://github.com/mobile-shell/mosh)
