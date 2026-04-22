@@ -37,6 +37,8 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
 fi
 
 if [[ "$OSTYPE" == "linux"* ]]; then
+    export VISUAL="nvim"
+    export EDITOR="$VISUAL"
     # procs
     command -v procs &>/dev/null && source <(procs --gen-completion-out bash)
 fi

@@ -3,9 +3,6 @@ alias ..='cd ..'
 alias ...='cd ../..'
 alias ....='cd ../../../'
 
-# ls
-alias ll="ls -l"
-
 # network
 alias ip="dig +short myip.opendns.com @resolver1.opendns.com"
 
@@ -108,7 +105,7 @@ dkstopit() { docker stop $(docker ps -aqf "ancestor=$1"); }
 dkexe() { docker exec -it $1 $2; }
 
 # exec command ($2) in container by name ($1)
-dkexcn() { dkexe $(docker ps -aqf "name=$1") /bin/sh -c '"$2"'; }
+dkexcn() { dkexe $(docker ps -aqf "name=$1") /bin/sh -c "$2"; }
 
 # shell into container by id
 dkexshc() { dkexe "$1" /bin/sh; }

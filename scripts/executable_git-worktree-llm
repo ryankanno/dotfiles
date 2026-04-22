@@ -233,16 +233,13 @@ EXAMPLES:
 WORKFLOW:
     1. git worktree-llm feature-name        # Start new feature
     2. # Work with Claude...
-    3. git worktree-merge                   # Complete and merge (separate command)
+    3. cd <repo-root> && git merge <branch> # Complete and merge manually
 
 NOTES:
     - Branch names are validated for safety
     - Slashes in branch names become hyphens in directory names
     - Existing worktrees are reused if found
     - Default branch (main/master) is auto-detected
-
-SEE ALSO:
-    git-worktree-merge - Complete and merge feature branch
 EOF
 }
 

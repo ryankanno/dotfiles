@@ -1,15 +1,4 @@
-# enable fzf keybindings
-{{- if eq .chezmoi.os "darwin" }}
-source /opt/local/share/fzf/shell/key-bindings.bash
-
-# enable fzf fuzzy completion
-[[ $- == *i* ]] && source /opt/local/share/fzf/shell/completion.bash 2> /dev/null
-{{- else if eq .chezmoi.os "linux" }}
-source /usr/share/doc/fzf/examples/key-bindings.bash
-
-# enable fzf fuzzy completion
-[[ $- == *i* ]] && source /usr/share/doc/fzf/examples/completion.bash 2> /dev/null
-{{- end }}
+command -v fzf &>/dev/null && eval "$(fzf --bash)"
 
 # w/ modifications
 if hash fd 2> /dev/null; then

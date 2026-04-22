@@ -124,7 +124,7 @@ function lcm() {
     local last_commit_message
     last_commit_message=$(git log -1 --pretty=%B)
 
-    echo -e "Checked into commmit: ${last_commit}\n\n${last_commit_message}" | pbcopy
+    echo -e "Checked into commit: ${last_commit}\n\n${last_commit_message}" | pbcopy
 }
 
 function matrix() {
@@ -152,7 +152,7 @@ function newrepo() {
         git add README.md
         git commit -m "first commit"
         git remote add origin git@github.com:${USER}/$1.git
-        git push -u origin master
+        git push -u origin main
         popd > /dev/null
     fi
 }
@@ -174,18 +174,19 @@ function prompt_yes_no() {
 }
 
 function pyjson() {
-    local cmd='python3 -c "import json, sys; print(json.dumps(json.loads(sys.stdin.read()), sort_keys=True, indent=2))"'
+    local output
+    output=$(python3 -c "import json, sys; print(json.dumps(json.loads(sys.stdin.read()), sort_keys=True, indent=2))")
     if command -v pygmentize >/dev/null 2>/dev/null; then
-        eval $cmd | pygmentize -l javascript
+        echo "$output" | pygmentize -l javascript
     else
-        eval $cmd
+        echo "$output"
     fi
 }
 
 # https://github.com/necolas/dotfiles/blob/master/shell/functions/pyserver
 function pyserver() {
     local port="${1:-8000}"
-    open "http://localhost:${port}/"
+    [[ "$OSTYPE" == darwin* ]] && open "http://localhost:${port}/"
     python -m http.server "$port"
 }
 
@@ -235,10 +236,6 @@ function tmk() {
 
 function used() {
     du -sch .[!.]* * 2>/dev/null | gsort -hr | head -$1
-}
-
-function uuid() {
-    python -c 'import uuid; print(str(uuid.uuid1()))'
 }
 
 # not sure where i found this one, but queries wikipedia

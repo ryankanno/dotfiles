@@ -1,6 +1,5 @@
 [user]
     name = Ryan
-    editor = vim
 [include]
     path = .gitconfig.local
 
@@ -137,7 +136,7 @@
 # }}}
 
 # gh {{{
-    checkout-pr = "!f() { gh pr checkout $1 }; f;"
+    checkout-pr = "!f() { gh pr checkout $1; }; f"
     fork = !"gh repo fork --remote"
     pr = !"gh pr create --fill"
 # }}}
@@ -198,7 +197,7 @@
     autoSetupRemote = true
 
 [pull]
-    default = current
+    rebase = true
 
 [diff]
     mnemonicprefix = true
@@ -227,9 +226,6 @@
 
 [rebase]
     autosquash = true
-
-[mergetool]
-	bc3 = trustExitCode
 
 [bash-it]
 	hide-status = 0

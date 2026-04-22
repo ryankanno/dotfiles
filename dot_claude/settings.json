@@ -83,7 +83,6 @@
     "deny": [
       "Bash(chmod 777:*)",
       "Bash(chown:*)",
-      "Bash(curl:*)",
       "Bash(dd:*)",
       "Bash(defaults write:*)",
       "Bash(fdisk:*)",
