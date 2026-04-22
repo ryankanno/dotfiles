@@ -1,7 +1,18 @@
 repos:
   - repo: https://github.com/shellcheck-py/shellcheck-py
-    rev: v0.10.0.1
+    rev: v0.11.0.1
     hooks:
       - id: shellcheck
-        files: ^(scripts|dot_claude/scripts)/executable_.*$
+        files: ^(scripts|dot_claude/scripts)/executable_.*$|^dot_githooks/executable_.*$|^dot_bash.*$
         args: [--severity=warning, --shell=bash]
+
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: ['--baseline', '.secrets.baseline']
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.0
+    hooks:
+      - id: gitleaks
