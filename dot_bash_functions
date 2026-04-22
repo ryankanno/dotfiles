@@ -5,14 +5,14 @@ function backup() {
     if [ -z "$1" ]; then
         echo "Usage: backup DIRECTORY"
     else
-        DIR="$( (cd $1 && pwd) | tail -1 )"
+        DIR="$( (cd "$1" && pwd) )"
         if [ $? -eq 0 ]; then
-            local dirname=$(basename ${DIR})
+            local dirname=$(basename "${DIR}")
             local date=$(date +%Y%m%d-%H%M%S)
             local tarball="${dirname}.${date}.tar.gz"
             echo "Backing up ${1} to ${tarball}"
             echo ""
-            tar -zcvf ${tarball} ${1}
+            tar -zcvf "${tarball}" "${1}"
         else
             echo "Unable to backup $1. Does it exist?"
         fi
@@ -20,11 +20,7 @@ function backup() {
 }
 
 function bak() {
-    cp $1 $1_$(date +%Y%m%d-%H%M%S)
-}
-
-function btc() {
-    echo "1 BTC = $(curl -s https://api.coindesk.com/v1/bpi/currentprice/usd.json | grep -o 'rate":"[^"]*' | cut -d\" -f3) USD"
+    cp "$1" "${1}_$(date +%Y%m%d-%H%M%S)"
 }
 
 function calc() {
@@ -37,7 +33,9 @@ function cd {
 }
 
 function cdf {
-    cd -- "$(gfind . -name "$1" -type f -printf '%h' -quit)"
+    local dir
+    dir=$(find . -name "$1" -type f | head -1 | xargs dirname 2>/dev/null)
+    [[ -n "$dir" ]] && cd -- "$dir"
 }
 
 # https://github.com/michaelkitson/dotfiles/blob/master/bash_functions
@@ -55,12 +53,13 @@ function datauri() {
 }
 
 function dirty_repos() {
-   for repo in `find . -maxdepth 10 -name .git`; do
-       base=`dirname $repo`
-       pushd $base > /dev/null
-       [ -z "`git status --porcelain --untracked-files=no`" ] || echo "Repository $base contains differences."
-       popd > /dev/null
-    done
+    while IFS= read -r repo; do
+        local base
+        base=$(dirname "$repo")
+        pushd "$base" > /dev/null
+        [ -z "$(git status --porcelain --untracked-files=no)" ] || echo "Repository $base contains differences."
+        popd > /dev/null
+    done < <(find . -maxdepth 10 -name .git)
 }
 
 function ed() {
@@ -73,19 +72,19 @@ function ef() {
 
 # https://github.com/anthonypdawson/dotfiles/blob/master/bash_functions
 function ex() {
-    if [ -f $1 ]; then
-        case $1 in
-            *.tar.bz2)   tar xjf $1   ;;
-            *.tar.gz)    tar xzf $1   ;;
-            *.bz2)       bunzip2 $1   ;;
-            *.rar)       rar x $1     ;;
-            *.gz)        gunzip $1    ;;
-            *.tar)       tar xf $1    ;;
-            *.tbz2)      tar xjf $1   ;;
-            *.tgz)       tar xzf $1   ;;
-            *.zip)       unzip $1     ;;
-            *.Z)         uncompress $1;;
-            *.7z)        7z x $1      ;;
+    if [ -f "$1" ]; then
+        case "$1" in
+            *.tar.bz2)   tar xjf "$1"   ;;
+            *.tar.gz)    tar xzf "$1"   ;;
+            *.bz2)       bunzip2 "$1"   ;;
+            *.rar)       rar x "$1"     ;;
+            *.gz)        gunzip "$1"    ;;
+            *.tar)       tar xf "$1"    ;;
+            *.tbz2)      tar xjf "$1"   ;;
+            *.tgz)       tar xzf "$1"   ;;
+            *.zip)       unzip "$1"     ;;
+            *.Z)         uncompress "$1";;
+            *.7z)        7z x "$1"      ;;
             *)           echo "'$1' cannot be extracted via ex()" ;;
         esac
     else
@@ -95,12 +94,12 @@ function ex() {
 
 # find a file
 function ff() {
-    find . -type f -iname '*'$*'*' -ls;
+    find . -type f -iname "*${1}*" -ls;
 }
 
 # find and execute
 function fe() {
-    find . -type f -iname '*'${1:-}'*' -exec ${2:-file} {} \;
+    find . -type f -iname "*${1:-}*" -exec "${2:-file}" {} \;
 }
 
 function fzf_log() {
@@ -137,8 +136,8 @@ function members() {
 }
 
 function mkcd() {
-    mkdir -p $1
-    cd $1
+    mkdir -p "$1"
+    cd "$1"
 }
 
 function newrepo() {
@@ -175,7 +174,7 @@ function prompt_yes_no() {
 }
 
 function pyjson() {
-    local cmd='python -c "import json; import sys; print json.dumps(json.loads(sys.stdin.read()), sort_keys = True, indent = 2)"'
+    local cmd='python3 -c "import json, sys; print(json.dumps(json.loads(sys.stdin.read()), sort_keys=True, indent=2))"'
     if command -v pygmentize >/dev/null 2>/dev/null; then
         eval $cmd | pygmentize -l javascript
     else
@@ -208,23 +207,6 @@ function scan() {
 # share a file on 8080 using netcat, just redirect (e.g. share < file.txt)
 function share() {
     sudo nc -v -l "${1:-8080}"
-}
-
-# shorten all the things
-function shorten() {
-    if [ -z "${BITLY_USERNAME}" -a -z "${BITLY_API_KEY}" -a -f "${HOME}/.bitly.cfg" ]; then
-        source "${HOME}/.bitly.cfg"
-    fi
-
-    if [ -z "${BITLY_USERNAME}" -o -z "${BITLY_API_KEY}" ]; then
-        echo "Please set BITLY_USERNAME and BITLY_API_KEY env vars"
-    else
-        if [ -n "$1" ]; then
-            curl -s "http://api.bitly.com/v3/shorten?login=${BITLY_USERNAME}&apiKey=${BITLY_API_KEY}&longUrl=${1}&format=txt"
-        else
-            echo "Usage: shorten URL"
-        fi
-    fi
 }
 
 function tm() {
