@@ -40,6 +40,7 @@ export PATH="$HOME/.local/bin:$PATH"
 [[ -f "${HOME}/.bashrc" ]] && source "${HOME}/.bashrc"
 
 # always just bounce into tmux
-if command -v tmux &> /dev/null && [ -z "$TMUX" ]; then
-    tmux attach -t default || tmux new -s default
+if command -v tmux &>/dev/null && [[ -z "$TMUX" ]] && [[ -t 0 ]] && [[ $- == *i* ]]; then
+    tmux has-session -t default 2>/dev/null || tmux new-session -d -s default 2>/dev/null
+    tmux attach-session -t default 2>/dev/null
 fi

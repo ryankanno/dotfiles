@@ -211,9 +211,19 @@ function share() {
 }
 
 function tm() {
+  local new_session="${1:-new}"
   local session
-  new_session=${1:-new}
-  session=$(tmux list-sessions -F "#{session_name}" | fzf --query="$1" --select-1 --exit-0) && tmux attach-session -t "$session" || tmux new-session -s $new_session
+  session=$(tmux list-sessions -F "#{session_name}" 2>/dev/null | fzf --query="$1" --select-1 --exit-0)
+  if [[ -n "$TMUX" ]]; then
+    [[ -z "$session" ]] && echo "tm: no matching session" >&2 && return 1
+    tmux switch-client -t "$session"
+  else
+    if [[ -z "$session" ]]; then
+      tmux new-session -s "$new_session"
+    else
+      tmux attach-session -t "$session"
+    fi
+  fi
 }
 
 function _tm_sessions () {
