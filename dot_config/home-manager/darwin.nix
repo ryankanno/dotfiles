@@ -4,7 +4,7 @@
 
 darwin-packages = with unstable; [
     colima         # container runtime (https://github.com/abiosoft/colima)
-    du-dust        # disk usage (https://github.com/bootandy/dust)
+    dust           # disk usage (https://github.com/bootandy/dust)
     fastfetch      # system info tool (https://github.com/fastfetch-cli/fastfetch)
 ];
 
