@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        scandir: ['./scripts', './dot_claude/scripts']
+        scandir: ['./scripts', './dot_claude/scripts', './dot_githooks']
     steps:
       - uses: actions/checkout@v4
       - name: Run shellcheck on ${{ matrix.scandir }}
@@ -19,3 +19,15 @@ jobs:
           SHELLCHECK_OPTS: --severity=warning --shell=bash
         with:
           scandir: ${{ matrix.scandir }}
+
+  shellcheck-dotfiles:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run shellcheck on bash dotfiles
+        run: |
+          shellcheck --severity=warning --shell=bash \
+            dot_bashrc \
+            dot_bash_aliases \
+            dot_bash_functions \
+            dot_bash_profile
