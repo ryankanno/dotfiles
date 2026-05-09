@@ -18,6 +18,7 @@ common-tools-packages = with unstable; [
     findutils
     fq             # jq for binary (https://github.com/wader/fq)
     fx             # terminal json (https://github.com/antonmedv/fx)
+    fzf            # fuzzy finder (https://github.com/junegunn/fzf)
     git-crypt
     git-open       # https://github.com/paulirish/git-open
     glow           # terminal markdown (https://github.com/charmbracelet/glow)
