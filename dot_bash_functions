@@ -245,7 +245,9 @@ function tmk() {
 }
 
 function used() {
-    du -sch .[!.]* * 2>/dev/null | (command -v gsort &>/dev/null && gsort -hr || sort -hr) | head -$1
+    local n="${1:-20}"
+    local depth="${2:-1}"
+    command du -h -d "${depth}" .[!.]* * 2>/dev/null | awk -F'\t' '{paths[NR]=$2; lines[NR]=$0} END {for(i=1;i<=NR;i++){p=1; for(j=1;j<=NR;j++){if(i!=j && index(paths[j],paths[i]"/")==1){p=0;break}} if(p)print lines[i]}}' | (command -v gsort &>/dev/null && gsort -hr || sort -hr) | head -n "${n}"
 }
 
 # not sure where i found this one, but queries wikipedia
