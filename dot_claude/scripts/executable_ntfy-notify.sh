@@ -8,6 +8,7 @@
 #   ntfy-notify.sh stop                    # task-completion for current repo
 #   ntfy-notify.sh subagent-stop           # subagent-completion
 #
+# Topics are <os>-<NTFY_TOPIC> (default <os>-cc); priority 4+ events route to <os>-<NTFY_TOPIC>-high.
 # Silently exits 0 if NTFY_SERVER_URL is unset.
 
 set -euo pipefail
@@ -18,18 +19,46 @@ if [ -z "${NTFY_SERVER_URL:-}" ]; then
     exit 0
 fi
 
-topic="${NTFY_TOPIC:-cc}"
-url="${NTFY_SERVER_URL%/}/${topic}"
+# Group hosts by OS so each class gets its own ntfy topic; WSL counts as windows.
+detect_os() {
+    case "$(uname -s)" in
+        Darwin) echo "macos" ;;
+        MINGW*|MSYS*|CYGWIN*) echo "windows" ;;
+        Linux)
+            if grep -qiE 'microsoft|wsl' /proc/version 2>/dev/null; then
+                echo "windows"
+            else
+                echo "linux"
+            fi
+            ;;
+        *) uname -s | tr '[:upper:]' '[:lower:]' ;;
+    esac
+}
+
+topic_base="$(detect_os)-${NTFY_TOPIC:-cc}"
+base_url="${NTFY_SERVER_URL%/}"
 
 post() {
     local title="$1"
     local body="$2"
     local priority="${3:-3}"
+    local tags="${4:-}"
+    # Priority 4+ gets its own topic; the ntfy Android app filters per-topic, not per-message.
+    local topic="${topic_base}"
+    if [ "${priority}" -ge 4 ]; then
+        topic="${topic_base}-high"
+    fi
     curl -s --max-time 5 \
-        -H "Title: ${title}" \
-        -H "Priority: ${priority}" \
-        -d "${body}" \
-        "${url}" >/dev/null || true
+        -H "Content-Type: application/json" \
+        -d "$(jq -nc \
+            --arg topic "${topic}" \
+            --arg title "${title}" \
+            --arg message "${body}" \
+            --argjson priority "${priority}" \
+            --arg tags "${tags}" \
+            '{topic: $topic, title: $title, message: $message, priority: $priority, tags: ($tags | split(","))}' \
+        )" \
+        "${base_url}" >/dev/null || true
 }
 
 repo_info() {
@@ -41,35 +70,42 @@ repo_info() {
     else
         remote="unknown"
     fi
-    printf '%s\t%s' "${remote}" "${branch}"
+    printf '%s\t%s\n' "${remote}" "${branch}"
 }
 
 read_notification() {
-    payload=$(cat)
+    if [ -t 0 ]; then
+        payload='{}'
+    else
+        payload=$(cat)
+    fi
     title=$(echo "${payload}" | jq -r '.title // "Claude Code"')
     message=$(echo "${payload}" | jq -r '.message // "No message"')
+}
+
+location() {
+    IFS=$'\t' read -r repo branch < <(repo_info)
+    printf '[%s @ %s — %s]' "${repo}" "${branch}" "$(pwd)"
 }
 
 case "${mode}" in
     notification)
         read_notification
-        post "${title}" "${message}"
+        post "${title}" "${message} $(location)" 3 "speech_balloon"
         ;;
     notification-idle)
         read_notification
-        post "Claude Code (idle)" "${message}" 3
+        post "Claude Code (idle)" "${message} $(location)" 4 "hourglass_flowing_sand"
         ;;
     notification-permission)
         read_notification
-        post "Claude Code (needs permission)" "${message}" 4
+        post "Claude Code (needs permission)" "${message} $(location)" 4 "lock"
         ;;
     stop)
-        IFS=$'\t' read -r repo branch < <(repo_info)
-        post "Claude Code" "Task completed for ${repo} ($(pwd)) on branch ${branch} 🎆"
+        post "Claude Code" "Task completed $(location)" 4 "tada"
         ;;
     subagent-stop)
-        IFS=$'\t' read -r repo branch < <(repo_info)
-        post "Claude Code: Subagent" "Subagent done in ${repo} on branch ${branch}"
+        post "Claude Code: Subagent" "Subagent done $(location)" 4 "robot"
         ;;
     *)
         echo "usage: $0 {notification|notification-idle|notification-permission|stop|subagent-stop}" >&2
