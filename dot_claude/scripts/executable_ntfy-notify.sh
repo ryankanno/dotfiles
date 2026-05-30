@@ -43,21 +43,26 @@ post() {
     local body="$2"
     local priority="${3:-3}"
     local tags="${4:-}"
-    # Priority 4+ gets its own topic; the ntfy Android app filters per-topic, not per-message.
+    local click="${5:-}"
     local topic="${topic_base}"
     if [ "${priority}" -ge 4 ]; then
         topic="${topic_base}-high"
     fi
+    local jq_args=(
+        --arg topic "${topic}"
+        --arg title "${title}"
+        --arg message "${body}"
+        --argjson priority "${priority}"
+        --arg tags "${tags}"
+    )
+    local jq_filter='{topic: $topic, title: $title, message: $message, priority: $priority, tags: ($tags | split(","))}'
+    if [ -n "${click}" ]; then
+        jq_args+=(--arg click "${click}")
+        jq_filter='{topic: $topic, title: $title, message: $message, priority: $priority, tags: ($tags | split(",")), click: $click}'
+    fi
     curl -s --max-time 5 \
         -H "Content-Type: application/json" \
-        -d "$(jq -nc \
-            --arg topic "${topic}" \
-            --arg title "${title}" \
-            --arg message "${body}" \
-            --argjson priority "${priority}" \
-            --arg tags "${tags}" \
-            '{topic: $topic, title: $title, message: $message, priority: $priority, tags: ($tags | split(","))}' \
-        )" \
+        -d "$(jq -nc "${jq_args[@]}" "${jq_filter}")" \
         "${base_url}" >/dev/null || true
 }
 
@@ -83,29 +88,45 @@ read_notification() {
     message=$(echo "${payload}" | jq -r '.message // "No message"')
 }
 
-location() {
+repo_label() {
+    local repo branch
     IFS=$'\t' read -r repo branch < <(repo_info)
-    printf '[%s @ %s — %s]' "${repo}" "${branch}" "$(pwd)"
+    printf '%s@%s' "${repo}" "${branch}"
+}
+
+pwd_line() {
+    printf '📂 %s' "$(pwd)"
+}
+
+tmux_click_url() {
+    if [ -z "${TMUX_PANE:-}" ]; then
+        return
+    fi
+    local s w p
+    s=$(tmux display-message -p -t "${TMUX_PANE}" '#S' 2>/dev/null) || return
+    w=$(tmux display-message -p -t "${TMUX_PANE}" '#I' 2>/dev/null) || return
+    p=$(tmux display-message -p -t "${TMUX_PANE}" '#P' 2>/dev/null) || return
+    printf 'tmux-focus://switch?session=%s&window=%s&pane=%s' "${s}" "${w}" "${p}"
 }
 
 case "${mode}" in
     notification)
         read_notification
-        post "${title}" "${message} $(location)" 3 "speech_balloon"
+        post "💬 ${title}: $(repo_label)" "${message}"$'\n'"$(pwd_line)" 3 "speech_balloon,bell" "$(tmux_click_url)"
         ;;
     notification-idle)
         read_notification
-        post "Claude Code (idle)" "${message} $(location)" 4 "hourglass_flowing_sand"
+        post "⏳ Idle: $(repo_label)" "${message}"$'\n'"$(pwd_line)" 4 "hourglass_flowing_sand,zzz" "$(tmux_click_url)"
         ;;
     notification-permission)
         read_notification
-        post "Claude Code (needs permission)" "${message} $(location)" 4 "lock"
+        post "🔐 Permission needed: $(repo_label)" "${message}"$'\n'"$(pwd_line)" 4 "lock,rotating_light" "$(tmux_click_url)"
         ;;
     stop)
-        post "Claude Code" "Task completed $(location)" 4 "tada"
+        post "✅ Done: $(repo_label)" "Task complete"$'\n'"$(pwd_line)" 4 "white_check_mark,tada" "$(tmux_click_url)"
         ;;
     subagent-stop)
-        post "Claude Code: Subagent" "Subagent done $(location)" 4 "robot"
+        post "🤖 Subagent done: $(repo_label)" "Subagent finished"$'\n'"$(pwd_line)" 4 "robot,checkered_flag" "$(tmux_click_url)"
         ;;
     *)
         echo "usage: $0 {notification|notification-idle|notification-permission|stop|subagent-stop}" >&2
