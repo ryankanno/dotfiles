@@ -9,3 +9,4 @@ CLAUDE.md
 .hammerspoon
 .finicky.js
 {{- end }}
+tests/
