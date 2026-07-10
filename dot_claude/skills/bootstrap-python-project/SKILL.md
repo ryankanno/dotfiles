@@ -47,9 +47,15 @@ Infer author info from `git config user.name` and `git config user.email`.
 
 Pass all gathered/inferred values via `--data` flags, then run:
 
+`--no-project` stops `uv run` from first trying to sync a project in the
+current directory (if you invoke this from inside another Python project, that
+sync runs before copier and can fail on unrelated dependencies). `--trust` is
+required because the template's `_tasks` section runs `git init`; without it
+copier aborts. Run from a directory that is not itself a Python project.
+
 ```bash
-uv run --with copier copier copy \
-  --defaults \
+uv run --no-project --with copier copier copy \
+  --defaults --trust \
   --data 'author_name=...' \
   --data 'author_email=...' \
   --data 'project_name=...' \
@@ -60,7 +66,7 @@ uv run --with copier copier copy \
   --data 'package_name=...' \
   --data 'version=0.0.0' \
   --data 'python_version=3.12' \
-  --data 'supported_python_versions=3.10, 3.11, 3.12, 3.13, pypy3.10, pypy3.11' \
+  --data 'supported_python_versions=3.11, 3.12, 3.13, pypy3.11' \
   --data 'uv_version=0.7.3' \
   --data 'tox_version=4.25.0' \
   --data 'sphinx_theme=furo' \
@@ -96,7 +102,7 @@ The destination path is the desired output directory (e.g. `./<package_name>` or
 | `package_name` | str | — | **Must ask user** (snake_case, validated: `^[a-z][a-z0-9_]*$`) |
 | `version` | str | 0.0.0 | Use default |
 | `python_version` | str | 3.12 | Use default unless user specifies |
-| `supported_python_versions` | str | 3.10, 3.11, 3.12, 3.13, pypy3.10, pypy3.11 | Use default |
+| `supported_python_versions` | str | 3.11, 3.12, 3.13, pypy3.11 | Comma-separated; the template validates each entry against `['3.11', '3.12', '3.13', 'pypy3.11']` and rejects anything else |
 | `uv_version` | str | 0.7.3 | Use default |
 | `tox_version` | str | 4.25.0 | Use default |
 | `sphinx_theme` | str (choice) | furo | Choices: furo, sphinx-rtd-theme, sphinx-book-theme, pydata-sphinx-theme, sphinx-press-theme, piccolo-theme, sphinxawesome-theme, sphinx-wagtail-theme, alabaster, agogo, bizstyle, classic, haiku, nature, pyramid, scrolls, sphinxdoc, traditional |
@@ -151,6 +157,9 @@ git push -u origin main
 ## Common Mistakes
 
 - **Forgetting `--defaults`**: Without it, copier prompts interactively which breaks automation
+- **Forgetting `--no-project`**: `uv run` inside another Python project syncs that project first and can fail before copier runs; also run from a non-project directory
+- **Forgetting `--trust`**: The template's `_tasks` runs `git init`, so copier aborts without `--trust`
+- **Invalid `supported_python_versions`**: Only `3.11`, `3.12`, `3.13`, `pypy3.11` are accepted; any other value (e.g. `3.10`, `pypy3.10`) fails validation
 - **Using `y`/`n` instead of `true`/`false`**: Copier uses proper booleans, not string flags
 - **Invalid `package_name`**: Must match `^[a-z][a-z0-9_]*$` (snake_case, no hyphens, starts with letter)
 - **Running `git init` manually**: Copier's `_tasks` already handles this — running it again is harmless but redundant
