@@ -127,11 +127,11 @@
       "Read(**/.ssh/**)",
       "Read(**/id_ed25519)",
       "Read(**/id_rsa)",
-      "Write(**/.aws/**)",
-      "Write(**/.env*)",
-      "Write(**/.gnupg/**)",
-      "Write(**/.ssh/**)",
-      "Write(**/secrets/**)"
+      "Edit(**/.aws/**)",
+      "Edit(**/.env*)",
+      "Edit(**/.gnupg/**)",
+      "Edit(**/.ssh/**)",
+      "Edit(**/secrets/**)"
     ]
   },
   "hooks": {
