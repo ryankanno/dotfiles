@@ -39,7 +39,7 @@ export EDITOR="$VISUAL"
 # os specific
 if [[ "$OSTYPE" == "linux"* ]]; then
     # procs
-    command -v procs &>/dev/null && source <(procs --gen-completion-out bash)
+    command -v procs &>/dev/null && eval "$(procs --gen-completion-out bash)"
 fi
 
 # android
@@ -67,7 +67,12 @@ command -v direnv &>/dev/null && eval "$(direnv hook bash)"
 # 1Password shell plugins: wraps aws, gh, and other CLIs with op run for credential injection
 [[ -s "${HOME}/.config/op/plugins.sh" ]] && source "${HOME}/.config/op/plugins.sh"
 
-command -v npm &>/dev/null && export PATH="$(npm config get prefix)/bin:$PATH"
+if command -v npm &>/dev/null; then
+    npm_prefix=$(npm config get prefix)
+    export PATH="${npm_prefix}/bin:$PATH"
+    unset npm_prefix
+fi
 
 # PATH fix - removes duplicates, preserves the ordering of paths, and doesn't add a colon at the end.
-export PATH="$(echo $PATH | perl -e 'print join(":", grep { not $seen{$_}++ } split(/:/, scalar <>))')"
+PATH=$(echo "$PATH" | perl -e 'print join(":", grep { not $seen{$_}++ } split(/:/, scalar <>))')
+export PATH

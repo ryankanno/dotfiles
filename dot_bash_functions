@@ -7,8 +7,9 @@ function backup() {
     else
         DIR="$( (cd "$1" && pwd) )"
         if [ $? -eq 0 ]; then
-            local dirname=$(basename "${DIR}")
-            local date=$(date +%Y%m%d-%H%M%S)
+            local dirname date
+            dirname=$(basename "${DIR}")
+            date=$(date +%Y%m%d-%H%M%S)
             local tarball="${dirname}.${date}.tar.gz"
             echo "Backing up ${1} to ${tarball}"
             echo ""
@@ -35,7 +36,8 @@ function cd() {
 function cdf {
     local dir
     dir=$(find . -name "$1" -type f | head -1 | xargs dirname 2>/dev/null)
-    [[ -n "$dir" ]] && cd -- "$dir"
+    [[ -n "$dir" ]] || return
+    cd -- "$dir" || return
 }
 
 # https://github.com/michaelkitson/dotfiles/blob/master/bash_functions
@@ -45,7 +47,8 @@ function define() {
 
 # https://github.com/necolas/dotfiles/blob/master/shell/functions/datauri
 function datauri() {
-    local mimeType=$(file -b --mime-type "$1")
+    local mimeType
+    mimeType=$(file -b --mime-type "$1")
     if [[ $mimeType == text/* ]]; then
         mimeType="${mimeType};charset=utf-8"
     fi
@@ -56,9 +59,9 @@ function dirty_repos() {
     while IFS= read -r repo; do
         local base
         base=$(dirname "$repo")
-        pushd "$base" > /dev/null
+        pushd "$base" > /dev/null || continue
         [ -z "$(git status --porcelain --untracked-files=no)" ] || echo "Repository $base contains differences."
-        popd > /dev/null
+        popd > /dev/null || return
     done < <(find . -maxdepth 10 -name .git)
 }
 
@@ -110,7 +113,8 @@ function fzf_log() {
 }
 
 function gi() {
-    curl -sL https://www.toptal.com/developers/gitignore/api/$@
+    local IFS=,
+    curl -sL "https://www.toptal.com/developers/gitignore/api/$*"
 }
 
 function keel() {
@@ -137,7 +141,7 @@ function members() {
 
 function mkcd() {
     mkdir -p "$1"
-    cd "$1"
+    cd "$1" || return
 }
 
 function newrepo() {
@@ -146,14 +150,14 @@ function newrepo() {
     else
         mkdir $1
         pushd . > /dev/null
-        cd "$1"
+        cd "$1" || return
         touch README.md
         git init
         git add README.md
         git commit -m "first commit"
         git remote add origin git@github.com:${USER}/$1.git
         git push -u origin main
-        popd > /dev/null
+        popd > /dev/null || return
     fi
 }
 
@@ -162,11 +166,11 @@ function port() {
 }
 
 function port_clean() {
-    sudo port -f clean --all all && sudo port -f uninstall inactive
+    sudo /opt/local/bin/port -f clean --all all && sudo /opt/local/bin/port -f uninstall inactive
 }
 
 function prompt_yes_no() {
-    read -p "$@ [y/N] " ans
+    read -r -p "$* [y/N] " ans
     case "$ans" in
         y|Y|yes|Yes) return 0;;
         *) return 1;;
@@ -198,7 +202,7 @@ function scan() {
         echo "Usage: scan CIDR"
     else
         if command -v nmap >/dev/null 2>&1; then
-            nmap -sn $@ -oG - | awk '$4=="Status:" && $5=="Up" {print $2, $3}'
+            nmap -sn "$@" -oG - | awk '$4=="Status:" && $5=="Up" {print $2, $3}'
         else
             echo "Nmap is not installed. Please install and try again."
         fi
@@ -230,7 +234,7 @@ function _tm_sessions () {
     local cur
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
-    COMPREPLY=( $( compgen -W "$(tmux list-sessions -F '#{session_name}' | cut -d' ' -f1)" -- "${cur}") )
+    mapfile -t COMPREPLY < <(compgen -W "$(tmux list-sessions -F '#{session_name}' | cut -d' ' -f1)" -- "${cur}")
     return 0
 }
 
