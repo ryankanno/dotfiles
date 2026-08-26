@@ -131,7 +131,12 @@
       "Edit(**/.env*)",
       "Edit(**/.gnupg/**)",
       "Edit(**/.ssh/**)",
-      "Edit(**/secrets/**)"
+      "Edit(**/secrets/**)",
+      "Write(**/.aws/**)",
+      "Write(**/.env*)",
+      "Write(**/.gnupg/**)",
+      "Write(**/.ssh/**)",
+      "Write(**/secrets/**)"
     ]
   },
   "hooks": {
