@@ -25,7 +25,7 @@ command -v eza &>/dev/null && alias lam='la -s=modified' || alias lam='la -r --s
 command -v rg &>/dev/null && alias rg='rg --hidden --follow --smart-case --heading --line-number' || alias rg='grep --color=auto --exclude-dir=.git -R'
 
 # stats
-alias t20="history | awk '{print \$4}' | sort | uniq -c | sort -n | tail -n20 | sort -r"
+t20() { history | awk '{print $4}' | sort | uniq -c | sort -n | tail -n20 | sort -r; }
 
 # docker
 
@@ -75,10 +75,10 @@ alias dkrmi='docker rmi $(docker images -q --filter "dangling=true")'
 alias dkrm-the-world='docker stop $(docker ps -a -q) && docker rm -f $(docker ps -a -q)'
 
 # remove all images
-alias dki-remove-all='docker images -a | grep -v ^REPOSITORY | awk "{print \$3}" | xargs docker rmi'
+dki-remove-all() { docker images -a | grep -v ^REPOSITORY | awk '{print $3}' | xargs docker rmi; }
 
 # remove all image orphans
-alias dki-remove-orphans='docker images | grep "^<none>" | awk "{print \$3}" | xargs docker rmi'
+dki-remove-orphans() { docker images | grep '^<none>' | awk '{print $3}' | xargs docker rmi; }
 
 # run daemonized container
 alias dkrund='docker run -d -P'
@@ -99,19 +99,23 @@ alias dks='docker stats --no-stream'
 alias dkstopall='docker stop $(docker ps -a -q)'
 
 # stop all containers by name
-dkstopit() { docker stop $(docker ps -aqf "ancestor=$1"); }
+dkstopit() {
+    local ids
+    mapfile -t ids < <(docker ps -aqf "ancestor=$1")
+    [[ ${#ids[@]} -gt 0 ]] && docker stop "${ids[@]}"
+}
 
 # exec command ($2) in container by id ($1)
 dkexe() { docker exec -it $1 $2; }
 
 # exec command ($2) in container by name ($1)
-dkexcn() { dkexe $(docker ps -aqf "name=$1") /bin/sh -c "$2"; }
+dkexcn() { local id; id=$(docker ps -aqf "name=$1"); dkexe "$id" /bin/sh -c "$2"; }
 
 # shell into container by id
 dkexshc() { dkexe "$1" /bin/sh; }
 
 # shell into container by name
-dkexshcn() { dkexe $(docker ps -aqf "name=$1") /bin/sh; }
+dkexshcn() { local id; id=$(docker ps -aqf "name=$1"); dkexe "$id" /bin/sh; }
 
 # run image
 dkrun() { docker run -it --entrypoint /bin/sh "$1"; }
@@ -128,25 +132,23 @@ alias pi='pip install'
 alias pir='pip install -r requirements.txt'
 
 # rsync
-rsync_cmd='rsync --verbose --progress --human-readable --compress --archive --hard-links --one-file-system'
+_rsync_args=(--verbose --progress --human-readable --compress --archive --hard-links --one-file-system)
 
 # http://www.bombich.com/rsync.html
 if [[ "$OSTYPE" == darwin* ]] && grep -q 'file-flags' <(rsync --help 2>&1); then
-  # rsync_cmd="${rsync_cmd} --crtimes --acls --xattrs --fileflags --protect-decmpfs --force-change"
-  rsync_cmd="${rsync_cmd} --crtimes --acls --xattrs --fileflags --force-change"
+  # _rsync_args+=(--crtimes --acls --xattrs --fileflags --protect-decmpfs --force-change)
+  _rsync_args+=(--crtimes --acls --xattrs --fileflags --force-change)
 fi
 
-alias rsync-copy="${rsync_cmd}"
-alias rsync-move="${rsync_cmd} --remove-source-files"
-alias rsync-update="${rsync_cmd} --update"
-alias rsync-sync="${rsync_cmd} --update --delete"
+rsync-copy() { rsync "${_rsync_args[@]}" "$@"; }
+rsync-move() { rsync "${_rsync_args[@]}" --remove-source-files "$@"; }
+rsync-update() { rsync "${_rsync_args[@]}" --update "$@"; }
+rsync-sync() { rsync "${_rsync_args[@]}" --update --delete "$@"; }
 
-alias dry-rsync-copy="${rsync_cmd} --dry-run"
-alias dry-rsync-move="${rsync_cmd} --remove-source-files --dry-run"
-alias dry-rsync-update="${rsync_cmd} --update --dry-run"
-alias dry-rsync-sync="${rsync_cmd} --update --delete --dry-run"
-
-unset rsync_cmd
+dry-rsync-copy() { rsync-copy --dry-run "$@"; }
+dry-rsync-move() { rsync-move --dry-run "$@"; }
+dry-rsync-update() { rsync-update --dry-run "$@"; }
+dry-rsync-sync() { rsync-sync --dry-run "$@"; }
 
 if grep -qE 'Microsoft|WSL' /proc/sys/kernel/osrelease 2>/dev/null; then
   alias pbcopy="clip.exe"
