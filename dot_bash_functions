@@ -264,3 +264,37 @@ function fn_exists() {
     command -v $1 >/dev/null 2>&1
     return $?
 }
+
+# workmux worktree from a GitHub issue or PR number: wmg 123
+function wmg() {
+    local n="${1#\#}"
+    if [ -z "$n" ]; then
+        echo "usage: wmg <issue-or-pr-number> [workmux add args...]"
+        return 1
+    fi
+    shift
+
+    # one call: the issues endpoint returns PRs too, tagged with .pull_request
+    local json
+    json=$(gh api "repos/{owner}/{repo}/issues/${n}") || return 1
+
+    if [ -n "$(jq -r '.pull_request // empty' <<<"$json")" ]; then
+        workmux add --pr "$n" "$@"
+    else
+        workmux add "issue-${n}" \
+            -p "$(jq -r '"Work on GitHub issue #\(.number): \(.title)\n\n\(.body // "")"' <<<"$json")" \
+            "$@"
+    fi
+}
+
+# remove merged workmux worktrees in the current repo: wmgone [-f]
+alias wmgone='workmux rm --gone'
+
+# same, but across EVERY repo workmux tracks: wmgoneall [-f]
+function wmgoneall() {
+    local repo
+    while read -r repo; do
+        echo "== ${repo}"
+        (cd "${repo}" && workmux rm --gone "$@")
+    done < <(workmux ls --all --json | jq -r '.[].project_path' | sort -u)
+}
