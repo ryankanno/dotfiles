@@ -288,7 +288,9 @@ function wmg() {
 }
 
 # remove merged workmux worktrees in the current repo: wmgone [-f]
-alias wmgone='workmux rm --gone'
+function wmgone() {
+    workmux rm --gone "$@"
+}
 
 # same, but across EVERY repo workmux tracks: wmgoneall [-f]
 function wmgoneall() {
