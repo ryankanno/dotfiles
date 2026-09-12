@@ -2,7 +2,20 @@
 set -euo pipefail
 
 RUNNER_VERSION="${RUNNER_VERSION:-2.334.0}"
-RUNNER_ARCH="${RUNNER_ARCH:-osx-arm64}"
+
+# Default the runner arch to this host's OS/CPU so `add` works out of the box on
+# both macOS and Linux. RUNNER_ARCH still overrides (e.g. cross-arch runners).
+default_arch() {
+  case "$(uname -s)/$(uname -m)" in
+    Darwin/arm64) echo osx-arm64 ;;
+    Darwin/x86_64) echo osx-x64 ;;
+    Linux/x86_64) echo linux-x64 ;;
+    Linux/aarch64 | Linux/arm64) echo linux-arm64 ;;
+    *) echo osx-arm64 ;;
+  esac
+}
+RUNNER_ARCH="${RUNNER_ARCH:-$(default_arch)}"
+
 BASE_DIR="${GITHUB_RUNNERS_DIR:-$HOME/.github-action-runners}"
 CACHE_DIR="$BASE_DIR/.cache"
 TARBALL="actions-runner-${RUNNER_ARCH}-${RUNNER_VERSION}.tar.gz"
@@ -132,8 +145,15 @@ cmd_add() {
     local -a args=(--unattended --replace --url "$url" --token "$token" --name "$name" --work _work)
     [[ -n "$labels" ]] && args+=(--labels "$labels")
     ./config.sh "${args[@]}"
-    ./svc.sh install
-    ./svc.sh start
+    # svc.sh manages a launchd agent on macOS (no sudo) but a systemd service on
+    # Linux (needs root, and the user to run the service as).
+    if [[ "$(uname -s)" == "Linux" ]]; then
+      sudo ./svc.sh install "$(whoami)"
+      sudo ./svc.sh start
+    else
+      ./svc.sh install
+      ./svc.sh start
+    fi
   )
 
   echo "Runner '$name' registered at $url; service started."
@@ -169,9 +189,15 @@ cmd_remove() {
 
   (
     cd "$dir"
-    # Service may not be installed; tolerate failure either way.
-    ./svc.sh stop      || true
-    ./svc.sh uninstall || true
+    # Service may not be installed; tolerate failure either way. Linux svc.sh
+    # (systemd) needs root, matching the sudo used at install time.
+    if [[ "$(uname -s)" == "Linux" ]]; then
+      sudo ./svc.sh stop      || true
+      sudo ./svc.sh uninstall || true
+    else
+      ./svc.sh stop      || true
+      ./svc.sh uninstall || true
+    fi
   )
 
   echo "Deregistering runner $name (id $agent_id) from $target ..."
