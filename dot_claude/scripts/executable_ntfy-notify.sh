@@ -129,21 +129,40 @@ case "${mode}" in
         post "🤖 Subagent done: $(repo_label)" "Subagent finished"$'\n'"$(pwd_line)" 4 "robot,checkered_flag" "$(tmux_click_url)"
         ;;
     roborev)
-        # args: repo_name sha verdict detail; verdict P=pass, F=findings, other=job error
+        # args: repo_name repo_path sha verdict detail
+        # verdict P=pass, F=findings, anything else=job error
         shift
         rr_repo="${1:-unknown}"
-        rr_sha="${2:-}"
-        rr_verdict="${3:-}"
-        rr_detail="${4:-}"
+        rr_path="${2:-}"
+        rr_sha="${3:-}"
+        rr_verdict="${4:-}"
+        rr_detail="${5:-}"
+
+        # Best-effort GitHub link: the PR containing the head commit, else the
+        # commit page. A slow or failed lookup must never delay the notification.
+        rr_click=""
+        rr_head="${rr_sha##*..}"
+        if [ -d "${rr_path}" ] && [ -n "${rr_head}" ]; then
+            rr_slug=$(git -C "${rr_path}" remote get-url origin 2>/dev/null \
+                | sed 's|.*[/:]\([^/]*/[^/]*\)$|\1|; s|\.git$||') || rr_slug=""
+            if [ -n "${rr_slug}" ]; then
+                rr_click=$(timeout 5 gh api "repos/${rr_slug}/commits/${rr_head}/pulls" \
+                    --jq '.[0].html_url // empty' 2>/dev/null) || rr_click=""
+                if [ -z "${rr_click}" ]; then
+                    rr_click="https://github.com/${rr_slug}/commit/${rr_head}"
+                fi
+            fi
+        fi
+
         case "${rr_verdict}" in
             P)
-                post "✅ roborev pass: ${rr_repo}" "${rr_sha}" 3 "white_check_mark"
+                post "✅ roborev pass: ${rr_repo}" "${rr_head}" 3 "white_check_mark" "${rr_click}"
                 ;;
             F)
-                post "❌ roborev findings: ${rr_repo}" "${rr_sha}"$'\n'"${rr_detail}" 4 "x,mag"
+                post "❌ roborev findings: ${rr_repo}" "${rr_head}"$'\n'"${rr_detail}" 4 "x,mag" "${rr_click}"
                 ;;
             *)
-                post "💥 roborev error: ${rr_repo}" "${rr_sha}"$'\n'"${rr_detail}" 4 "boom,rotating_light"
+                post "💥 roborev error: ${rr_repo}" "${rr_head}"$'\n'"${rr_detail}" 4 "boom,rotating_light" "${rr_click}"
                 ;;
         esac
         ;;
