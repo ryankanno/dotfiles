@@ -128,8 +128,27 @@ case "${mode}" in
     subagent-stop)
         post "🤖 Subagent done: $(repo_label)" "Subagent finished"$'\n'"$(pwd_line)" 4 "robot,checkered_flag" "$(tmux_click_url)"
         ;;
+    roborev)
+        # args: repo_name sha verdict detail; verdict P=pass, F=findings, other=job error
+        shift
+        rr_repo="${1:-unknown}"
+        rr_sha="${2:-}"
+        rr_verdict="${3:-}"
+        rr_detail="${4:-}"
+        case "${rr_verdict}" in
+            P)
+                post "✅ roborev pass: ${rr_repo}" "${rr_sha}" 3 "white_check_mark"
+                ;;
+            F)
+                post "❌ roborev findings: ${rr_repo}" "${rr_sha}"$'\n'"${rr_detail}" 4 "x,mag"
+                ;;
+            *)
+                post "💥 roborev error: ${rr_repo}" "${rr_sha}"$'\n'"${rr_detail}" 4 "boom,rotating_light"
+                ;;
+        esac
+        ;;
     *)
-        echo "usage: $0 {notification|notification-idle|notification-permission|stop|subagent-stop}" >&2
+        echo "usage: $0 {notification|notification-idle|notification-permission|stop|subagent-stop|roborev}" >&2
         exit 2
         ;;
 esac
