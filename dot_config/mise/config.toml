@@ -1,4 +1,5 @@
 [tools]
+"cargo:raine/workmux" = "latest"
 fzf = "latest"
 node = "24"
 python = "3.13"
