@@ -9,6 +9,7 @@ linux-packages = with unstable; [
     litestream     # https://github.com/benbjohnson/litestream
     mosh           # mobile shell (https://github.com/mobile-shell/mosh)
     nix-prefetch
+    ntfy-sh        # ntfy client (https://github.com/binwiederhier/ntfy)
     rofi           # https://github.com/davatorium/rofi
 ];
 
