@@ -28,6 +28,7 @@ usage:
   runner.sh add <owner> [repo] [--labels a,b,c] [--name <name>]
   runner.sh remove <folder-name>
   runner.sh list <owner> [repo]
+  runner.sh restart <glob>
   runner.sh restart-all
 EOF
   exit 1
@@ -243,6 +244,34 @@ cmd_restart_all() {
   echo "Runners restarted."
 }
 
+# Restart only the runners whose folder name matches a glob, e.g.
+#   runner.sh restart 'actions-runner-myrepo-*'
+# Drives each runner's own svc.sh rather than a systemd unit glob, so one code
+# path covers systemd and launchd. Linux svc.sh needs root, as it does in add.
+cmd_restart() {
+  local pattern="${1:-}"
+  [[ -n "$pattern" ]] || usage
+  [[ -d "$BASE_DIR" ]] || die "no runner directory at $BASE_DIR"
+
+  local dir name matched=0
+  while IFS= read -r dir; do
+    [[ -f "$dir/svc.sh" ]] || continue
+    name="$(basename "$dir")"
+    matched=$((matched + 1))
+    echo "Restarting $name ..."
+    if [[ "$(uname -s)" == "Linux" ]]; then
+      ( cd "$dir" && sudo ./svc.sh stop && sudo ./svc.sh start ) \
+        || echo "warning: failed to restart $name" >&2
+    else
+      ( cd "$dir" && ./svc.sh stop && ./svc.sh start ) \
+        || echo "warning: failed to restart $name" >&2
+    fi
+  done < <(find "$BASE_DIR" -mindepth 1 -maxdepth 1 -type d -name "$pattern" | sort)
+
+  [[ "$matched" -gt 0 ]] || die "no runner in $BASE_DIR matches: $pattern"
+  echo "Restarted $matched runner(s)."
+}
+
 main() {
   local sub="${1:-}"
   shift || true
@@ -250,6 +279,7 @@ main() {
     add)     cmd_add "$@";;
     remove)  cmd_remove "$@";;
     list)    cmd_list "$@";;
+    restart)     cmd_restart "$@";;
     restart-all) cmd_restart_all "$@";;
     -h|--help|help|"") usage;;
     *) die "unknown command: $sub";;
