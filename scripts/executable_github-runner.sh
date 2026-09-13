@@ -28,6 +28,7 @@ usage:
   runner.sh add <owner> [repo] [--labels a,b,c] [--name <name>]
   runner.sh remove <folder-name>
   runner.sh list <owner> [repo]
+  runner.sh restart
 EOF
   exit 1
 }
@@ -222,13 +223,34 @@ cmd_list() {
     --jq '.runners[] | [.name, .status, (.busy|tostring), (.labels|map(.name)|join(","))] | @tsv'
 }
 
+# Restart every self-hosted runner service on this host. A runner can wedge
+# (listener alive but not claiming queued jobs); a restart reconnects it.
+cmd_restart() {
+  if [[ "$(uname -s)" == "Linux" ]]; then
+    # systemd matches the glob across every actions.runner.* unit at once.
+    sudo systemctl restart 'actions.runner.*'
+    systemctl list-units --type=service --no-legend --no-pager \
+      'actions.runner.*' | awk '{print $1, $4}'
+  else
+    # launchd has no glob, so bounce each runner via its own svc.sh.
+    local dir
+    for dir in "$BASE_DIR"/actions-runner-*/; do
+      [[ -f "$dir/svc.sh" ]] || continue
+      ( cd "$dir" && ./svc.sh stop && ./svc.sh start ) \
+        || echo "warning: failed to restart $dir" >&2
+    done
+  fi
+  echo "Runners restarted."
+}
+
 main() {
   local sub="${1:-}"
   shift || true
   case "$sub" in
-    add)    cmd_add "$@";;
-    remove) cmd_remove "$@";;
-    list)   cmd_list "$@";;
+    add)     cmd_add "$@";;
+    remove)  cmd_remove "$@";;
+    list)    cmd_list "$@";;
+    restart) cmd_restart "$@";;
     -h|--help|help|"") usage;;
     *) die "unknown command: $sub";;
   esac
