@@ -164,7 +164,7 @@
 	old = red
 	new = green
 	commit = yellow
-	whitespace = default red
+	whitespace = normal red
 
 [color "grep"]
 	match = normal
