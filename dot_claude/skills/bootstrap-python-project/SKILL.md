@@ -120,17 +120,16 @@ The destination path is the desired output directory (e.g. `./<package_name>` or
 ### Step 3: Create GitHub Repo
 
 ```bash
-~/scripts/github-create-repo.sh <repo-name>
+$HOME/scripts/github-create-repo.sh <repo-name>
 ```
 
 The repo name defaults to `package_name` with underscores replaced by hyphens (e.g. `my_awesome_library` → `my-awesome-library`).
 
-**Settings applied by the script:**
-- Private repository
-- Merge: squash, merge, rebase all enabled; auto-merge on; delete branch on merge
-- Features: issues, wiki, projects enabled; discussions disabled
-- Actions: enabled, all actions allowed
-- Branch ruleset on main: required signatures, linear history, PR reviews (1 approval), code owner review
+The script creates the repo private and applies the standard merge, features, Actions, and `main` branch ruleset settings. It is the source of truth for that list, so read it there rather than restating it here:
+
+```bash
+$HOME/scripts/github-create-repo.sh --help
+```
 
 ### Step 4: Add Remote, Commit, and Push
 
