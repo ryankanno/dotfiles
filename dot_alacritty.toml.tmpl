@@ -41,7 +41,11 @@ TERM = "xterm-256color"
 WINIT_X11_SCALE_FACTOR = "1.0"
 
 [font]
+{{- if eq .chezmoi.os "darwin" }}
 size = 18.0
+{{- else }}
+size = 22.0
+{{- end }}
 
 [font.bold]
 family = "MonaspiceNe Nerd Font Propo"
