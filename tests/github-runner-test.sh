@@ -237,6 +237,89 @@ test_api_target_from_url() {
   assert_eq "$got" "repos/acme/widget" "trailing slash trimmed"
 }
 
+# Build runner folders with logging svc.sh stubs, without going through add.
+seed_runners() { # name...
+  local n dir
+  for n in "$@"; do
+    dir="$GITHUB_RUNNERS_DIR/$n"
+    mkdir -p "$dir"
+    printf '#!/usr/bin/env bash\necho "%s svc.sh $*" >>"%s"\n' "$n" "$PKG_LOG" >"$dir/svc.sh"
+    chmod +x "$dir/svc.sh"
+  done
+}
+
+test_restart_glob_subset() {
+  echo "test_restart_glob_subset"
+  new_sandbox
+  seed_runners actions-runner-acme-widget actions-runner-acme-gadget other-runner-acme
+  run_runner restart 'actions-runner-acme-w*'
+  assert_eq "$RC" "0" "exits 0"
+  local pkg; pkg="$(cat "$PKG_LOG")"
+  assert_contains "$pkg" "actions-runner-acme-widget svc.sh stop" "match stopped"
+  assert_contains "$pkg" "actions-runner-acme-widget svc.sh start" "match started"
+  assert_not_contains "$pkg" "actions-runner-acme-gadget" "non-match left alone"
+  assert_not_contains "$pkg" "other-runner-acme" "prefix outside glob left alone"
+  assert_contains "$OUT" "Restarted 1 runner" "reports how many"
+  drop_sandbox
+}
+
+test_restart_glob_multiple() {
+  echo "test_restart_glob_multiple"
+  new_sandbox
+  seed_runners actions-runner-acme-widget actions-runner-acme-gadget other-runner-acme
+  run_runner restart '*acme*'
+  assert_eq "$RC" "0" "exits 0"
+  assert_contains "$OUT" "Restarted 3 runner" "all three matched"
+  drop_sandbox
+}
+
+test_restart_glob_no_match_fails() {
+  echo "test_restart_glob_no_match_fails"
+  new_sandbox
+  seed_runners actions-runner-acme-widget
+  run_runner restart 'nothing-like-this-*'
+  assert_eq "$RC" "1" "nonzero exit"
+  assert_contains "$OUT" "no runner in" "explains the failure"
+  drop_sandbox
+}
+
+test_restart_skips_folder_without_svc() {
+  echo "test_restart_skips_folder_without_svc"
+  new_sandbox
+  mkdir -p "$GITHUB_RUNNERS_DIR/actions-runner-halfbuilt"
+  run_runner restart 'actions-runner-halfbuilt'
+  assert_eq "$RC" "1" "half-built folder is not a match"
+  assert_contains "$OUT" "no runner in" "explains the failure"
+  drop_sandbox
+}
+
+test_restart_requires_glob() {
+  echo "test_restart_requires_glob"
+  new_sandbox
+  run_runner restart
+  assert_eq "$RC" "1" "nonzero exit"
+  assert_contains "$OUT" "usage:" "prints usage"
+  drop_sandbox
+}
+
+test_restart_all_hits_every_runner() {
+  echo "test_restart_all_hits_every_runner"
+  new_sandbox
+  seed_runners actions-runner-acme-widget actions-runner-acme-gadget
+  run_runner restart-all
+  assert_eq "$RC" "0" "exits 0"
+  local pkg; pkg="$(cat "$PKG_LOG")"
+  if [[ "$(uname -s)" == "Linux" ]]; then
+    # Linux takes the systemd path: one glob covers every unit.
+    assert_contains "$pkg" "systemctl restart actions.runner.*" "systemd glob used"
+  else
+    assert_contains "$pkg" "actions-runner-acme-widget svc.sh stop" "widget bounced"
+    assert_contains "$pkg" "actions-runner-acme-gadget svc.sh stop" "gadget bounced"
+  fi
+  assert_contains "$OUT" "Runners restarted" "reports completion"
+  drop_sandbox
+}
+
 test_add_repo
 test_add_org
 test_add_user_no_repo_fails
@@ -247,6 +330,12 @@ test_list_org
 test_list_repo
 test_list_user_no_repo_fails
 test_api_target_from_url
+test_restart_glob_subset
+test_restart_glob_multiple
+test_restart_glob_no_match_fails
+test_restart_skips_folder_without_svc
+test_restart_requires_glob
+test_restart_all_hits_every_runner
 
 echo
 echo "passed: $PASS  failed: $FAIL"
