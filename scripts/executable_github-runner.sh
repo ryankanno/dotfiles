@@ -28,7 +28,7 @@ usage:
   runner.sh add <owner> [repo] [--labels a,b,c] [--name <name>]
   runner.sh remove <folder-name>
   runner.sh list <owner> [repo]
-  runner.sh restart
+  runner.sh restart-all
 EOF
   exit 1
 }
@@ -225,7 +225,7 @@ cmd_list() {
 
 # Restart every self-hosted runner service on this host. A runner can wedge
 # (listener alive but not claiming queued jobs); a restart reconnects it.
-cmd_restart() {
+cmd_restart_all() {
   if [[ "$(uname -s)" == "Linux" ]]; then
     # systemd matches the glob across every actions.runner.* unit at once.
     sudo systemctl restart 'actions.runner.*'
@@ -250,7 +250,7 @@ main() {
     add)     cmd_add "$@";;
     remove)  cmd_remove "$@";;
     list)    cmd_list "$@";;
-    restart) cmd_restart "$@";;
+    restart-all) cmd_restart_all "$@";;
     -h|--help|help|"") usage;;
     *) die "unknown command: $sub";;
   esac
