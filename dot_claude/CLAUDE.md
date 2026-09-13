@@ -28,9 +28,11 @@
 - Do not start dev servers or long-running watchers. Assume one is already running.
 - When anything fails, the next output is words, not another tool call. State the error, the theory, the proposed action, and the expected outcome. Then wait.
 - Proceed when the next step is low-risk and reversible. Ask first when it is consequential, irreversible, or likely to surprise.
+- Comment on a GitHub issue or PR only when I own the repository. Everywhere else, draft the comment, show it, and wait for a yes. This binds `gh pr review` hardest, since a review carries an approval verdict in my name. Filing issues on my own repos needs no ask.
 
 ## Tools
 - Python: `uv` + `just`. Node: `pnpm`.
+- Create GitHub repos with `$HOME/scripts/github-create-repo.sh <name>` (`-o <org>` for an org). Never `gh repo create`: it skips the merge settings, features, Actions permissions, and the `main` branch ruleset, and the repo cannot be deleted and redone because the token has no `delete_repo` scope.
 - No global installs (`pip install`, `npm install -g`). Run dev tools through `uvx` or `pnpm dlx`.
 - Use absolute paths in every tool call; never `~` or relative paths.
 - One command per Bash call; no `&&` chains.
