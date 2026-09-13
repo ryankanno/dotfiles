@@ -6,7 +6,7 @@
 set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SCRIPT="$HERE/executable_github-runner.sh"
+SCRIPT="$HERE/../scripts/executable_github-runner.sh"
 
 PASS=0
 FAIL=0
@@ -75,7 +75,16 @@ for s in config.sh svc.sh; do
 done
 TAR
 
-  chmod +x "$fakebin/gh" "$fakebin/tar"
+  # svc.sh runs under sudo on Linux, so the sandbox needs its own sudo that
+  # just drops the prefix. systemctl is stubbed too: nothing here may reach
+  # the host's real actions.runner.* units.
+  printf '#!/usr/bin/env bash\nexec "$@"\n' >"$fakebin/sudo"
+  cat >"$fakebin/systemctl" <<SYSCTL
+#!/usr/bin/env bash
+echo "systemctl \$*" >>"\$PKG_LOG"
+SYSCTL
+
+  chmod +x "$fakebin/gh" "$fakebin/tar" "$fakebin/sudo" "$fakebin/systemctl"
   export PATH="$fakebin:$PATH"
 }
 
