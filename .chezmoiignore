@@ -10,3 +10,6 @@ CLAUDE.md
 .finicky.js
 {{- end }}
 tests/
+{{- if eq .chezmoi.os "darwin" }}
+.config/ntfy
+{{- end }}

@@ -1,0 +1,9 @@
+{{- $host := env "NTFY_SERVER_URL" -}}
+{{- if not $host }}{{ fail "NTFY_SERVER_URL is unset; it is exported from ~/.bashrc_local" }}{{ end -}}
+default-host: {{ $host }}
+
+subscribe:
+  - topic: linux-cc
+    command: 'notify-send -a roborev "$title" "[$(date -d @${time:-$(date +%s)} +%F\ %T)] $message"'
+  - topic: linux-cc-high
+    command: 'notify-send -a roborev -u critical "$title" "[$(date -d @${time:-$(date +%s)} +%F\ %T)] $message"'
