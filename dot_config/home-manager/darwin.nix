@@ -6,6 +6,7 @@ darwin-packages = with unstable; [
     colima         # container runtime (https://github.com/abiosoft/colima)
     dust           # disk usage (https://github.com/bootandy/dust)
     fastfetch      # system info tool (https://github.com/fastfetch-cli/fastfetch)
+    ntfy-sh        # ntfy client (https://github.com/binwiederhier/ntfy)
 ];
 
 in
