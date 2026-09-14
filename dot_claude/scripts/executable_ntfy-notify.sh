@@ -8,7 +8,8 @@
 #   ntfy-notify.sh stop                    # task-completion for current repo
 #   ntfy-notify.sh subagent-stop           # subagent-completion
 #
-# Topics are <os>-<NTFY_TOPIC> (default <os>-cc); priority 4+ events route to <os>-<NTFY_TOPIC>-high.
+# Topics are <os>-<source> (cc for Claude Code hooks, roborev for roborev);
+# priority 4+ events route to <os>-<source>-high. NTFY_TOPIC overrides <source>.
 # Silently exits 0 if NTFY_SERVER_URL is unset.
 
 set -euo pipefail
@@ -35,7 +36,15 @@ detect_os() {
     esac
 }
 
-topic_base="$(detect_os)-${NTFY_TOPIC:-cc}"
+# Each source gets its own topic so a subscriber can label, icon, and mute
+# them separately. Sharing one topic meant every message rendered under
+# whichever app name that topic's command happened to hardcode.
+case "${mode}" in
+    roborev) source_topic="roborev" ;;
+    *) source_topic="cc" ;;
+esac
+
+topic_base="$(detect_os)-${NTFY_TOPIC:-${source_topic}}"
 base_url="${NTFY_SERVER_URL%/}"
 
 post() {
