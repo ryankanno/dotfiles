@@ -1,0 +1,9 @@
+{{- $host := env "NTFY_SERVER_URL" -}}
+{{- if not $host }}{{ fail "NTFY_SERVER_URL is unset; it is exported from ~/.bashrc_local" }}{{ end -}}
+# ntfy-macos configuration file
+# local_server_port: 9292  # optional: enable local HTTP server for script-triggered notifications
+servers:
+  - url: {{ $host }}
+    topics:
+      - name: macos-cc-high
+      - name: macos-cc
