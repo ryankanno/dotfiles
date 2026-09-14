@@ -63,7 +63,7 @@ command -v direnv &>/dev/null && eval "$(direnv hook bash)"
 [[ -s "/opt/local/etc/profile.d/bash_completion.sh" ]] && source "/opt/local/etc/profile.d/bash_completion.sh"
 [[ -s "${HOME}/.bash_aliases" ]] && source "${HOME}/.bash_aliases"
 [[ -s "${HOME}/.bash_functions" ]] && source "${HOME}/.bash_functions"
-[[ -s "${HOME}/.bash_local" ]] && source "${HOME}/.bash_local"
+[[ -s "${HOME}/.bashrc_local" ]] && source "${HOME}/.bashrc_local"
 # 1Password shell plugins: wraps aws, gh, and other CLIs with op run for credential injection
 [[ -s "${HOME}/.config/op/plugins.sh" ]] && source "${HOME}/.config/op/plugins.sh"
 
