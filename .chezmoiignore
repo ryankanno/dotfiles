@@ -8,6 +8,7 @@ CLAUDE.md
 {{- if eq .chezmoi.os "linux" }}
 .hammerspoon
 .finicky.js
+.config/ntfy-macos
 {{- end }}
 tests/
 {{- if eq .chezmoi.os "darwin" }}
