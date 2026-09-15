@@ -2,8 +2,15 @@
 {{- if not $host }}{{ fail "NTFY_SERVER_URL is unset; it is exported from ~/.bashrc_local" }}{{ end -}}
 default-host: {{ $host }}
 
+# One topic per source, so each renders under its own app name and icon
+# rather than everything inheriting whichever label a shared topic set.
+# The -high variants carry priority 4+ and raise urgency to critical.
 subscribe:
+  - topic: linux-roborev
+    command: 'notify-send -a roborev -i dialog-information "$title" "[$(date -d @${time:-$(date +%s)} +%F\ %T)] $message"'
+  - topic: linux-roborev-high
+    command: 'notify-send -a roborev -i dialog-warning -u critical "$title" "[$(date -d @${time:-$(date +%s)} +%F\ %T)] $message"'
   - topic: linux-cc
-    command: 'notify-send -a roborev "$title" "[$(date -d @${time:-$(date +%s)} +%F\ %T)] $message"'
+    command: 'notify-send -a claude-code -i utilities-terminal "$title" "[$(date -d @${time:-$(date +%s)} +%F\ %T)] $message"'
   - topic: linux-cc-high
-    command: 'notify-send -a roborev -u critical "$title" "[$(date -d @${time:-$(date +%s)} +%F\ %T)] $message"'
+    command: 'notify-send -a claude-code -i dialog-password -u critical "$title" "[$(date -d @${time:-$(date +%s)} +%F\ %T)] $message"'
