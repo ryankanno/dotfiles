@@ -21,9 +21,9 @@ end
 
 -- * Set monitor input
 hk.bind({"ctrl", "shift"}, '1', function()
-  toggleInput(2, 17)
+  toggleInput(2, 15)
   hs.timer.doAfter(0.5, function()
-    toggleInput(1, 16)
+    toggleInput(1, 17)
   end)
 end)
 hk.bind({"ctrl", "shift"}, '2', function() toggleInput(1, 17) end)
