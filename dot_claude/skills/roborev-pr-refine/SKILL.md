@@ -389,9 +389,18 @@ The comment states, plainly:
   is an assertion. This is the artifact that replaces the failing review the
   PR is still showing
 - the pushed SHA, so the reader can tell which commits the claims cover
-- that the review was local, and that the CI poller will review the pushed
-  commits on its own cycle — so a reader knows a second, independent verdict
-  is coming without anyone paying for it
+- that the review was local. Whether a second verdict follows depends on the
+  repo, so check before promising one:
+
+  ```bash
+  roborev config get ci.repos
+  ```
+
+  Listed, and the CI poller reviews the pushed commits on its own cycle: say so,
+  and the reader knows an independent verdict is coming without anyone paying
+  for it. Not listed, and nothing will ever review them. Promising a follow-up
+  that never arrives is precisely the claim no command printed, and it leaves
+  the reader waiting on a verdict instead of reading the diff.
 
 Write the body to a file rather than inlining it. Review text can contain shell
 metacharacters.
