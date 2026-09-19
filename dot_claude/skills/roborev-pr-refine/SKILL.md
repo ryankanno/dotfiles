@@ -121,10 +121,22 @@ gh pr view <pr> --json comments \
       | select(.author.login == $poster)] | last | .body'
 ```
 
-`$poster` is the account roborev posts as: the authenticated `gh` user on the
-token path, or the app's bot login where `ci.github_app_id` is set. A comment
-carrying the marker under any other author is not a roborev review. Treat it as
-absent and fall through, and say that you did.
+`gh api user` returns the authenticated `gh` user, which is the account roborev
+posts as **on the token path only**. Check first:
+
+```bash
+roborev config get ci.github_app_id
+```
+
+A non-zero id means a GitHub App posts the comments, and the author is
+`<app-slug>[bot]`, which `gh api user` does not return. Read the author off a
+known-good roborev comment once and pin it, rather than letting the snippet
+above supply it: left alone it rejects every genuine comment, and the
+fall-through below then re-reviews from scratch on every run, so the clean-`HEAD`
+early exit can never fire.
+
+A comment carrying the marker under any other author is not a roborev review.
+Treat it as absent and fall through, and say that you did.
 
 The body opens with a `## roborev:` heading carrying the short SHA it reviewed,
 then either lists findings or ends with `No issues found.` Parse severity, file
@@ -183,7 +195,9 @@ first, then confirm the range is the one the PR shows:
 git log --oneline $(git merge-base origin/<base> HEAD)..HEAD
 ```
 
-Drop the flag entirely when there is no PR and let roborev auto-detect.
+Drop `--base` when there is no PR and let roborev auto-detect. Keep `--branch`:
+without it `roborev review` reviews only `HEAD`, so the loop would converge on a
+single commit and claim a verdict that never covered the branch.
 
 **`--wait` exits 1 when the verdict is Fail.** That is the review speaking, not
 a broken command. Capture the output whatever the exit code and read the verdict
@@ -413,8 +427,8 @@ at `HEAD` (nothing run, nothing posted), and a review that came back clean
 - **`/roborev-refine`** — roborev's shipped loop. Same shape, but it reads
   findings from the daemon rather than the PR, gates on `go test ./...`, and
   never touches the pull request.
-- **`/roborev-fix <job>`** — roborev's shipped single-pass fix, no loop and no
-  gate.
+- **`/roborev-fix <job>`** — roborev's shipped single-pass fix: it runs the
+  project's tests, but re-reviews nothing and never pushes.
 
 ## Notes
 
