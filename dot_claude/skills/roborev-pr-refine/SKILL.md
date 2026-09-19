@@ -336,9 +336,19 @@ Push only when **both** are true: the local review passed and the gate is
 green. A failed or empty review, or a red gate, ends the loop with the commits
 local and unpushed — say so, and let the user decide.
 
-If the push is rejected, stop. The remote moved while the loop was running, and
-the commits need rebasing onto it before anything is claimed about them. Do not
-force-push, and do not comment.
+If the push fails, stop, and work out which failure it is before saying anything
+about it. They have different causes and different fixes:
+
+- **`no upstream branch`**: nothing moved. The branch has simply never been
+  pushed, which is the ordinary state of the no-PR path step 1 allows. Push it
+  with `git push -u origin <branch>`, or ask first where creating a remote
+  branch is not obviously wanted.
+- **Rejected on a branch that already tracks a remote**: the remote moved while
+  the loop was running, and the commits need rebasing onto it before anything is
+  claimed about them.
+
+Reporting the first as the second blames a rebase the branch does not need. In
+both cases: do not force-push, and do not comment.
 
 ## Step 7: Record it on the PR
 
