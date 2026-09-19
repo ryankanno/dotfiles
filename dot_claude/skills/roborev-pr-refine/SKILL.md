@@ -465,8 +465,11 @@ at `HEAD` (nothing run, nothing posted), and a review that came back clean
   unwinding a stack. Three is the cap for that reason, well under the binary's
   own default of ten. A loop that has not converged in three passes wants a
   person, not another cycle.
-- The local daemon and the CI poller share an agent and model
-  (`default_agent` / `ci.agents`), so a provider fault affects both. Switching
-  paths is not a workaround for an empty review.
+- The two paths read **different** agent keys: this skill's `roborev review`
+  takes `default_agent`, `/roborev-pr-review`'s `ci review` takes `ci.agents`.
+  Both hold `opencode` today, so a provider fault hits both and switching paths
+  is no workaround for an empty review. That equivalence is a fact about today's
+  config, not a property of the tool, so check the key for the path you are on
+  rather than assuming they still match.
 - `roborev list` defaults to the current repo and branch, which is what step 2
   wants. Pass `--branch` only to look elsewhere.

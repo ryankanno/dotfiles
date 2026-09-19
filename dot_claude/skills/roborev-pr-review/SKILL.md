@@ -166,15 +166,21 @@ which is the safe way to read them without touching the global config.
 - Requires `gh` / `GITHUB_TOKEN` auth with permission to comment on the repo.
 - The review can take several minutes; run it in the background and report when
   it finishes rather than blocking.
-- If a repo has no checked-in `.roborev.toml` or roborev CI workflow, the
-  automatic `roborev` PR check comes from a local daemon/poller. This command is
-  how to force a re-review by hand in that setup.
+- What produces a repo's automatic PR check, in order: a checked-in roborev CI
+  workflow runs it in CI; failing that, the local daemon's poller covers the
+  repo if and only if it is listed in `ci.repos`; failing both, nothing reviews
+  the PR and this command is the only thing that will. A repo-level
+  `.roborev.toml` configures a review that already runs, it never causes one to
+  run, so its presence says nothing about coverage.
 - To only fetch an existing review instead of generating a new one, use
   `roborev show <commit-or-job>` or read the PR comment. Don't re-run
   `ci review` just to look at the last result.
-- The local daemon and the CI poller share `default_agent` / `ci.agents` and
-  their models. Switching between `roborev review` and `ci review` changes the
-  transport, not the agent, so it is not a workaround for a provider fault.
+- The two paths read **different** agent keys: `roborev review` takes
+  `default_agent`, `ci review` takes `ci.agents`. Both hold `opencode` today, so
+  switching between the paths changes the transport and not the agent, and is no
+  workaround for a provider fault. That equivalence is a fact about today's
+  config, not a property of the tool, so read the key for the path you are on
+  rather than assuming they still match.
 - `roborev refine` does exist as a non-interactive binary subcommand for CI and
   scripting. It runs the agent in an isolated worktree, commits unattended, and
   has no project test gate. It is not the right tool from inside a coding
