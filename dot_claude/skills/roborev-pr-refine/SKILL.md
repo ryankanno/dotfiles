@@ -90,7 +90,8 @@ Stop if the current branch is the default branch — there is nothing to refine.
 If there is no PR for the branch, continue anyway: everything runs locally and
 step 7 is skipped, with a line saying so.
 
-`baseRefName` is what every review below scopes against. Without it, `--branch`
+`baseRefName` is what every review below scopes against, and it is passed as the
+**remote-tracking** ref: `origin/main`, never bare `main`. Without it, `--branch`
 auto-detects the base and compares against the default branch, so a PR stacked
 on another feature branch gets reviewed with its parent's commits folded in.
 
@@ -168,12 +169,21 @@ roborev cancel <job_id>
 Then review:
 
 ```bash
-roborev review --branch --base <base> --wait
+roborev review --branch --base origin/<base> --wait
 ```
 
-`<base>` is the PR's `baseRefName` from step 1, which scopes the review to the
-commits the PR actually contains. Drop the flag when there is no PR and let
-roborev auto-detect.
+`<base>` is the PR's `baseRefName` from step 1, and `origin/` on the front is
+load-bearing. `--branch` takes its merge-base from whatever ref you name, and a
+local base branch falls behind its remote the moment anything merges without a
+pull. Against a stale local `main`, commits already merged into the PR's base
+get folded into the review as though this branch added them. Run `git fetch`
+first, then confirm the range is the one the PR shows:
+
+```bash
+git log --oneline $(git merge-base origin/<base> HEAD)..HEAD
+```
+
+Drop the flag entirely when there is no PR and let roborev auto-detect.
 
 **`--wait` exits 1 when the verdict is Fail.** That is the review speaking, not
 a broken command. Capture the output whatever the exit code and read the verdict
@@ -281,7 +291,7 @@ commit, not just the first.
 Then re-review the full branch, scoped as in step 2:
 
 ```bash
-roborev review --branch --base <base> --wait
+roborev review --branch --base origin/<base> --wait
 ```
 
 Exit code 1 means a Fail verdict here too, not a failed command.
