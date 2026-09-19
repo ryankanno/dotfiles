@@ -55,7 +55,7 @@ sandboxed probe could not reach it.
 ## The command
 
 ```bash
-roborev ci review --gh-repo <owner/repo> --pr <N> --ref <base>..HEAD --comment --upsert-comments=false
+roborev ci review --gh-repo <owner/repo> --pr <N> --ref origin/<base>..<head> --comment --upsert-comments=false
 ```
 
 - `--comment` posts the synthesized review as a GitHub PR comment.
@@ -64,9 +64,10 @@ roborev ci review --gh-repo <owner/repo> --pr <N> --ref <base>..HEAD --comment -
   `ci.upsert_comments = false`, but pin the flag anyway: a repo-level
   `.roborev.toml` can set it back to true, and that would clobber the prior
   review.
-- `--ref <base>..HEAD` is **required when running locally**. The ref range is
-  auto-detected only inside GitHub Actions / GitLab CI. It reviews the PR
-  branch's commits against its base (usually `main`).
+- `--ref` is **required when running locally**; the range is auto-detected only
+  inside GitHub Actions / GitLab CI. Resolve `<base>` and `<head>` from the PR
+  the way step 1 does, never from the checkout. `HEAD` is whatever happens to be
+  checked out, so a `..HEAD` range reviews code the PR may not contain.
 - roborev uses the repo's configured agent (`roborev config get default_agent`).
 
 ## How to run it
@@ -105,8 +106,9 @@ roborev ci review --gh-repo <owner/repo> --pr <N> --ref <base>..HEAD --comment -
 
 ## When a review comes back empty
 
-roborev sometimes records a review with no content: the comment reads **Review
-Skipped** or **No review output generated**, and the job carries verdict `F`.
+roborev sometimes produces a review with no content: the comment reads **Review
+Skipped** or **No review output generated**. When the poller produced it, the
+daemon also recorded a job carrying verdict `F`.
 
 **That is not a failing review, and it must never be reported as one.** The
 agent loop ended on a tool call without emitting text — an opencode fault, not
@@ -120,10 +122,13 @@ hand. That is roughly one review in ten, and it is the main reason this skill
 exists.
 
 Retrying the same command is a coin flip; it has both worked and failed
-minutes apart on one branch. `roborev log <job>` shows the agent's event
-stream, and a run with no `text` event that ends `reason: "tool-calls"` is this
-fault rather than anything local. `--reasoning medium` is the thing worth
-trying.
+minutes apart on one branch. `--reasoning medium` is the thing worth trying.
+
+The event-stream diagnostic exists only for daemon jobs, which means the
+poller's runs and not the manual `ci review` above: that path keeps no database
+row, so there is no job id to inspect. For a poller run, find it with
+`roborev list` and read it with `roborev log <job>`. A run with no `text` event
+that ends `reason: "tool-calls"` is this fault rather than anything local.
 
 **Do not switch agents to dodge it.** `ocr_review`, which `review_guidelines`
 requires every review to call before forming its own findings, is an **opencode
