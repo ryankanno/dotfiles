@@ -68,7 +68,9 @@ roborev ci review --gh-repo <owner/repo> --pr <N> --ref origin/<base>..<head> --
   inside GitHub Actions / GitLab CI. Resolve `<base>` and `<head>` from the PR
   the way step 1 does, never from the checkout. `HEAD` is whatever happens to be
   checked out, so a `..HEAD` range reviews code the PR may not contain.
-- roborev uses the repo's configured agent (`roborev config get default_agent`).
+- The agent comes from `ci.agents` (`roborev config get ci.agents`), not
+  `default_agent`, which governs the daemon path instead. Both read `opencode`
+  today, so the wrong key gives the right answer until they diverge.
 
 ## How to run it
 

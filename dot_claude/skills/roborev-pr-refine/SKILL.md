@@ -203,6 +203,11 @@ single commit and claim a verdict that never covered the branch.
 a broken command. Capture the output whatever the exit code and read the verdict
 out of it; a non-zero exit here is the normal path into step 3.
 
+The output opens with `Enqueued job <id> for <range>`. Keep that id. Step 7
+quotes the job behind the review it reports, every pass mints a new one, and an
+id from a failing pass or from a hook job cancelled in step 5 would pair a
+stored Fail or cancelled verdict with a comment claiming the branch is clean.
+
 **If that review produces no output** (`No review output generated`), stop and
 say so. It is a known opencode failure where the agent loop ends on a tool call
 without emitting text; an empty result is recorded with verdict `F`, which is
@@ -308,7 +313,10 @@ Then re-review the full branch, scoped as in step 2:
 roborev review --branch --base origin/<base> --wait
 ```
 
-Exit code 1 means a Fail verdict here too, not a failed command.
+Exit code 1 means a Fail verdict here too, not a failed command. Each pass
+prints its own `Enqueued job <id>`; the one step 7 needs is the id from the pass
+that finally comes back clean, so carry it forward and discard the earlier
+ones.
 
 - **Passed**: go to step 6.
 - **Failed**: return to step 3 with the new findings, until `--max-iterations`.
@@ -344,7 +352,9 @@ commits and came back clean; pushing does not change a SHA, so that verdict
 already describes what is on the remote. A second run is the same agent and
 model reviewing the same code, with a fresh chance of coming back empty.
 
-Quote it from the job rather than retyping it:
+Quote it from the job rather than retyping it. `<job_id>` is the id from the
+final passing re-review's `Enqueued job <id>` line, carried out of step 5. It is
+not the step 2 review that failed, and not a hook job step 5 cancelled:
 
 ```bash
 roborev show <job_id>
