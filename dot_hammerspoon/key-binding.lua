@@ -20,14 +20,21 @@ local function toggleInput(display, toInput)
 end
 
 -- * Set monitor input
+-- DDC/CI input-source codes, named after the VESA MCCS table. Panel firmware
+-- deviates from that table often enough that the names describe the standard,
+-- not a promise about which cable is physically lit; confirm against the
+-- display before trusting a name over the number.
+local INPUT_DP1 = 15
+local INPUT_HDMI1 = 17
+
 hk.bind({"ctrl", "shift"}, '1', function()
-  toggleInput(2, 15)
+  toggleInput(2, INPUT_DP1)
   hs.timer.doAfter(0.5, function()
-    toggleInput(1, 17)
+    toggleInput(1, INPUT_HDMI1)
   end)
 end)
-hk.bind({"ctrl", "shift"}, '2', function() toggleInput(1, 17) end)
-hk.bind({"ctrl", "shift"}, '3', function() toggleInput(2, 17) end)
+hk.bind({"ctrl", "shift"}, '2', function() toggleInput(1, INPUT_HDMI1) end)
+hk.bind({"ctrl", "shift"}, '3', function() toggleInput(2, INPUT_HDMI1) end)
 
 -- * Set window position on current display
 windowBind({"ctrl", "cmd"}, {
