@@ -118,7 +118,7 @@ poster=$(gh api user -q .login)
 gh pr view <pr> --json comments \
   | jq -r --arg poster "$poster" '[.comments[]
       | select(.body | startswith("<!-- roborev-pr-comment -->"))
-      | select(.author.login == $poster)] | last | .body'
+      | select(.author.login == $poster)] | last | .body // empty'
 ```
 
 `gh api user` returns the authenticated `gh` user, which is the account roborev
@@ -164,21 +164,29 @@ saying the same thing.
 A clean comment for an *older* SHA is not this case. The branch moved since, so
 the commits on top of it are unreviewed. Fall through.
 
-**If the PR has no usable findings**, run locally instead. Before enqueuing,
-check whether the daemon is already working on this ref:
+**Clear the queue now, whichever path you are on.** This runs before the branch
+below, not inside it: step 5 only cancels what this loop's own commits enqueue,
+so a job already in flight at loop start otherwise survives the entire run. Left
+alone it burns a worker and can post its own comment mid-flight, and a stale
+Fail landing after step 7 becomes the newest marker comment, sending the next
+run after findings that are already fixed.
 
 ```bash
 roborev list --json --limit 10
 ```
 
-Cancel anything queued or running for the current branch, so the loop is not
-racing a job that will post its own comment mid-flight:
+Cancel the jobs on this branch whose ref is at or below the current `HEAD`,
+which this loop's own review supersedes, and name them when you report:
 
 ```bash
 roborev cancel <job_id>
 ```
 
-Then review:
+Leave everything else alone. Cancelling indiscriminately also kills a review
+someone started in another session, `/roborev-review-branch` for instance, which
+runs for minutes and posts nothing this loop could race.
+
+**If the PR has no usable findings**, review locally instead:
 
 ```bash
 roborev review --branch --base origin/<base> --wait
@@ -304,8 +312,9 @@ roborev cancel <job_id>
 ```
 
 Cancel only jobs on this branch whose ref is a commit this loop just made.
-Step 2 does this once, before the first review; it has to happen after every
-commit, not just the first.
+Step 2 clears whatever was already in flight when the loop started, on both of
+its paths; this clears what each commit adds, so it runs after every commit and
+not just the first.
 
 Then re-review the full branch, scoped as in step 2:
 
@@ -367,7 +376,7 @@ final passing re-review's `Enqueued job <id>` line, carried out of step 5. It is
 not the step 2 review that failed, and not a hook job step 5 cancelled:
 
 ```bash
-roborev show <job_id>
+roborev show --job <job_id>
 gh pr comment <pr> --body-file <file>
 ```
 

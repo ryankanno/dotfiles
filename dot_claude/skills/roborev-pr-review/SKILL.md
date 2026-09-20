@@ -66,7 +66,7 @@ roborev ci review --gh-repo <owner/repo> --pr <N> --ref origin/<base>..<head> --
   review.
 - `--ref` is **required when running locally**; the range is auto-detected only
   inside GitHub Actions / GitLab CI. Resolve `<base>` and `<head>` from the PR
-  the way step 1 does, never from the checkout. `HEAD` is whatever happens to be
+  as item 1 of "How to run it" does below, never from the checkout. `HEAD` is whatever happens to be
   checked out, so a `..HEAD` range reviews code the PR may not contain.
 - The agent comes from `ci.agents` (`roborev config get ci.agents`), not
   `default_agent`, which governs the daemon path instead. Both read `opencode`
