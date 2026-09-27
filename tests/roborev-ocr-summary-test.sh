@@ -29,18 +29,21 @@ assert_eq()  { [[ "$1" == "$2" ]] && ok "$3" || bad "$3 (got '$1' want '$2')"; }
 # Fresh sandbox with a fake roborev on PATH, replacing the previous one. It
 # answers only the exact calls the script should make for job 42:
 # `log --raw 42` prints $WS/log (or fails when $WS/log-fails exists), and
-# `show --job 42 --json` prints a job whose range is aaa..bbb.
+# `show --job 42 --json` prints a job whose git_ref is $WS/git_ref (default
+# aaa..bbb) in repo $WS/repo.
 new_sandbox() {
   [[ -n "${WS:-}" ]] && rm -rf "$WS"
   WS="$(mktemp -d)"
-  mkdir -p "$WS/bin"
+  mkdir -p "$WS/bin" "$WS/repo"
+  echo "aaa..bbb" >"$WS/git_ref"
   cat >"$WS/bin/roborev" <<'FAKE'
 #!/usr/bin/env bash
 case "$*" in
   "log --raw 42")
     [[ -e "$WS/log-fails" ]] && { echo "roborev: job not found" >&2; exit 1; }
     cat "$WS/log";;
-  "show --job 42 --json") echo '{"job":{"git_ref":"aaa..bbb","repo_path":"'"$WS"'"}}';;
+  "show --job 42 --json")
+    jq -cn --arg ref "$(cat "$WS/git_ref")" --arg repo "$WS/repo" '{job:{git_ref:$ref,repo_path:$repo}}';;
   *) echo "fake roborev: unexpected call: $*" >&2; exit 64;;
 esac
 FAKE
@@ -84,6 +87,53 @@ assert_eq "$RC" 0 "exits 0"
 assert_contains "$OUT" 'stray &lt;/details> tag' "escapes the bare tag"
 assert_contains "$OUT" 'quoted `</details>` tag' "leaves the tag in a code span as written"
 assert_eq "$(sed 's/`[^`]*`//g' <<<"$OUT" | grep -c '</details>')" 2 "only the script's own two containers close"
+
+echo "a bare HTML tag in a group label cannot close the files list early"
+new_sandbox
+ocr_event '{"status":"complete","message":"m","groups":[{"label":"x </details> y","files":["a.sh"]}]}' >"$WS/log"
+run
+assert_eq "$RC" 0 "exits 0"
+assert_contains "$OUT" '- **x &lt;/details> y**: `a.sh`' "escapes the label"
+
+echo "a JSON scalar line in the review body is not an event"
+new_sandbox
+{ ocr_event '{"status":"complete","message":"m"}'; echo "123"; echo "[1,2]"; } >"$WS/log"
+run
+assert_eq "$RC" 0 "exits 0"
+assert_contains "$OUT" "**Range check:** OCR reviewed the same change" "still renders the call"
+
+echo "short SHAs from the agent match the full SHAs roborev stores"
+new_sandbox
+git -C "$WS/repo" init -q
+git -C "$WS/repo" -c user.name=t -c user.email=t@t commit -q --allow-empty -m one
+git -C "$WS/repo" -c user.name=t -c user.email=t@t commit -q --allow-empty -m two
+base=$(git -C "$WS/repo" rev-parse HEAD^)
+head=$(git -C "$WS/repo" rev-parse HEAD)
+echo "$base..$head" >"$WS/git_ref"
+jq -cn --arg f "${base:0:7}" --arg t "${head:0:7}" '{type:"tool_use",part:{tool:"ocr_review",state:{status:"completed",input:{from:$f,to:$t},output:"{\"status\":\"complete\",\"message\":\"m\"}"}}}' >"$WS/log"
+run
+assert_contains "$OUT" "**Range check:** OCR reviewed the same change as the review, range ${base:0:7}..${head:0:7}." "resolves both sides before comparing"
+
+echo "a single-commit call is compared as a commit"
+new_sandbox
+echo "ccc" >"$WS/git_ref"
+jq -cn '{type:"tool_use",part:{tool:"ocr_review",state:{status:"completed",input:{commit:"ccc"},output:"{\"status\":\"complete\",\"message\":\"m\"}"}}}' >"$WS/log"
+run
+assert_contains "$OUT" "OCR reviewed the same change as the review, commit ccc." "matches a single commit"
+
+echo "an uncommitted-changes job matches a call with no range"
+new_sandbox
+echo "dirty" >"$WS/git_ref"
+jq -cn '{type:"tool_use",part:{tool:"ocr_review",state:{status:"completed",input:{},output:"{\"status\":\"complete\",\"message\":\"m\"}"}}}' >"$WS/log"
+run
+assert_contains "$OUT" "OCR reviewed the same change as the review, uncommitted changes." "matches uncommitted changes"
+
+echo "several calls are numbered"
+new_sandbox
+{ ocr_event '{"status":"complete","message":"m"}'; ocr_event '{"status":"complete","message":"m"}'; } >"$WS/log"
+run
+assert_contains "$OUT" "### OCR cross-check (call 2 of 2)" "numbers the headings"
+assert_contains "$OUT" "**Range check (call 2):**" "numbers the range checks"
 
 echo "a finding without content still renders"
 new_sandbox

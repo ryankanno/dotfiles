@@ -29,7 +29,7 @@ out=$(jq -rRn --arg job "$job" '
     | join("`");
   def paths: map("`\(.path)`") | join(", ");
 
-  [inputs | fromjson?] as $events
+  [inputs | fromjson? | objects] as $events
   | if ($events | length) == 0 then
       error("job \($job): no JSON events in the log, so whether ocr_review ran is unknown")
     else . end
@@ -58,7 +58,7 @@ out=$(jq -rRn --arg job "$job" '
                 + "- **Tool calls:** \($o.tool_calls.total // "unknown") (\($o.tool_calls.failure // "unknown") failed)\n"
                 + ([$o.tool_calls.failure_details[]? | "  - `\(.tool_name)` on `\(.file_path)`: \(.error // "no error text" | oneline)"] | if length > 0 then join("\n") + "\n" else "" end)
                 + "\n<details><summary>Files: \($c.selected // [] | length) selected, \($c.completed // [] | length) completed, \($failed | length) failed, \($waived | length) waived, \($c.reused // [] | length) reused</summary>\n\n"
-                + ([$o.groups[]? | "- **\(.label)**: \(.files | map("`\(.)`") | join(", "))"] | join("\n"))
+                + ([$o.groups[]? | "- **\(.label | html)**: \(.files | map("`\(.)`") | join(", "))"] | join("\n"))
                 + (if ($failed | length) > 0 then "\n\n**Failed:** \($failed | paths)" else "" end)
                 + (if ($waived | length) > 0 then "\n\n**Waived:** \($waived | paths)" else "" end)
                 + "\n\n</details>\n\n"
@@ -96,7 +96,7 @@ case "$git_ref" in
   *) want="commit $(full "$git_ref")" ;;
 esac
 inputs=$(jq -cRn '
-  inputs | fromjson? | select(.type == "tool_use" and .part.tool == "ocr_review") | .part.state.input' <<<"$log")
+  inputs | fromjson? | objects | select(.type == "tool_use" and .part.tool == "ocr_review") | .part.state.input' <<<"$log")
 count=$(grep -c . <<<"$inputs" || true)
 n=0
 while IFS= read -r input; do
