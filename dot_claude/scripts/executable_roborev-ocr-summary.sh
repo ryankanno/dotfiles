@@ -59,3 +59,44 @@ roborev log --raw "$job" | jq -rRn --arg job "$job" '
 ' | sed -e "s#${HOME}#~#g" -e "s#${home_dashed}#~#g"
 # OCR error text is raw stderr and names local paths (session files, worktrees);
 # the output goes on a PR, so the home directory never leaves the machine.
+
+# Whether each ocr_review call reviewed the change the job did. The review
+# agent picks from/to itself, and the prompt names no base: a guess taken from
+# a SHA in its Previous Reviews block has handed OCR a diff many times the size
+# of the change. OCR's coverage and findings then describe that other change,
+# and nothing above says so.
+job_json=$(roborev show --job "$job" --json)
+git_ref=$(jq -r '.job.git_ref // ""' <<<"$job_json")
+repo=$(jq -r '.job.repo_path // "."' <<<"$job_json")
+full() { git -C "$repo" rev-parse --verify --quiet "$1^{commit}" 2>/dev/null || printf '%s' "$1"; }
+short() { sed -E 's/([0-9a-f]{7})[0-9a-f]{33}/\1/g' <<<"$1"; }
+case "$git_ref" in
+  *..*) want="range $(full "${git_ref%%..*}")..$(full "${git_ref##*..}")" ;;
+  dirty | "") want="uncommitted changes" ;;
+  *) want="commit $(full "$git_ref")" ;;
+esac
+inputs=$(roborev log --raw "$job" | jq -cRn '
+  inputs | fromjson? | select(.type == "tool_use" and .part.tool == "ocr_review") | .part.state.input')
+count=$(grep -c . <<<"$inputs" || true)
+n=0
+while IFS= read -r input; do
+  [ -n "$input" ] || continue
+  n=$((n + 1))
+  commit=$(jq -r '.commit // empty' <<<"$input")
+  from=$(jq -r '.from // empty' <<<"$input")
+  to=$(jq -r '.to // empty' <<<"$input")
+  if [ -n "$commit" ]; then
+    got="commit $(full "$commit")"
+  elif [ -n "$from$to" ]; then
+    got="range $(full "$from")..$(full "$to")"
+  else
+    got="uncommitted changes"
+  fi
+  label=""
+  [ "$count" -gt 1 ] && label=" (call $n)"
+  if [ "$got" = "$want" ]; then
+    printf '\n**Range check%s:** OCR reviewed the same change as the review, %s.\n' "$label" "$(short "$want")"
+  else
+    printf '\n**Range check%s: mismatch.** OCR reviewed %s, but the review covered %s. OCR'\''s coverage and findings above describe a different change and are no cross-check of this one.\n' "$label" "$(short "$got")" "$(short "$want")"
+  fi
+done <<<"$inputs"

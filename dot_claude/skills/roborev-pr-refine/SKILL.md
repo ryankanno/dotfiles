@@ -450,6 +450,16 @@ review did with it: confirmed as which finding, listed under "Unconfirmed
 candidates" (quote the reason), or not addressed by the review. Match on file,
 line and claim.
 
+The script ends with one `**Range check**` line per call, comparing the
+`from`/`to` (or `commit`) the agent passed against the job's `git_ref`. The
+agent picks that range itself, and the prompt names no base, so it can guess a
+SHA from the prompt's Previous Reviews block and hand OCR another change. On
+`mismatch`, OCR's files and findings describe that other change: write "not a
+cross-check of this change" in place of each per-finding line above, and do not
+describe the clean review as OCR-corroborated anywhere in the comment or the
+report. The review then stands on the agent's own reading, and the comment
+says so.
+
 The quoted review carries the agent's "Unconfirmed candidates", which
 `review_guidelines` requires. Quote it whole so that section survives, and if
 the review has none, say so in one line.

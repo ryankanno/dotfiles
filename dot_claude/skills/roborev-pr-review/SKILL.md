@@ -164,6 +164,14 @@ roborev review --branch=<headRefOid> --base origin/<base> --wait
      review, so say "not addressed by the review" rather than leaving it out.
    - The script's output already states when `ocr_review` errored or was never
      called. Keep it as printed; do not soften it.
+   - **The range check.** The script ends with one `**Range check**` line per
+     call, comparing the `from`/`to` (or `commit`) the agent passed against
+     `job.git_ref`. The agent picks that range itself, and the prompt names no
+     base, so it can guess a SHA from the prompt's Previous Reviews block and
+     hand OCR another change. On `mismatch`, OCR's files and findings describe
+     that other change: write "not a cross-check of this change" in place of
+     each "OCR findings against the review" line, and do not describe the
+     review as OCR-corroborated anywhere in the comment or the report.
 
 6. **Scan it, post it, and report.** The review text and OCR error output are
    written on this machine and can name its paths, services or credentials.
