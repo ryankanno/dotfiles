@@ -20,6 +20,13 @@ log=$(roborev log --raw "$job")
 # line by line and skip what is not JSON.
 out=$(jq -rRn --arg job "$job" '
   def oneline: gsub("\\s*\n\\s*"; " ");
+  # A bare </details> in a finding would close the findings container early
+  # and hide the findings after it. Only text outside code spans is escaped:
+  # GitHub shows an entity inside a span literally, and backticks are the
+  # markdown OCR writes.
+  def html: split("`") | to_entries
+    | map(if .key % 2 == 0 then .value | gsub("<"; "&lt;") else .value end)
+    | join("`");
   def paths: map("`\(.path)`") | join(", ");
 
   [inputs | fromjson?] as $events
@@ -57,7 +64,7 @@ out=$(jq -rRn --arg job "$job" '
                 + "\n\n</details>\n\n"
                 + "<details><summary>OCR findings: \($findings | length)</summary>\n\n"
                 + ([$findings | to_entries[] | .value as $f
-                    | "\(.key + 1). **\($f.severity)** `\($f.path):\($f.start_line)" + (if $f.end_line != $f.start_line then "-\($f.end_line)" else "" end) + "` (\($f.category)): \($f.content // "no content" | oneline)"]
+                    | "\(.key + 1). **\($f.severity)** `\($f.path):\($f.start_line)" + (if $f.end_line != $f.start_line then "-\($f.end_line)" else "" end) + "` (\($f.category)): \($f.content // "no content" | oneline | html)"]
                    | if length > 0 then join("\n") else "None." end)
                 + "\n\n</details>"
               end

@@ -26,24 +26,28 @@ assert_not_contains() {
 }
 assert_eq()  { [[ "$1" == "$2" ]] && ok "$3" || bad "$3 (got '$1' want '$2')"; }
 
-# Fresh sandbox with a fake roborev on PATH. `roborev log --raw` prints
-# $WS/log (or fails when $WS/log-fails exists); `roborev show --json` prints a
-# job whose range matches the fixtures' ocr_review input.
+# Fresh sandbox with a fake roborev on PATH, replacing the previous one. It
+# answers only the exact calls the script should make for job 42:
+# `log --raw 42` prints $WS/log (or fails when $WS/log-fails exists), and
+# `show --job 42 --json` prints a job whose range is aaa..bbb.
 new_sandbox() {
+  [[ -n "${WS:-}" ]] && rm -rf "$WS"
   WS="$(mktemp -d)"
   mkdir -p "$WS/bin"
   cat >"$WS/bin/roborev" <<'FAKE'
 #!/usr/bin/env bash
-case "$1" in
-  log)
+case "$*" in
+  "log --raw 42")
     [[ -e "$WS/log-fails" ]] && { echo "roborev: job not found" >&2; exit 1; }
     cat "$WS/log";;
-  show) echo '{"job":{"git_ref":"aaa..bbb","repo_path":"'"$WS"'"}}';;
+  "show --job 42 --json") echo '{"job":{"git_ref":"aaa..bbb","repo_path":"'"$WS"'"}}';;
+  *) echo "fake roborev: unexpected call: $*" >&2; exit 64;;
 esac
 FAKE
   chmod +x "$WS/bin/roborev"
   export WS
 }
+trap '[[ -n "${WS:-}" ]] && rm -rf "$WS"' EXIT
 
 # One ocr_review tool_use event carrying $1 (an OCR result object) as output.
 ocr_event() {
@@ -63,6 +67,23 @@ run
 assert_eq "$RC" 0 "exits 0"
 assert_contains "$OUT" '**low** `a.sh:1` (bug): broken' "lists the finding"
 assert_contains "$OUT" "1 selected, 1 completed" "reports coverage"
+assert_contains "$OUT" "**Range check:** OCR reviewed the same change as the review" "range check matches"
+
+echo "an ocr_review call on another range is flagged"
+new_sandbox
+jq -cn '{type:"tool_use",part:{tool:"ocr_review",state:{status:"completed",input:{from:"ccc",to:"bbb"},output:"{\"status\":\"complete\",\"message\":\"m\"}"}}}' >"$WS/log"
+run
+assert_eq "$RC" 0 "exits 0"
+assert_contains "$OUT" "**Range check: mismatch.** OCR reviewed range ccc..bbb, but the review covered range aaa..bbb." "range check reports the mismatch"
+
+echo "a bare HTML tag in a finding cannot close the findings list early"
+new_sandbox
+ocr_event '{"status":"complete","message":"m","comments":[{"path":"a.sh","start_line":1,"end_line":1,"severity":"low","category":"bug","content":"stray </details> tag, quoted `</details>` tag"},{"path":"b.sh","start_line":1,"end_line":1,"severity":"low","category":"bug","content":"second"}]}' >"$WS/log"
+run
+assert_eq "$RC" 0 "exits 0"
+assert_contains "$OUT" 'stray &lt;/details> tag' "escapes the bare tag"
+assert_contains "$OUT" 'quoted `</details>` tag' "leaves the tag in a code span as written"
+assert_eq "$(sed 's/`[^`]*`//g' <<<"$OUT" | grep -c '</details>')" 2 "only the script's own two containers close"
 
 echo "a finding without content still renders"
 new_sandbox
