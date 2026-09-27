@@ -12,13 +12,21 @@ job="${1:?usage: roborev-ocr-summary.sh <job_id>}"
 home_dashed="${HOME#/}"
 home_dashed="${home_dashed//\//-}"
 
+# Captured rather than piped: a failed read must stop here, not reach jq as an
+# empty log that reads like a review which never called ocr_review.
+log=$(roborev log --raw "$job")
+
 # The log is JSONL events followed by the review's plain-text body, so parse
 # line by line and skip what is not JSON.
-roborev log --raw "$job" | jq -rRn --arg job "$job" '
+out=$(jq -rRn --arg job "$job" '
   def oneline: gsub("\\s*\n\\s*"; " ");
   def paths: map("`\(.path)`") | join(", ");
 
-  [inputs | fromjson? | select(.type == "tool_use" and .part.tool == "ocr_review") | .part.state] as $calls
+  [inputs | fromjson?] as $events
+  | if ($events | length) == 0 then
+      error("job \($job): no JSON events in the log, so whether ocr_review ran is unknown")
+    else . end
+  | [$events[] | select(.type == "tool_use" and .part.tool == "ocr_review") | .part.state] as $calls
   | if ($calls | length) == 0 then
       "### OCR cross-check\n\nJob \($job) made no `ocr_review` call, so this review has no OCR cross-check."
     else
@@ -39,9 +47,9 @@ roborev log --raw "$job" | jq -rRn --arg job "$job" '
                 | ($o.comments // []) as $findings
                 | "- **Status:** \($o.status). \($o.message)\n"
                 + "- **Range:** `\($o.manifest.input.exact_range // "unknown")` (\($o.manifest.input.mode // "unknown mode"))\n"
-                + "- **Model:** \($o.llm.provider)/\($o.llm.model), OCR \($o.manifest.execution.ocr_version // "unknown"), \($o.summary.elapsed)\n"
-                + "- **Tool calls:** \($o.tool_calls.total) (\($o.tool_calls.failure) failed)\n"
-                + ([$o.tool_calls.failure_details[]? | "  - `\(.tool_name)` on `\(.file_path)`: \(.error | oneline)"] | if length > 0 then join("\n") + "\n" else "" end)
+                + "- **Model:** \($o.llm.provider // "unknown")/\($o.llm.model // "unknown"), OCR \($o.manifest.execution.ocr_version // "unknown"), \($o.summary.elapsed // "elapsed unknown")\n"
+                + "- **Tool calls:** \($o.tool_calls.total // "unknown") (\($o.tool_calls.failure // "unknown") failed)\n"
+                + ([$o.tool_calls.failure_details[]? | "  - `\(.tool_name)` on `\(.file_path)`: \(.error // "no error text" | oneline)"] | if length > 0 then join("\n") + "\n" else "" end)
                 + "\n<details><summary>Files: \($c.selected // [] | length) selected, \($c.completed // [] | length) completed, \($failed | length) failed, \($waived | length) waived, \($c.reused // [] | length) reused</summary>\n\n"
                 + ([$o.groups[]? | "- **\(.label)**: \(.files | map("`\(.)`") | join(", "))"] | join("\n"))
                 + (if ($failed | length) > 0 then "\n\n**Failed:** \($failed | paths)" else "" end)
@@ -49,16 +57,21 @@ roborev log --raw "$job" | jq -rRn --arg job "$job" '
                 + "\n\n</details>\n\n"
                 + "<details><summary>OCR findings: \($findings | length)</summary>\n\n"
                 + ([$findings | to_entries[] | .value as $f
-                    | "\(.key + 1). **\($f.severity)** `\($f.path):\($f.start_line)" + (if $f.end_line != $f.start_line then "-\($f.end_line)" else "" end) + "` (\($f.category)): \($f.content | oneline)"]
+                    | "\(.key + 1). **\($f.severity)** `\($f.path):\($f.start_line)" + (if $f.end_line != $f.start_line then "-\($f.end_line)" else "" end) + "` (\($f.category)): \($f.content // "no content" | oneline)"]
                    | if length > 0 then join("\n") else "None." end)
                 + "\n\n</details>"
               end
           end
       ) | join("\n\n")
     end
-' | sed -e "s#${HOME}#~#g" -e "s#${home_dashed}#~#g"
-# OCR error text is raw stderr and names local paths (session files, worktrees);
-# the output goes on a PR, so the home directory never leaves the machine.
+' <<<"$log")
+# OCR error text is raw stderr and names local paths (session files, worktrees),
+# and the output goes on a PR. Literal replacement, not sed: a home path is not
+# a regex, and one holding a metacharacter would break the pattern.
+tilde='~'
+out="${out//"$HOME"/$tilde}"
+out="${out//"$home_dashed"/$tilde}"
+printf '%s\n' "$out"
 
 # Whether each ocr_review call reviewed the change the job did. The review
 # agent picks from/to itself, and the prompt names no base: a guess taken from
@@ -75,8 +88,8 @@ case "$git_ref" in
   dirty | "") want="uncommitted changes" ;;
   *) want="commit $(full "$git_ref")" ;;
 esac
-inputs=$(roborev log --raw "$job" | jq -cRn '
-  inputs | fromjson? | select(.type == "tool_use" and .part.tool == "ocr_review") | .part.state.input')
+inputs=$(jq -cRn '
+  inputs | fromjson? | select(.type == "tool_use" and .part.tool == "ocr_review") | .part.state.input' <<<"$log")
 count=$(grep -c . <<<"$inputs" || true)
 n=0
 while IFS= read -r input; do
