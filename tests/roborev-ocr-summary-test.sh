@@ -88,6 +88,20 @@ assert_contains "$OUT" 'stray &lt;/details> tag' "escapes the bare tag"
 assert_contains "$OUT" 'quoted `</details>` tag' "leaves the tag in a code span as written"
 assert_eq "$(sed 's/`[^`]*`//g' <<<"$OUT" | grep -c '</details>')" 2 "only the script's own two containers close"
 
+echo "a tag after an unmatched backtick is still escaped"
+new_sandbox
+ocr_event '{"status":"complete","message":"m","comments":[{"path":"a.sh","start_line":1,"end_line":1,"severity":"low","category":"bug","content":"unmatched ` then </details> after"}]}' >"$WS/log"
+run
+assert_contains "$OUT" 'unmatched ` then &lt;/details> after' "escapes the tag"
+
+echo "an ocr_review event with no input is not counted as a call"
+new_sandbox
+{ ocr_event '{"status":"complete","message":"m"}'
+  jq -cn '{type:"tool_use",part:{tool:"ocr_review",state:{status:"running"}}}'; } >"$WS/log"
+run
+assert_eq "$(grep -c 'Range check' <<<"$OUT")" 1 "one range check, for the call that has input"
+assert_not_contains "$OUT" "Range check (call" "no call numbering for a single real call"
+
 echo "a bare HTML tag in a group label cannot close the files list early"
 new_sandbox
 ocr_event '{"status":"complete","message":"m","groups":[{"label":"x </details> y","files":["a.sh"]}]}' >"$WS/log"

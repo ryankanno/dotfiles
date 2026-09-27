@@ -23,9 +23,11 @@ out=$(jq -rRn --arg job "$job" '
   # A bare </details> in a finding would close the findings container early
   # and hide the findings after it. Only text outside code spans is escaped:
   # GitHub shows an entity inside a span literally, and backticks are the
-  # markdown OCR writes.
-  def html: split("`") | to_entries
-    | map(if .key % 2 == 0 then .value | gsub("<"; "&lt;") else .value end)
+  # markdown OCR writes. An odd backtick count leaves the last segment outside
+  # any span, so it is escaped too.
+  def html: split("`") | length as $n | to_entries
+    | map(if .key % 2 == 0 or (.key == $n - 1 and $n % 2 == 0)
+          then .value | gsub("<"; "&lt;") else .value end)
     | join("`");
   def paths: map("`\(.path)`") | join(", ");
 
@@ -96,7 +98,7 @@ case "$git_ref" in
   *) want="commit $(full "$git_ref")" ;;
 esac
 inputs=$(jq -cRn '
-  inputs | fromjson? | objects | select(.type == "tool_use" and .part.tool == "ocr_review") | .part.state.input' <<<"$log")
+  inputs | fromjson? | objects | select(.type == "tool_use" and .part.tool == "ocr_review") | .part.state.input | objects' <<<"$log")
 count=$(grep -c . <<<"$inputs" || true)
 n=0
 while IFS= read -r input; do
