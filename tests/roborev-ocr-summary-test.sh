@@ -43,6 +43,7 @@ case "$*" in
     [[ -e "$WS/log-fails" ]] && { echo "roborev: job not found" >&2; exit 1; }
     cat "$WS/log";;
   "show --job 42 --json")
+    [[ -e "$WS/show-fails" ]] && { echo "roborev: job not found" >&2; exit 1; }
     jq -cn --arg ref "$(cat "$WS/git_ref")" --arg repo "$WS/repo" '{job:{git_ref:$ref,repo_path:$repo}}';;
   *) echo "fake roborev: unexpected call: $*" >&2; exit 64;;
 esac
@@ -94,13 +95,54 @@ ocr_event '{"status":"complete","message":"m","comments":[{"path":"a.sh","start_
 run
 assert_contains "$OUT" 'unmatched ` then &lt;/details> after' "escapes the tag"
 
-echo "an ocr_review event with no input is not counted as a call"
+echo "an ocr_review event with no input gets a heading but no range check"
 new_sandbox
 { ocr_event '{"status":"complete","message":"m"}'
   jq -cn '{type:"tool_use",part:{tool:"ocr_review",state:{status:"running"}}}'; } >"$WS/log"
 run
 assert_eq "$(grep -c 'Range check' <<<"$OUT")" 1 "one range check, for the call that has input"
-assert_not_contains "$OUT" "Range check (call" "no call numbering for a single real call"
+assert_contains "$OUT" "**Range check (call 1):**" "numbered like its heading"
+
+echo "range checks keep their heading's number around an input-less call"
+new_sandbox
+{ ocr_event '{"status":"complete","message":"m"}'
+  jq -cn '{type:"tool_use",part:{tool:"ocr_review",state:{status:"running"}}}'
+  ocr_event '{"status":"complete","message":"m"}'; } >"$WS/log"
+run
+assert_contains "$OUT" "### OCR cross-check (call 3 of 3)" "three headings"
+assert_contains "$OUT" "**Range check (call 3):**" "third call's range check says call 3"
+assert_not_contains "$OUT" "**Range check (call 2)" "no range check for the input-less call"
+
+echo "a result missing status, message and finding fields renders no null"
+new_sandbox
+ocr_event '{"comments":[{"start_line":1,"end_line":1,"content":"c"}]}' >"$WS/log"
+run
+assert_eq "$RC" 0 "exits 0"
+assert_not_contains "$OUT" "null" "no null in output"
+
+echo "failed and waived files are listed"
+new_sandbox
+ocr_event '{"status":"complete","message":"m","manifest":{"coverage":{"selected":[{"path":"a.sh"},{"path":"b.sh"}],"failed":[{"path":"a.sh"}],"waived":[{"path":"b.sh"}]}}}' >"$WS/log"
+run
+assert_contains "$OUT" "0 completed, 1 failed, 1 waived" "counts them"
+assert_contains "$OUT" '**Failed:** `a.sh`' "lists the failed file"
+assert_contains "$OUT" '**Waived:** `b.sh`' "lists the waived file"
+
+echo "a completed call whose output is not JSON says so"
+new_sandbox
+jq -cn '{type:"tool_use",part:{tool:"ocr_review",state:{status:"completed",input:{from:"aaa",to:"bbb"},output:"plain text"}}}' >"$WS/log"
+run
+assert_eq "$RC" 0 "exits 0"
+assert_contains "$OUT" "completed, but the output is not JSON" "names the problem"
+assert_contains "$OUT" "plain text" "shows the output"
+
+echo "a failing roborev show is an error, not a range verdict"
+new_sandbox
+touch "$WS/show-fails"
+ocr_event '{"status":"complete","message":"m"}' >"$WS/log"
+run
+assert_eq "$([[ $RC -ne 0 ]] && echo nonzero)" nonzero "exits non-zero"
+assert_not_contains "$OUT" "Range check" "prints no range check"
 
 echo "a bare HTML tag in a group label cannot close the files list early"
 new_sandbox

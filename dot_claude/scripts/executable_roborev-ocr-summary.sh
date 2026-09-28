@@ -54,7 +54,7 @@ out=$(jq -rRn --arg job "$job" '
                 | ($c.failed // []) as $failed
                 | ($c.waived // []) as $waived
                 | ($o.comments // []) as $findings
-                | "- **Status:** \($o.status). \($o.message)\n"
+                | "- **Status:** \($o.status // "unknown"). \($o.message // "No message.")\n"
                 + "- **Range:** `\($o.manifest.input.exact_range // "unknown")` (\($o.manifest.input.mode // "unknown mode"))\n"
                 + "- **Model:** \($o.llm.provider // "unknown")/\($o.llm.model // "unknown"), OCR \($o.manifest.execution.ocr_version // "unknown"), \($o.summary.elapsed // "elapsed unknown")\n"
                 + "- **Tool calls:** \($o.tool_calls.total // "unknown") (\($o.tool_calls.failure // "unknown") failed)\n"
@@ -66,7 +66,7 @@ out=$(jq -rRn --arg job "$job" '
                 + "\n\n</details>\n\n"
                 + "<details><summary>OCR findings: \($findings | length)</summary>\n\n"
                 + ([$findings | to_entries[] | .value as $f
-                    | "\(.key + 1). **\($f.severity)** `\($f.path):\($f.start_line)" + (if $f.end_line != $f.start_line then "-\($f.end_line)" else "" end) + "` (\($f.category)): \($f.content // "no content" | oneline | html)"]
+                    | "\(.key + 1). **\($f.severity // "unrated")** `\($f.path // "unknown file"):\($f.start_line // "?")" + (if ($f.end_line // $f.start_line) != $f.start_line then "-\($f.end_line)" else "" end) + "` (\($f.category // "uncategorized")): \($f.content // "no content" | oneline | html)"]
                    | if length > 0 then join("\n") else "None." end)
                 + "\n\n</details>"
               end
@@ -97,13 +97,14 @@ case "$git_ref" in
   dirty | "") want="uncommitted changes" ;;
   *) want="commit $(full "$git_ref")" ;;
 esac
-inputs=$(jq -cRn '
-  inputs | fromjson? | objects | select(.type == "tool_use" and .part.tool == "ocr_review") | .part.state.input | objects' <<<"$log")
-count=$(grep -c . <<<"$inputs" || true)
-n=0
-while IFS= read -r input; do
+# Numbered across every call, as the headings above are, so "call N" names the
+# same call in both places; a call without input has nothing to compare.
+inputs=$(jq -rRn '
+  [inputs | fromjson? | objects | select(.type == "tool_use" and .part.tool == "ocr_review") | .part.state]
+  | length as $total | to_entries[] | select(.value.input | type == "object")
+  | "\(.key + 1)\t\($total)\t\(.value.input | tojson)"' <<<"$log")
+while IFS=$'\t' read -r n total input; do
   [ -n "$input" ] || continue
-  n=$((n + 1))
   commit=$(jq -r '.commit // empty' <<<"$input")
   from=$(jq -r '.from // empty' <<<"$input")
   to=$(jq -r '.to // empty' <<<"$input")
@@ -115,7 +116,7 @@ while IFS= read -r input; do
     got="uncommitted changes"
   fi
   label=""
-  [ "$count" -gt 1 ] && label=" (call $n)"
+  [ "$total" -gt 1 ] && label=" (call $n)"
   if [ "$got" = "$want" ]; then
     printf '\n**Range check%s:** OCR reviewed the same change as the review, %s.\n' "$label" "$(short "$want")"
   else
