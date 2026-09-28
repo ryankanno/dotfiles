@@ -16,9 +16,13 @@ home_dashed="${home_dashed//\//-}"
 # empty log that reads like a review which never called ocr_review.
 log=$(roborev log --raw "$job")
 
+# Shared by both passes below: the headings and the range checks number the
+# same list, so "call N" names the same call in each.
+ocr_calls_def='def ocr_calls: map(select(.type == "tool_use" and .part.tool == "ocr_review") | .part.state);'
+
 # The log is JSONL events followed by the review's plain-text body, so parse
 # line by line and skip what is not JSON.
-out=$(jq -rRn --arg job "$job" '
+out=$(jq -rRn --arg job "$job" "$ocr_calls_def"'
   def oneline: gsub("\\s*\n\\s*"; " ");
   # A bare </details> in a finding would close the findings container early
   # and hide the findings after it. Only text outside code spans is escaped:
@@ -38,7 +42,7 @@ out=$(jq -rRn --arg job "$job" '
   | if ($events | length) == 0 then
       error("job \($job): no JSON events in the log, so whether ocr_review ran is unknown")
     else . end
-  | [$events[] | select(.type == "tool_use" and .part.tool == "ocr_review") | .part.state] as $calls
+  | ($events | ocr_calls) as $calls
   | if ($calls | length) == 0 then
       "### OCR cross-check\n\nJob \($job) made no `ocr_review` call, so this review has no OCR cross-check."
     else
@@ -104,10 +108,9 @@ case "$git_ref" in
   dirty | "") want="uncommitted changes" ;;
   *) want="commit $(full "$git_ref")" ;;
 esac
-# Numbered across every call, as the headings above are, so "call N" names the
-# same call in both places; a call without input has nothing to compare.
-inputs=$(jq -rRn '
-  [inputs | fromjson? | objects | select(.type == "tool_use" and .part.tool == "ocr_review") | .part.state]
+# A call without input has nothing to compare, but keeps its number.
+inputs=$(jq -rRn "$ocr_calls_def"'
+  [inputs | fromjson? | objects] | ocr_calls
   | length as $total | to_entries[] | select(.value.input | type == "object")
   | "\(.key + 1)\t\($total)\t\(.value.input | tojson)"' <<<"$log")
 while IFS=$'\t' read -r n total input; do
