@@ -189,6 +189,23 @@ run
 assert_contains "$OUT" "**Arguments:** none recorded" "says none were recorded"
 assert_not_contains "$OUT" "null" "no null in output"
 
+echo "a completed call with no output, or non-string error text, still renders"
+new_sandbox
+{ jq -cn '{type:"tool_use",part:{tool:"ocr_review",state:{status:"completed",input:{from:"aaa",to:"bbb"}}}}'
+  jq -cn '{type:"tool_use",part:{tool:"ocr_review",state:{status:"error",input:{from:"aaa",to:"bbb"},error:{code:7}}}}'; } >"$WS/log"
+run
+assert_eq "$RC" 0 "exits 0"
+assert_contains "$OUT" "completed, but the output is not JSON" "reports the missing output"
+assert_contains "$OUT" '{"code":7}' "shows the non-string error"
+
+echo "a bare HTML tag in the range, model or timing fields is escaped"
+new_sandbox
+ocr_event '{"status":"complete","message":"m","manifest":{"input":{"mode":"m</details>"},"execution":{"ocr_version":"v</details>"}},"llm":{"provider":"p</details>","model":"o</details>"},"summary":{"elapsed":"e</details>"}}' >"$WS/log"
+run
+assert_eq "$(sed 's/`[^`]*`//g' <<<"$OUT" | grep -o '</details>' | wc -l | tr -d ' ')" 2 "only the script's own two containers close"
+assert_contains "$OUT" "(m&lt;/details>)" "escapes the mode"
+assert_contains "$OUT" "p&lt;/details>/o&lt;/details>, OCR v&lt;/details>, e&lt;/details>" "escapes provider, model, version and elapsed"
+
 echo "a single-component home is not replaced inside ordinary words"
 new_sandbox
 ocr_event '{"status":"complete","message":"the rootx cause"}' >"$WS/log"

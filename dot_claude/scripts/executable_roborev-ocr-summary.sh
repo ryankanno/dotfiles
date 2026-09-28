@@ -39,7 +39,7 @@ out=$(jq -rRn --arg job "$job" "$ocr_calls_def"'
   def paths: map(.path | code) | join(", ");
   # Raw stderr can hold any fence run, so the fence is one tilde longer than
   # the longest run in the text, and never shorter than four.
-  def fenced: . as $t | ("~" * (([$t | scan("~+") | length] + [3] | max) + 1)) as $f
+  def fenced: (if type == "string" then . else tojson end) | .[0:1500] | . as $t | ("~" *(([$t | scan("~+") | length] + [3] | max) + 1)) as $f
     | "\($f)\n\($t)\n\($f)";
 
   [inputs | fromjson? | objects] as $events
@@ -55,19 +55,19 @@ out=$(jq -rRn --arg job "$job" "$ocr_calls_def"'
         | "### OCR cross-check" + (if ($calls | length) > 1 then " (call \($i + 1) of \($calls | length))" else "" end) + "\n\n"
         + "**Arguments:** \(if $s.input == null then "none recorded" else ($s.input | tojson | code) end)\n\n"
         + if $s.status != "completed" then
-            "**Status:** \($s.status | tostring | html)\n\n" + ($s.error // "no error text recorded" | .[0:1500] | fenced)
+            "**Status:** \($s.status | tostring | html)\n\n" + ($s.error // "no error text recorded" | fenced)
           else
             ($s.output | try fromjson catch null) as $o
             | if $o == null then
-                "**Status:** completed, but the output is not JSON:\n\n" + ($s.output | .[0:1500] | fenced)
+                "**Status:** completed, but the output is not JSON:\n\n" + ($s.output // "no output recorded" | fenced)
               else
                 ($o.manifest.coverage // {}) as $c
                 | ($c.failed // []) as $failed
                 | ($c.waived // []) as $waived
                 | ($o.comments // []) as $findings
                 | "- **Status:** \($o.status // "unknown" | html). \($o.message // "No message." | html)\n"
-                + "- **Range:** \($o.manifest.input.exact_range // "unknown" | code) (\($o.manifest.input.mode // "unknown mode"))\n"
-                + "- **Model:** \($o.llm.provider // "unknown")/\($o.llm.model // "unknown"), OCR \($o.manifest.execution.ocr_version // "unknown"), \($o.summary.elapsed // "elapsed unknown")\n"
+                + "- **Range:** \($o.manifest.input.exact_range // "unknown" | code) (\($o.manifest.input.mode // "unknown mode" | tostring | html))\n"
+                + "- **Model:** \($o.llm.provider // "unknown" | tostring | html)/\($o.llm.model // "unknown" | tostring | html), OCR \($o.manifest.execution.ocr_version // "unknown" | tostring | html), \($o.summary.elapsed // "elapsed unknown" | tostring | html)\n"
                 + "- **Tool calls:** \($o.tool_calls.total // "unknown") (\($o.tool_calls.failure // "unknown") failed)\n"
                 + ([$o.tool_calls.failure_details[]? | "  - \(.tool_name | code) on \(.file_path | code): \(.error // "no error text" | oneline | html)"] | if length > 0 then join("\n") + "\n" else "" end)
                 + "\n<details><summary>Files: \($c.selected // [] | length) selected, \($c.completed // [] | length) completed, \($failed | length) failed, \($waived | length) waived, \($c.reused // [] | length) reused</summary>\n\n"
