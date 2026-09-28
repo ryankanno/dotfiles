@@ -29,7 +29,10 @@ out=$(jq -rRn --arg job "$job" '
     | map(if .key % 2 == 0 or (.key == $n - 1 and $n % 2 == 0)
           then .value | gsub("<"; "&lt;") else .value end)
     | join("`");
-  def paths: map("`\(.path)`") | join(", ");
+  # Paths, tool names and arguments sit in code spans, where GitHub renders
+  # "<" as text; only a backtick can end the span early and let a tag through.
+  def code: "`" + (tostring | gsub("`"; "")) + "`";
+  def paths: map(.path | code) | join(", ");
 
   [inputs | fromjson? | objects] as $events
   | if ($events | length) == 0 then
@@ -42,31 +45,32 @@ out=$(jq -rRn --arg job "$job" '
       $calls | to_entries | map(
         .key as $i | .value as $s
         | "### OCR cross-check" + (if ($calls | length) > 1 then " (call \($i + 1) of \($calls | length))" else "" end) + "\n\n"
-        + "**Arguments:** `\($s.input | tojson)`\n\n"
+        + "**Arguments:** \($s.input | tojson | code)\n\n"
+        # A ~~~~ fence: stderr can hold a ``` run, which would close a ``` fence.
         + if $s.status != "completed" then
-            "**Status:** \($s.status)\n\n```\n\($s.error // "no error text recorded" | .[0:1500])\n```"
+            "**Status:** \($s.status)\n\n~~~~\n\($s.error // "no error text recorded" | .[0:1500])\n~~~~"
           else
             ($s.output | try fromjson catch null) as $o
             | if $o == null then
-                "**Status:** completed, but the output is not JSON:\n\n```\n\($s.output | .[0:1500])\n```"
+                "**Status:** completed, but the output is not JSON:\n\n~~~~\n\($s.output | .[0:1500])\n~~~~"
               else
                 ($o.manifest.coverage // {}) as $c
                 | ($c.failed // []) as $failed
                 | ($c.waived // []) as $waived
                 | ($o.comments // []) as $findings
-                | "- **Status:** \($o.status // "unknown"). \($o.message // "No message.")\n"
-                + "- **Range:** `\($o.manifest.input.exact_range // "unknown")` (\($o.manifest.input.mode // "unknown mode"))\n"
+                | "- **Status:** \($o.status // "unknown"). \($o.message // "No message." | html)\n"
+                + "- **Range:** \($o.manifest.input.exact_range // "unknown" | code) (\($o.manifest.input.mode // "unknown mode"))\n"
                 + "- **Model:** \($o.llm.provider // "unknown")/\($o.llm.model // "unknown"), OCR \($o.manifest.execution.ocr_version // "unknown"), \($o.summary.elapsed // "elapsed unknown")\n"
                 + "- **Tool calls:** \($o.tool_calls.total // "unknown") (\($o.tool_calls.failure // "unknown") failed)\n"
-                + ([$o.tool_calls.failure_details[]? | "  - `\(.tool_name)` on `\(.file_path)`: \(.error // "no error text" | oneline)"] | if length > 0 then join("\n") + "\n" else "" end)
+                + ([$o.tool_calls.failure_details[]? | "  - \(.tool_name | code) on \(.file_path | code): \(.error // "no error text" | oneline | html)"] | if length > 0 then join("\n") + "\n" else "" end)
                 + "\n<details><summary>Files: \($c.selected // [] | length) selected, \($c.completed // [] | length) completed, \($failed | length) failed, \($waived | length) waived, \($c.reused // [] | length) reused</summary>\n\n"
-                + ([$o.groups[]? | "- **\(.label | html)**: \(.files | map("`\(.)`") | join(", "))"] | join("\n"))
+                + ([$o.groups[]? | "- **\(.label | html)**: \(.files | map(code) | join(", "))"] | join("\n"))
                 + (if ($failed | length) > 0 then "\n\n**Failed:** \($failed | paths)" else "" end)
                 + (if ($waived | length) > 0 then "\n\n**Waived:** \($waived | paths)" else "" end)
                 + "\n\n</details>\n\n"
                 + "<details><summary>OCR findings: \($findings | length)</summary>\n\n"
                 + ([$findings | to_entries[] | .value as $f
-                    | "\(.key + 1). **\($f.severity // "unrated")** `\($f.path // "unknown file"):\($f.start_line // "?")" + (if ($f.end_line // $f.start_line) != $f.start_line then "-\($f.end_line)" else "" end) + "` (\($f.category // "uncategorized")): \($f.content // "no content" | oneline | html)"]
+                    | "\(.key + 1). **\($f.severity // "unrated")** \("\($f.path // "unknown file"):\($f.start_line // "?")" + (if ($f.end_line // $f.start_line) != $f.start_line then "-\($f.end_line)" else "" end) | code) (\($f.category // "uncategorized")): \($f.content // "no content" | oneline | html)"]
                    | if length > 0 then join("\n") else "None." end)
                 + "\n\n</details>"
               end
@@ -79,7 +83,10 @@ out=$(jq -rRn --arg job "$job" '
 # a regex, and one holding a metacharacter would break the pattern.
 tilde='~'
 out="${out//"$HOME"/$tilde}"
-out="${out//"$home_dashed"/$tilde}"
+# A one-component home (/root) dashes to a bare word that ordinary text holds.
+if [[ "$home_dashed" == *-* ]]; then
+  out="${out//"$home_dashed"/$tilde}"
+fi
 printf '%s\n' "$out"
 
 # Whether each ocr_review call reviewed the change the job did. The review

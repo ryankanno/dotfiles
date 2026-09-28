@@ -144,6 +144,37 @@ run
 assert_eq "$([[ $RC -ne 0 ]] && echo nonzero)" nonzero "exits non-zero"
 assert_not_contains "$OUT" "Range check" "prints no range check"
 
+echo "a backtick in a code-span value cannot let a tag through"
+new_sandbox
+jq -cn --arg out "$(jq -cn '{status:"complete",message:"m",
+    groups:[{label:"g",files:["f`</details>`x"]}],
+    tool_calls:{total:1,failure:1,failure_details:[{tool_name:"t`</details>`",file_path:"p`</details>`",error:"e"}]},
+    comments:[{path:"a`</details>`b",start_line:1,end_line:1,severity:"low",category:"bug",content:"c"},
+              {path:"z.sh",start_line:1,end_line:1,severity:"low",category:"bug",content:"second"}]}')" \
+  '{type:"tool_use",part:{tool:"ocr_review",state:{status:"completed",input:{from:"aaa",to:"bbb",x:"`</details>`"},output:$out}}}' >"$WS/log"
+run
+assert_eq "$RC" 0 "exits 0"
+assert_eq "$(sed 's/`[^`]*`//g' <<<"$OUT" | grep -o '</details>' | wc -l | tr -d ' ')" 2 "only the script's own two containers close"
+assert_contains "$OUT" "second" "the finding after it still renders"
+
+echo "a bare HTML tag in the OCR message is escaped"
+new_sandbox
+ocr_event '{"status":"complete","message":"done </details> here"}' >"$WS/log"
+run
+assert_contains "$OUT" "done &lt;/details> here" "escapes the message"
+
+echo "a code fence in error text cannot close its block"
+new_sandbox
+jq -cn '{type:"tool_use",part:{tool:"ocr_review",state:{status:"error",input:{from:"aaa",to:"bbb"},error:"boom\n```\n</details>"}}}' >"$WS/log"
+run
+assert_contains "$OUT" $'~~~~\nboom\n```\n</details>\n~~~~' "fences with a run the error cannot contain"
+
+echo "a single-component home is not replaced inside ordinary words"
+new_sandbox
+ocr_event '{"status":"complete","message":"the rootx cause"}' >"$WS/log"
+run "/rootx"
+assert_contains "$OUT" "the rootx cause" "leaves the word alone"
+
 echo "a bare HTML tag in a group label cannot close the files list early"
 new_sandbox
 ocr_event '{"status":"complete","message":"m","groups":[{"label":"x </details> y","files":["a.sh"]}]}' >"$WS/log"
@@ -161,8 +192,11 @@ assert_contains "$OUT" "**Range check:** OCR reviewed the same change" "still re
 echo "short SHAs from the agent match the full SHAs roborev stores"
 new_sandbox
 git -C "$WS/repo" init -q
-git -C "$WS/repo" -c user.name=t -c user.email=t@t commit -q --allow-empty -m one
-git -C "$WS/repo" -c user.name=t -c user.email=t@t commit -q --allow-empty -m two
+# Isolated from the developer's git config: a global commit.gpgsign would make
+# these commits depend on a signing key.
+git_t() { GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$WS/repo" -c user.name=t -c user.email=t@t "$@"; }
+git_t commit -q --allow-empty -m one
+git_t commit -q --allow-empty -m two
 base=$(git -C "$WS/repo" rev-parse HEAD^)
 head=$(git -C "$WS/repo" rev-parse HEAD)
 echo "$base..$head" >"$WS/git_ref"
