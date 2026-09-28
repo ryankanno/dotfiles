@@ -30,15 +30,13 @@ share:
 
 | | `/roborev-pr-review` | `/roborev-pr-refine` |
 |---|---|---|
-| command | `roborev ci review` | `roborev review --branch` |
-| daemon | not used | required |
-| agents | the `ci.review_types` x `ci.agents` matrix, synthesized | one, `default_agent` |
-| who posts | roborev itself, via `--comment` | this skill, via `gh pr comment` |
-| job id | no database row, so `roborev show` has nothing to read | the id step 7 quotes |
+| command | `roborev review --branch=<headRefOid> --base origin/<base>` | `roborev review --branch --base origin/<base>` |
+| reviews | the PR's head commit, whatever is checked out | the checkout's `HEAD` |
+| who posts | that skill, via `gh pr comment` | this skill, via `gh pr comment` |
 | touches code | no | yes: edits, commits, pushes |
 
-The agent is the same on both today (`default_agent` and `ci.agents` are both
-`opencode`), which is why they can look interchangeable. The transport is not.
+Both read `default_agent` (`opencode`), both run through the daemon, and both
+quote the job they report by id.
 
 ## Usage
 
@@ -219,8 +217,11 @@ stored Fail or cancelled verdict with a comment claiming the branch is clean.
 **If that review produces no output** (`No review output generated`), stop and
 say so. It is a known opencode failure where the agent loop ends on a tool call
 without emitting text; an empty result is recorded with verdict `F`, which is
-not the same as a failing review and must never be reported as one. Suggest
-`--reasoning medium` as the next thing to try, and do not loop.
+not the same as a failing review and must never be reported as one. The usual
+cause is a denied tool call: `roborev log <job>` shows `rejected permission` on
+the call that stopped it, most often a write under `/tmp` that opencode's
+`permission` block does not allow. Do not retry at a lower reasoning setting,
+and do not loop.
 
 **Do not switch agents to dodge it.** `ocr_review`, which `review_guidelines`
 requires every review to call before forming its own findings, is an **opencode
@@ -397,6 +398,7 @@ The comment states, plainly:
   issues found" in roborev's words is evidence; "everything is clean" in yours
   is an assertion. This is the artifact that replaces the failing review the
   PR is still showing
+- the OCR cross-check behind that clean review, described below
 - the pushed SHA, so the reader can tell which commits the claims cover
 - that the review was local. Whether a second verdict follows depends on the
   repo, so check before promising one:
@@ -414,12 +416,61 @@ The comment states, plainly:
 Write the body to a file rather than inlining it. Review text can contain shell
 metacharacters.
 
+Scan that file before posting. Review text, gate output and OCR error output
+are written on this machine and can name its paths, services or credentials:
+
+```bash
+grep -nE "$HOME|$USER|/Users/|/home/|/private/|/var/folders/|127\.0\.0\.1|localhost|(sk|ghp|gho|github_pat)[-_][A-Za-z0-9_]{10,}|[Bb]earer " <file>
+```
+
+Replace a home-directory path with `~`. Anything else it finds (a temp path, a
+local URL, a token): show the lines to the user and wait before posting.
+
+### The OCR cross-check
+
+"No issues found" alone does not tell the reader what was looked at. Every
+review calls `ocr_review` first, and its output survives only in the job's log,
+so render it from there:
+
+```bash
+~/.claude/scripts/roborev-ocr-summary.sh <job_id>
+```
+
+It prints the call's arguments and status, the exact range, model, elapsed
+time, tool calls and their failures, every file OCR selected, completed, failed
+or waived with its grouping, and each raw OCR finding. Paste it verbatim,
+including when it reports that `ocr_review` errored or was never called. When
+the job is a panel's synthesis parent (`panel_role` `synthesis` in `roborev show
+--job <job_id> --json`), the calls live in the members instead: the `roborev
+list --json` entries with `panel_role` `member` and the parent's
+`panel_run_uuid`. Render each.
+
+Then, one line per OCR finding by the number the script gave it, say what the
+review did with it: confirmed as which finding, listed under "Unconfirmed
+candidates" (quote the reason), or not addressed by the review. Match on file,
+line and claim.
+
+The script ends with one `**Range check**` line per call, comparing the
+`from`/`to` (or `commit`) the agent passed against the job's `git_ref`. The
+agent picks that range itself, and the prompt names no base, so it can guess a
+SHA from the prompt's Previous Reviews block and hand OCR another change. On
+`mismatch`, OCR's files and findings describe that other change: write "not a
+cross-check of this change" in place of each per-finding line above, and do not
+describe the clean review as OCR-corroborated anywhere in the comment or the
+report. The review then stands on the agent's own reading, and the comment
+says so.
+
+The quoted review carries the agent's "Unconfirmed candidates", which
+`review_guidelines` requires. Quote it whole so that section survives, and if
+the review has none, say so in one line.
+
 ### When the review found nothing
 
 A run that reached step 7 with no findings posts a shorter comment carrying only
 what happened:
 
-- the review, **quoted**, with its job id and the SHA it reviewed
+- the review, **quoted** whole, with its job id and the SHA it reviewed
+- the OCR cross-check, as above
 - the gate, named and quoted exactly: the command run and what it printed
 - that no code changed, so nothing was committed and nothing was pushed
 
@@ -474,11 +525,8 @@ at `HEAD` (nothing run, nothing posted), and a review that came back clean
   unwinding a stack. Three is the cap for that reason, well under the binary's
   own default of ten. A loop that has not converged in three passes wants a
   person, not another cycle.
-- The two paths read **different** agent keys: this skill's `roborev review`
-  takes `default_agent`, `/roborev-pr-review`'s `ci review` takes `ci.agents`.
-  Both hold `opencode` today, so a provider fault hits both and switching paths
-  is no workaround for an empty review. That equivalence is a fact about today's
-  config, not a property of the tool, so check the key for the path you are on
-  rather than assuming they still match.
+- This skill and `/roborev-pr-review` both run `roborev review` on
+  `default_agent`, so a provider fault hits both and switching skills is no
+  workaround for an empty review.
 - `roborev list` defaults to the current repo and branch, which is what step 2
   wants. Pass `--branch` only to look elsewhere.

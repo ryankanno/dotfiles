@@ -37,7 +37,7 @@ home-manager switch --flake .#ryankanno@macmini --impure
   - `settings.json` - permissions, hooks, plugins, env vars, status line
   - `agents/` - subagent definitions (e.g. `diataxis-expert`)
   - `skills/` - model-invoked skills (`preflight`, `bootstrap-python-project`, `diataxis-knowledge`)
-  - `scripts/` - shared hook helpers (`ntfy-notify.sh` for push notifications)
+  - `scripts/` - shared helpers (`ntfy-notify.sh` for push notifications, `roborev-ocr-summary.sh` for the roborev PR skills)
   - `commands/` - slash commands (currently empty; built-ins and skills cover common workflows)
 - `dot_hammerspoon/` - macOS window management and key bindings
 - `dot_githooks/` - Git hooks (prepare-commit-msg for conventional commits)
