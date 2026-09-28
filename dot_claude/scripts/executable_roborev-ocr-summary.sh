@@ -37,6 +37,10 @@ out=$(jq -rRn --arg job "$job" "$ocr_calls_def"'
   # "<" as text; only a backtick can end the span early and let a tag through.
   def code: "`" + (tostring | gsub("`"; "")) + "`";
   def paths: map(.path | code) | join(", ");
+  # Raw stderr can hold any fence run, so the fence is one tilde longer than
+  # the longest run in the text, and never shorter than four.
+  def fenced: . as $t | ("~" * (([$t | scan("~+") | length] + [3] | max) + 1)) as $f
+    | "\($f)\n\($t)\n\($f)";
 
   [inputs | fromjson? | objects] as $events
   | if ($events | length) == 0 then
@@ -49,20 +53,19 @@ out=$(jq -rRn --arg job "$job" "$ocr_calls_def"'
       $calls | to_entries | map(
         .key as $i | .value as $s
         | "### OCR cross-check" + (if ($calls | length) > 1 then " (call \($i + 1) of \($calls | length))" else "" end) + "\n\n"
-        + "**Arguments:** \($s.input | tojson | code)\n\n"
-        # A ~~~~ fence: stderr can hold a ``` run, which would close a ``` fence.
+        + "**Arguments:** \(if $s.input == null then "none recorded" else ($s.input | tojson | code) end)\n\n"
         + if $s.status != "completed" then
-            "**Status:** \($s.status)\n\n~~~~\n\($s.error // "no error text recorded" | .[0:1500])\n~~~~"
+            "**Status:** \($s.status | tostring | html)\n\n" + ($s.error // "no error text recorded" | .[0:1500] | fenced)
           else
             ($s.output | try fromjson catch null) as $o
             | if $o == null then
-                "**Status:** completed, but the output is not JSON:\n\n~~~~\n\($s.output | .[0:1500])\n~~~~"
+                "**Status:** completed, but the output is not JSON:\n\n" + ($s.output | .[0:1500] | fenced)
               else
                 ($o.manifest.coverage // {}) as $c
                 | ($c.failed // []) as $failed
                 | ($c.waived // []) as $waived
                 | ($o.comments // []) as $findings
-                | "- **Status:** \($o.status // "unknown"). \($o.message // "No message." | html)\n"
+                | "- **Status:** \($o.status // "unknown" | html). \($o.message // "No message." | html)\n"
                 + "- **Range:** \($o.manifest.input.exact_range // "unknown" | code) (\($o.manifest.input.mode // "unknown mode"))\n"
                 + "- **Model:** \($o.llm.provider // "unknown")/\($o.llm.model // "unknown"), OCR \($o.manifest.execution.ocr_version // "unknown"), \($o.summary.elapsed // "elapsed unknown")\n"
                 + "- **Tool calls:** \($o.tool_calls.total // "unknown") (\($o.tool_calls.failure // "unknown") failed)\n"
@@ -74,7 +77,7 @@ out=$(jq -rRn --arg job "$job" "$ocr_calls_def"'
                 + "\n\n</details>\n\n"
                 + "<details><summary>OCR findings: \($findings | length)</summary>\n\n"
                 + ([$findings | to_entries[] | .value as $f
-                    | "\(.key + 1). **\($f.severity // "unrated")** \("\($f.path // "unknown file"):\($f.start_line // "?")" + (if ($f.end_line // $f.start_line) != $f.start_line then "-\($f.end_line)" else "" end) | code) (\($f.category // "uncategorized")): \($f.content // "no content" | oneline | html)"]
+                    | "\(.key + 1). **\($f.severity // "unrated" | html)** \("\($f.path // "unknown file"):\($f.start_line // "?")" + (if ($f.end_line // $f.start_line) != $f.start_line then "-\($f.end_line)" else "" end) | code) (\($f.category // "uncategorized" | html)): \($f.content // "no content" | oneline | html)"]
                    | if length > 0 then join("\n") else "None." end)
                 + "\n\n</details>"
               end

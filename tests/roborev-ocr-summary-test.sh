@@ -169,6 +169,26 @@ jq -cn '{type:"tool_use",part:{tool:"ocr_review",state:{status:"error",input:{fr
 run
 assert_contains "$OUT" $'~~~~\nboom\n```\n</details>\n~~~~' "fences with a run the error cannot contain"
 
+echo "a bare HTML tag in status, severity or category is escaped"
+new_sandbox
+ocr_event '{"status":"s</details>","message":"m","comments":[{"path":"a.sh","start_line":1,"end_line":1,"severity":"v</details>","category":"c</details>","content":"x"},{"path":"b.sh","start_line":1,"end_line":1,"severity":"low","category":"bug","content":"second"}]}' >"$WS/log"
+run
+assert_eq "$(sed 's/`[^`]*`//g' <<<"$OUT" | grep -o '</details>' | wc -l | tr -d ' ')" 2 "only the script's own two containers close"
+assert_contains "$OUT" "**Status:** s&lt;/details>. m" "escapes the status"
+
+echo "a tilde fence in error text cannot close its block"
+new_sandbox
+jq -cn '{type:"tool_use",part:{tool:"ocr_review",state:{status:"error",input:{from:"aaa",to:"bbb"},error:"boom\n~~~~~~\n</details>"}}}' >"$WS/log"
+run
+assert_contains "$OUT" $'~~~~~~~\nboom\n~~~~~~\n</details>\n~~~~~~~' "fences with a longer run than the error holds"
+
+echo "a call without input shows no arguments rather than null"
+new_sandbox
+jq -cn '{type:"tool_use",part:{tool:"ocr_review",state:{status:"running"}}}' >"$WS/log"
+run
+assert_contains "$OUT" "**Arguments:** none recorded" "says none were recorded"
+assert_not_contains "$OUT" "null" "no null in output"
+
 echo "a single-component home is not replaced inside ordinary words"
 new_sandbox
 ocr_event '{"status":"complete","message":"the rootx cause"}' >"$WS/log"
