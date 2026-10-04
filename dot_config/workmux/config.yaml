@@ -1,0 +1,37 @@
+nerdfont: true
+
+# Branch new worktrees from the repo's main branch, not whatever is checked out.
+base_branch: auto
+
+# Worktrees live inside the repo, not in a `<project>__worktrees` sibling.
+worktree_dir: .worktrees
+
+# The loop dispatches with `-l <name>`, so harness and prompt stack ride together
+# in one layout name. The top-level panes keep the superpowers default, so a
+# manual `workmux add` without `-l` behaves exactly as before.
+panes:
+  - command: 'claude --append-system-prompt "Use the superpowers skills to plan and complete this task."'
+    focus: true
+  - split: horizontal
+
+layouts:
+  claude-sp:
+    panes:
+      - command: 'claude --append-system-prompt "Use the superpowers skills to plan and complete this task."'
+        focus: true
+      - split: horizontal
+  claude-mp:
+    panes:
+      - command: 'claude --append-system-prompt "Use the mattpocock skills to plan and complete this task."'
+        focus: true
+      - split: horizontal
+  opencode-sp:
+    panes:
+      - command: 'opencode --agent sp'
+        focus: true
+      - split: horizontal
+  opencode-mp:
+    panes:
+      - command: 'opencode --agent mp'
+        focus: true
+      - split: horizontal
