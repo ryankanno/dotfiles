@@ -1,0 +1,121 @@
+---
+name: pr-review
+description: >-
+  Use when asked to run one native review round on a pull request and post
+  it as a comment: "review this PR", "run a review round", or as a step of
+  the issue-to-pr loop. Runs the reviewer binding (ocr by default) and the
+  adversarial critic over the PR's ref range, adds the caller's own read,
+  and posts the standard report comment. Not for fixing findings
+  (/pr-refine) and not for the whole loop (/issue-to-pr).
+---
+
+# pr-review
+
+One review round over a pull request's ref range: the reviewer binding,
+the adversarial critic binding, the caller's own read, one report
+comment. The caller (the issue-to-pr orchestrator, the implementer in a
+refine round, or a human) assembles nothing by hand; this skill defines
+every step.
+
+Two independent reviews plus the caller's read is the whole point: a
+single reviewer that found nothing proves only that one reader was
+unpersuaded.
+
+## 1. Run the round
+
+The range mechanics live in the slot's tested script, not in this
+skill's prose:
+
+```bash
+~/.claude/skills/issue-to-pr/tools/pr-round.sh \
+  --repo <repo> --pr <n> --round <N> \
+  --brief <brief-file> --expect-branch <branch-name>
+```
+
+`--expect-branch` binds the round to this loop's branch: a PR whose
+head is any other branch is a hallucinated number, and the script exits
+3 before anything reviews or posts. Omit it only when the caller
+cannot know the branch (a human's standalone review). The script
+resolves the range from the PR (never the checkout's `HEAD`), fetches
+the refs, runs the active reviewer binding over
+`origin/<base>..<headRefOid>`, applies the per-commit empty-retry
+policy once per commit in the range, and prints the round directory
+whose `round.json` carries the range, the identity, every run (mode,
+directory, status, session id, exit code), and `reviewer_complete`.
+
+## 2. Read round.json
+
+**`reviewer_complete: true`** with zero findings is a clean review:
+report it as clean. **`reviewer_complete: false`** is an empty
+result: the reviewer produced no review text, whatever runs it
+attempted. That is never clean and never a failure. The visible
+`**Reviewer:**` line and the verdict follow report-template.md: with
+findings from the critic or the caller's read, the verdict counts them;
+with nothing from any source, the verdict is `unrecovered (the reviewer
+produced no review text)`, which /pr-refine reads as neither clean nor
+failing, and the loop cannot declare the branch clean off that round.
+
+## 3. The adversarial critic
+
+Resolve the critic from the manifest and follow its binding file
+(`~/.claude/skills/issue-to-pr/tools/<critic>/binding.md`) for how to
+spawn it: a fresh, clean-context subagent, given the binding's critic
+prompt, the diff, and the brief. Its findings arrive numbered with
+file, line, the claim, the break, and severity. Findings that do not
+reference the diff are dropped, per the binding's contract.
+
+```bash
+git -C <repo> diff origin/<baseRefName>...<headRefOid>
+```
+
+## 4. The caller's own read
+
+Read the diff against the brief yourself:
+
+- **Scope creep:** anything the diff changes that the brief does not
+  ask for.
+- **Weakened tests:** assertions that would survive deleting the
+  feature, tests weakened to pass, tests deleted. A deleted test is a
+  high-severity finding.
+- **Gate output:** in refine and convergence rounds, scrutinize the
+  gate transcript, not its exit code alone.
+
+## 5. Assemble the comment
+
+Follow [`report-template.md`](report-template.md) exactly: marker first
+line, heading, verdict, visible consolidated findings tagged by source,
+collapsed blocks with each source's output verbatim. The reviewer's
+sections render with the binding's renderer, once per run recorded in
+`round.json` (`render.sh <runs[].dir>`), completed or skipped alike:
+thin coverage and a skipped run must read as what they are.
+
+The verdict line is machine-read by /pr-refine; keep the protocol exact,
+one of: `**Verdict:** No issues found.` when every source ran and
+produced zero findings, `**Verdict:** <n> finding(s).` when findings
+exist, or `**Verdict:** unrecovered (the reviewer produced no review
+text).` when the binding ended unrecovered with nothing else to report.
+
+## 6. Scan before posting
+
+Write the body to a file, never inline. Search it before it leaves the
+machine (the pattern from [`report-template.md`](report-template.md)):
+home paths become `~`. Any other hit, a temp path, a local URL, or a
+token: **do not post**. Record the line. Unattended does not mean
+leaked; the blocked post surfaces in the loop's final report.
+
+## 7. Post
+
+```bash
+gh pr comment <n> --body-file <file>
+```
+
+Record the comment URL and the round directory: the final report needs
+the session ids and token totals from the round's `review.json`.
+
+## Never
+
+- Never review `HEAD` or the checkout's branch tip.
+- Never soften or summarize the binding's rendered output; verbatim or
+  not at all.
+- Never post a comment that failed the scan.
+- Never report an empty result as clean or as a failure.

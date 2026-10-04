@@ -1,0 +1,372 @@
+#!/usr/bin/env bash
+# Tests for the pr-loop tool bindings: the ocr reviewer wrapper's argument
+# contract and the renderer's markdown. Fixtures mirror the ocr v1.12.11 json
+# shape, pinned from a live run 2026-10-03; the wrapper tests stub the ocr
+# binary because the real one is a billed LLM service.
+set -u
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+TOOLS="$ROOT/dot_claude/skills/issue-to-pr/tools"
+REVIEW="$TOOLS/ocr/executable_review.sh"
+RENDER="$TOOLS/ocr/executable_render.sh"
+PASS=0 FAIL=0
+WS=""
+
+new_sandbox() { WS="$(mktemp -d)"; }
+render() { OUT="$("$RENDER" "$WS" 2>&1)"; RC=$?; }
+report() {
+  echo
+  echo "passed: $PASS  failed: $FAIL"
+  [[ $FAIL -eq 0 ]]
+}
+assert_eq() {
+  if [[ "$1" == "$2" ]]; then PASS=$((PASS + 1)); else
+    FAIL=$((FAIL + 1)); printf 'FAIL: %s\n  expected: %s\n  actual:   %s\n' "$3" "$2" "$1"
+  fi
+}
+assert_contains() {
+  if grep -qF -- "$2" <<<"$1"; then PASS=$((PASS + 1)); else
+    FAIL=$((FAIL + 1)); printf 'FAIL: %s\n  missing: %s\n' "$3" "$2"
+  fi
+}
+assert_not_contains() {
+  if grep -qF -- "$2" <<<"$1"; then
+    FAIL=$((FAIL + 1)); printf 'FAIL: %s\n  unexpectedly present: %s\n' "$3" "$2"
+  else PASS=$((PASS + 1)); fi
+}
+
+fixture_full() {
+  jq -cn '{
+    status: "complete",
+    llm: {provider: "lunaroute", model: "deepseek-4.1-flash"},
+    message: "Review complete: 2 finding(s) across 1 selected item(s).",
+    summary: {files_reviewed: 1, comments: 2, total_tokens: 17248,
+      input_tokens: 16456, output_tokens: 792, cache_read_tokens: 8832,
+      elapsed: "4s"},
+    tool_calls: {total: 1, by_tool: {code_comment: 1}, failure: 0,
+      failure_by_tool: {}, failure_details: []},
+    comments: [
+      {path: "calc.py",
+       content: "Mutable default argument: `bucket=[]` is shared across every call.",
+       suggestion_code: "def collect(item, bucket=None):",
+       start_line: 7, end_line: 7, category: "bug", severity: "high"},
+      {path: "calc.py",
+       content: "Bare `except:` swallows everything.",
+       suggestion_code: "    except Exception as e:\n        pass",
+       start_line: 10, end_line: 11, category: "bug", severity: "high"}
+    ],
+    groups: [{label: "calc.py", files: ["calc.py"]}],
+    session_id: "288a5029-d175-454f-8575-4c6af2964fa5",
+    manifest: {input: {mode: "range",
+        requested_from: "aaa", requested_head: "bbb",
+        resolved_base: "aaaa", resolved_head: "bbbb",
+        exact_range: "aaaa..bbbb"},
+      execution: {ocr_version: "v1.12.11"},
+      coverage: {selected: [{path: "calc.py"}], completed: [{path: "calc.py"}],
+        failed: [], waived: [], reused: []}}
+  }' >"$WS/review.json"
+}
+
+fixture_minimal() { jq -cn "$1" >"$WS/review.json"; }
+
+echo "renderer: every section from a findings-bearing run"
+new_sandbox
+fixture_full
+render
+assert_eq "$RC" 0 "exits 0"
+assert_contains "$OUT" '- **Reviewer:** OpenCodeReview `v1.12.11`, `lunaroute`/`deepseek-4.1-flash`.' "identity"
+assert_contains "$OUT" '- **Status:** `complete`. Review complete: 2 finding(s) across 1 selected item(s).' "status with message"
+assert_contains "$OUT" '- **Range:** `aaaa..bbbb` (mode `range`), resolved by the orchestrator from the PR.' "range and mode"
+assert_contains "$OUT" '- **Tokens:** 17248 total (16456 input, 792 output, 8832 cache read), elapsed 4s.' "tokens"
+assert_contains "$OUT" '- **Tool calls:** 1 (0 failed): `code_comment` 1' "tool calls by tool"
+assert_contains "$OUT" '- **Files:** 1 selected, 1 completed, 0 failed, 0 waived, 0 reused.' "file coverage"
+assert_contains "$OUT" '1. **bug/high** `calc.py`:7-7: Mutable default argument' "first finding numbered"
+assert_contains "$OUT" '2. **bug/high** `calc.py`:10-11: Bare `except:` swallows everything.' "second finding numbered"
+assert_contains "$OUT" '~~~' "suggestion is fenced"
+assert_contains "$OUT" '- **Session:** `288a5029-d175-454f-8575-4c6af2964fa5`' "session id"
+
+echo "renderer: a clean run says none, not null"
+new_sandbox
+fixture_minimal '{"status":"complete","message":"Review complete: 0 finding(s).","comments":[],
+  "manifest":{"input":{"mode":"commit","exact_range":"x..y"},"execution":{},"coverage":{}}}'
+render
+assert_eq "$RC" 0 "exits 0"
+assert_contains "$OUT" '- **Findings:** none.' "clean says none"
+assert_not_contains "$OUT" 'null' "no null in output"
+
+echo "renderer: missing summary, llm and tool_calls say unknown"
+new_sandbox
+fixture_minimal '{"status":"complete","comments":[],"manifest":{"input":{}}}'
+render
+assert_eq "$RC" 0 "exits 0"
+assert_contains "$OUT" '- **Tokens:** unknown' "tokens unknown"
+assert_contains "$OUT" '- **Tool calls:** unknown (unknown failed)' "tool calls unknown"
+assert_contains "$OUT" '- **Reviewer:** OpenCodeReview `unknown`, `unknown`/`unknown`.' "identity unknown"
+assert_not_contains "$OUT" 'null' "no null in output"
+
+echo "renderer: a finding cannot close the collapsed block"
+new_sandbox
+fixture_minimal '{"status":"complete","comments":[
+  {"path":"a.md","content":"closes early </details> and keeps going","start_line":1,"category":"bug","severity":"high"}]}'
+render
+assert_eq "$RC" 0 "exits 0"
+assert_not_contains "$OUT" '</details>' "no raw close tag"
+assert_contains "$OUT" '&lt;/details&gt;' "escaped close tag"
+
+echo "renderer: details tags are entity-escaped in every form"
+new_sandbox
+fixture_minimal '{"status":"complete","comments":[
+  {"path":"a.md","content":"opens <details> then </DETAILS> and </details > too","start_line":1,"category":"bug","severity":"high"}]}'
+render
+assert_eq "$RC" 0 "exits 0"
+assert_not_contains "$OUT" '<details>' "no raw opening tag"
+assert_not_contains "$OUT" '</DETAILS>' "no raw uppercase close tag"
+assert_not_contains "$OUT" '</details >' "no raw spaced close tag"
+assert_contains "$OUT" '&lt;details&gt;' "opening tag entity-escaped"
+assert_contains "$OUT" '&lt;/details&gt;' "close tag entity-escaped"
+
+echo "renderer: null content reads unknown, not the literal null"
+new_sandbox
+fixture_minimal '{"status":"complete","comments":[{"path":"a.md","content":null,"start_line":1}]}'
+render
+assert_not_contains "$OUT" ': null' "no literal null in the findings line"
+assert_contains "$OUT" 'unknown' "null content reads as unknown"
+
+echo "renderer: the fence beats a five-tilde run, not just the minimum"
+new_sandbox
+fixture_minimal '{"status":"complete","comments":[
+  {"path":"a.py","content":"c","suggestion_code":"x = ~~~~~\ny","start_line":1}]}'
+render
+assert_eq "$(printf '%s\n' "$OUT" | grep -cE '^[[:space:]]*~~~~~~$')" 2 "fence is six tildes, top and bottom"
+
+echo "renderer: tilde runs inside a suggestion cannot close the fence"
+new_sandbox
+fixture_minimal '{"status":"complete","comments":[
+  {"path":"a.py","content":"c","suggestion_code":"x = ~~~\ny","start_line":1,"category":"bug","severity":"low"}]}'
+render
+assert_eq "$RC" 0 "exits 0"
+assert_contains "$OUT" '~~~~' "fence beats the longest run"
+
+echo "renderer: failed files are listed"
+new_sandbox
+fixture_minimal '{"status":"complete","comments":[],
+  "manifest":{"input":{},"coverage":{"selected":[],"completed":[],
+    "failed":[{"path":"big.py"},{"path":"small.py"}],"waived":[],"reused":[]}}}'
+render
+assert_contains "$OUT" '- **Failed files:** big.py, small.py' "failed files listed"
+
+echo "renderer: no review.json is a usage error"
+new_sandbox
+OUT="$("$RENDER" "$WS" 2>&1)"; RC=$?
+assert_eq "$RC" 2 "usage error exits 2"
+
+make_stub() {
+  stub="$WS/stub"
+  mkdir -p "$stub"
+  cat >"$stub/ocr" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >>"$STUB_LOG"
+out=""
+args=("$@")
+for ((i = 0; i < $#; i++)); do
+  if [[ "${args[$i]}" == "--output" ]]; then out="${args[$((i + 1))]}"; fi
+done
+if [[ -n "$STUB_EXIT" ]]; then exit "$STUB_EXIT"; fi
+printf '{"status":"complete","session_id":"abc-123","comments":[]}' >"$out"
+STUB
+  chmod +x "$stub/ocr"
+  export STUB_LOG="$WS/args.txt"
+  export STUB_EXIT=""
+  : >"$STUB_LOG"
+}
+
+echo "wrapper: range mode passes the range, brief and provenance"
+new_sandbox
+make_stub
+mkdir -p "$WS/repo" "$WS/out"
+printf 'make add safe\n' >"$WS/brief.md"
+PATH="$WS/stub:$PATH" "$REVIEW" --repo "$WS/repo" --out "$WS/out" --brief "$WS/brief.md" --base aaa --head bbb
+assert_eq "$?" 0 "exits 0"
+assert_contains "$(cat "$WS/args.txt")" 'review --format json' "invokes ocr review"
+assert_contains "$(cat "$WS/args.txt")" "--from aaa --to bbb" "passes the range"
+assert_contains "$(cat "$WS/args.txt")" "--background-file" "passes the brief"
+assert_contains "$(cat "$WS/out/cmd.txt")" 'ocr review' "records the tool invocation"
+assert_contains "$(cat "$WS/out/cmd.txt")" '--from aaa --to bbb' "records the range"
+assert_eq "$(cat "$WS/out/session.txt")" "abc-123" "extracts the session id"
+
+echo "wrapper: commit mode passes the commit"
+new_sandbox
+make_stub
+mkdir -p "$WS/repo" "$WS/out"
+: >"$STUB_LOG"
+PATH="$WS/stub:$PATH" "$REVIEW" --repo "$WS/repo" --out "$WS/out" --commit c946c58
+assert_contains "$(cat "$WS/args.txt")" "--commit c946c58" "passes the commit"
+assert_not_contains "$(cat "$WS/args.txt")" "--from" "no range in commit mode"
+
+echo "wrapper: an ocr failure propagates and is recorded"
+new_sandbox
+make_stub
+STUB_EXIT=3
+mkdir -p "$WS/repo" "$WS/out"
+set +e
+PATH="$WS/stub:$PATH" "$REVIEW" --repo "$WS/repo" --out "$WS/out" --commit x >/dev/null 2>&1
+rc=$?
+set -e
+assert_eq "$rc" 3 "propagates ocr's exit code"
+assert_eq "$(cat "$WS/out/exit.txt")" "3" "records the code"
+
+echo "wrapper: a missing brief is a usage error, not a silent review"
+new_sandbox
+make_stub
+mkdir -p "$WS/repo" "$WS/out"
+set +e
+PATH="$WS/stub:$PATH" "$REVIEW" --repo "$WS/repo" --out "$WS/out" --brief "$WS/nope.md" --commit x >/dev/null 2>&1
+rc=$?
+set -e
+assert_eq "$rc" 2 "usage error exits 2"
+assert_not_contains "$(cat "$WS/args.txt")" "review" "never invoked the tool"
+
+echo "wrapper: an option without its value is a usage error, not a crash"
+new_sandbox
+make_stub
+mkdir -p "$WS/repo"
+set +e
+PATH="$WS/stub:$PATH" "$REVIEW" --repo "$WS/repo" --out >/dev/null 2>&1
+rc=$?
+set -e
+assert_eq "$rc" 2 "missing value exits 2 via usage"
+
+echo "wrapper: relative out and brief paths are rejected before the cd"
+new_sandbox
+make_stub
+mkdir -p "$WS/repo" "$WS/out"
+set +e
+PATH="$WS/stub:$PATH" "$REVIEW" --repo "$WS/repo" --out out --commit x >/dev/null 2>&1
+rc1=$?
+PATH="$WS/stub:$PATH" "$REVIEW" --repo "$WS/repo" --out "$WS/out" --brief brief.md --commit x >/dev/null 2>&1
+rc2=$?
+set -e
+assert_eq "$rc1" 2 "relative out rejected"
+assert_eq "$rc2" 2 "relative brief rejected"
+assert_not_contains "$(cat "$WS/args.txt")" "review" "never invoked the tool"
+
+PRR="$TOOLS/executable_pr-round.sh"
+
+make_pr_round_env() {
+  stub="$WS/stubbin"
+  mkdir -p "$stub"
+  cat >"$stub/gh" <<'GHSTUB'
+#!/usr/bin/env bash
+case "$1 $2" in
+  "pr view") printf '%s\n' "$GH_PR_JSON" ;;
+  "repo view") printf 'test-owner/test-repo\n' ;;
+  *) exit 64 ;;
+esac
+GHSTUB
+  cat >"$stub/ocr" <<'OCRSTUB'
+#!/usr/bin/env bash
+out=""; mode="range"
+args=("$@")
+for ((i = 0; i < $#; i++)); do
+  case "${args[$i]}" in
+    --output) out="${args[$((i + 1))]}" ;;
+    --from) mode="range" ;;
+    --commit) mode="commit" ;;
+  esac
+done
+status="$STUB_RANGE_STATUS"
+if [[ "$mode" == "commit" ]]; then status="$STUB_COMMIT_STATUS"; fi
+printf '{"status":"%s","session_id":"stub-session","comments":[]}' "$status" >"$out"
+OCRSTUB
+  chmod +x "$stub/gh" "$stub/ocr"
+  export STUB_RANGE_STATUS=complete STUB_COMMIT_STATUS=complete
+}
+
+make_fixture_repo() {
+  origin="$WS/origin.git"
+  repo="$WS/repo"
+  git init -q --bare "$origin"
+  git init -q "$repo"
+  git -C "$repo" config user.email t@t.local
+  git -C "$repo" config user.name test
+  git -C "$repo" config commit.gpgsign false
+  git -C "$repo" remote add origin "$origin"
+  printf 'a\n' >"$repo/f.txt"
+  git -C "$repo" add f.txt
+  git -C "$repo" commit -qm base
+  FR_BASE=$(git -C "$repo" rev-parse HEAD)
+  printf 'b\n' >"$repo/f.txt"
+  git -C "$repo" commit -qam second
+  FR_HEAD=$(git -C "$repo" rev-parse HEAD)
+  git -C "$repo" push -q origin "$FR_BASE:refs/heads/main" "HEAD:refs/pull/39/head"
+  export GH_PR_JSON='{"state":"OPEN","baseRefName":"main","headRefOid":"'"$FR_HEAD"'","headRefName":"loop/x-y-abc12345","url":"https://example.test/39"}'
+}
+
+run_prr() {
+  (
+    HOME="$WS/home"
+    export HOME
+    mkdir -p "$HOME"
+    PATH="$stub:$PATH" "$PRR" "$@"
+  )
+}
+
+echo "pr-round: a completed range run records one run"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+out=$(run_prr --repo "$repo" --pr 39 --round 1 --expect-branch loop/x-y-abc12345)
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
+assert_eq "$out" "$rd" "prints the round dir"
+jq -e '.reviewer_complete == true' "$rd/round.json" >/dev/null
+assert_eq "$?" 0 "reviewer_complete true"
+assert_eq "$(jq '.runs | length' "$rd/round.json")" 1 "one run"
+assert_eq "$(jq -r '.runs[0].mode' "$rd/round.json")" "range" "range mode"
+assert_eq "$(jq -r '.range.head' "$rd/round.json")" "$FR_HEAD" "range head recorded"
+assert_eq "$(jq -r '.identity.head_branch' "$rd/round.json")" "loop/x-y-abc12345" "identity recorded"
+
+echo "pr-round: a skipped range retries per commit and recovers"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+export STUB_RANGE_STATUS=skipped STUB_COMMIT_STATUS=complete
+out=$(run_prr --repo "$repo" --pr 39 --round 1)
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
+jq -e '.reviewer_complete == true' "$rd/round.json" >/dev/null
+assert_eq "$?" 0 "reviewer_complete true after the commit retry"
+assert_eq "$(jq '.runs | length' "$rd/round.json")" 2 "range plus one commit run"
+assert_eq "$(jq -r '.runs[0].status' "$rd/round.json")" "skipped" "the skip is recorded verbatim"
+
+echo "pr-round: an all-skipped round is reviewer_complete false"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+export STUB_RANGE_STATUS=skipped STUB_COMMIT_STATUS=skipped
+out=$(run_prr --repo "$repo" --pr 39 --round 1)
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
+jq -e '.reviewer_complete == false' "$rd/round.json" >/dev/null
+assert_eq "$?" 0 "reviewer_complete false"
+assert_eq "$(jq '.runs | length' "$rd/round.json")" 2 "both runs recorded"
+
+echo "pr-round: an identity mismatch stops before anything runs"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+set +e
+out=$(run_prr --repo "$repo" --pr 39 --round 1 --expect-branch loop/someone-else 2>/dev/null)
+rc=$?
+set -e
+assert_eq "$rc" 3 "identity mismatch exits 3"
+assert_eq "$([[ -d "$WS/home/.cache/pr-loop" ]] && printf yes || printf no)" "no" "no round dir created"
+
+echo "pr-round: a non-open PR is refused"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+export GH_PR_JSON='{"state":"MERGED","baseRefName":"main","headRefOid":"x","headRefName":"y","url":"z"}'
+set +e
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null 2>&1
+rc=$?
+set -e
+assert_eq "$rc" 4 "merged PR exits 4"
+
+report
