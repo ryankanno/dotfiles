@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        scandir: ['./scripts', './dot_claude/scripts', './dot_githooks']
+        scandir: ['./scripts', './dot_claude/scripts', './dot_claude/skills/issue-to-pr/tools', './dot_githooks']
     steps:
       - uses: actions/checkout@v4
       - name: Run shellcheck on ${{ matrix.scandir }}
