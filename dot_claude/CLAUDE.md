@@ -62,9 +62,14 @@
 - Microsoft style guide for business writing.
 - Apply the mechanics below.
 - These mechanics come from ASD-STE100 Simplified Technical English, without its licensed approved-words dictionary.
+- Where a mechanic conflicts with the Microsoft style guide, the mechanic wins.
 - Write short sentences.
 - Use at most 20 words in an instruction.
 - Use at most 25 words in every other sentence.
+- A sentence is an instruction when it tells the reader to act.
 - Do not put more than one instruction in a sentence.
-- Do not make noun clusters of more than three nouns. Count a proper name or a code identifier as one noun.
-- Put an article before a singular countable noun.
+- Do not make noun clusters of more than three nouns.
+- Count a proper name or a code identifier as one noun.
+- Put a determiner before a singular countable noun.
+- Count a code identifier, a file path, or a quoted command as one word.
+- Quoted program output is exempt from the word caps.
