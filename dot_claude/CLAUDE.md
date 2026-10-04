@@ -60,4 +60,8 @@
 ## Text
 - Present tense, active voice.
 - Microsoft style guide for business writing.
-- Use ASD-STE100 Simplified Technical English: only approved words in their approved meanings, short sentences (max ~20 words), one instruction per sentence, no compound nouns stacked three deep, and articles wherever the noun is countable.
+- Apply the ASD-STE100 Simplified Technical English mechanics below. The licensed approved-words dictionary is out of scope. For word choice, the Microsoft style guide keeps precedence.
+- Write short sentences. Use at most 20 words in an instruction and at most 25 words in a description.
+- Put one instruction in one sentence.
+- Do not make noun clusters of more than three nouns.
+- Put an article before every countable noun.
