@@ -60,3 +60,4 @@
 ## Text
 - Present tense, active voice.
 - Microsoft style guide for business writing.
+- Use the ASD-STE100 Simplified Technical English mechanics: short sentences (max ~20 words), one instruction per sentence, no compound nouns stacked three deep, and articles wherever the noun is countable.
