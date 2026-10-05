@@ -203,7 +203,7 @@ done
 
 jq -n --arg pr "$pr" --arg url "$url" --arg base "$base" --arg base_sha "$base_sha" --arg head "$head" \
      --arg hb "$head_branch" --arg expect "$expect" \
-     --argjson round "$round" --argjson runs "$runs" --argjson complete "$complete" \
+     --argjson round "$((10#$round))" --argjson runs "$runs" --argjson complete "$complete" \
      --argjson rt "$current_tokens" --argjson ct "$((current_tokens + prior_tokens))" '
   {pr: $pr, url: $url, round: $round,
    identity: {expected_branch: (if $expect == "" then null else $expect end),

@@ -552,6 +552,15 @@ export STUB_TOKENS=100
 run_prr --repo "$repo" --pr 39 --round 9 >/dev/null
 assert_json '.cumulative_tokens == 150' "$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-9/round.json" "round 08 is counted"
 
+echo "pr-round: a zero-padded round number works end to end"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+export STUB_TOKENS=10
+run_prr --repo "$repo" --pr 39 --round 08 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-08"
+assert_json '.round == 8' "$rd/round.json" "round.json records the decimal round"
+
 echo "pr-round: the recorded base does not move when main advances"
 new_sandbox
 make_pr_round_env
