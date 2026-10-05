@@ -328,6 +328,21 @@ new_sandbox
 scan 'the owner someone/repo serves http://localhost:3000 on 127.0.0.1; a bearer token check; grep -E "/Users/|/home/|sk-[A-Za-z0-9_-]{20,}"; docs that name the /tmp/ prefix, /root/ usage, and /run/user/ ids'
 assert_eq "$RC" 0 "exits 0"
 
+echo "scan: secret key formats are caught"
+# The fakes are assembled at runtime so the source holds no key-shaped
+# literal for the repo's own scanners to flag.
+b='AbCdEfGhIjKlMnOpQrStUvWxYz0123456789'
+for tok in "AIza${b:0:35}" "sk_live_${b:0:24}" "aws_secret_access_key = ${b}${b:0:4}"; do
+  new_sandbox
+  scan "leaked $tok here"
+  assert_eq "$RC" 1 "blocks ${tok:0:14}"
+done
+
+echo "scan: a forty-hex sha is not a secret"
+new_sandbox
+scan "commit $(printf 'a%.0s' {1..40}) landed"
+assert_eq "$RC" 0 "a plain sha passes"
+
 echo "scan: no file is a usage error"
 new_sandbox
 OUT="$("$SCAN" "$WS/nope.md" 2>&1)"; RC=$?
