@@ -308,7 +308,8 @@ for tok in "ghp_${b}012345" "github_pat_11${b}" "AKIA${up}" \
 done
 
 echo "scan: other home and temp paths are caught"
-for p in /Users/other/x /home/other/x /private/tmp/x /var/folders/ab/x; do
+for p in /Users/other/x /home/other/x /private/tmp/x /var/folders/ab/x \
+  /tmp/agent-scratch-9f2/x /root/.ssh/id_ed25519 /run/user/1000/x; do
   new_sandbox
   scan "at $p"
   assert_eq "$RC" 1 "blocks $p"
@@ -316,7 +317,7 @@ done
 
 echo "scan: ordinary code under review is not a leak"
 new_sandbox
-scan 'the owner someone/repo serves http://localhost:3000 on 127.0.0.1; a bearer token check; grep -E "/Users/|/home/|sk-[A-Za-z0-9_-]{20,}"'
+scan 'the owner someone/repo serves http://localhost:3000 on 127.0.0.1; a bearer token check; grep -E "/Users/|/home/|sk-[A-Za-z0-9_-]{20,}"; docs that name the /tmp/ prefix, /root/ usage, and /run/user/ ids'
 assert_eq "$RC" 0 "exits 0"
 
 echo "scan: no file is a usage error"
