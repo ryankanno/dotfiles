@@ -25,12 +25,13 @@ if [[ -z "${HOME:-}" || "$HOME" == "/" ]]; then
   exit 2
 fi
 
-# The tilde rides in a variable: bash 3.2 keeps the escaped form literal in
-# the replacement, and every posted comment from a stock macOS would carry
-# a stray backslash before the redacted path.
-tilde='~'
-body="$(<"$file")"
-printf '%s\n' "${body//"$HOME"/$tilde}" >"$file"
+# The rewrite anchors on the home with its slash: replacing the bare home
+# would also rewrite a sibling path that merely extends it and post it
+# past the gate (measured round 4), and a bare home the anchor cannot
+# touch stays for the patterns to block: fail-closed, never silently
+# half-redacted. The replacement rides quoted so no shell expands it.
+body="$(<"$file")" || { printf 'scan failed (unreadable body)\n' >&2; exit 2; }
+printf '%s\n' "${body//"$HOME\/"/"~/"}" >"$file"
 
 # Token patterns require the variable part (a key body). Home and temp
 # patterns require the first path segment (a username, a scratch name,

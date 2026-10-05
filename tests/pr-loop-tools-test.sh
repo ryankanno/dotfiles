@@ -312,6 +312,17 @@ scan 'see /Users/someone/src/app/main.py:4'
 assert_eq "$RC" 0 "exits 0"
 assert_eq "$BODY" 'see ~/src/app/main.py:4' "home redacted in place"
 
+echo "scan: a sibling home is blocked, not mangled into the body"
+new_sandbox
+scan 'see /Users/someoneelse/x at 4'
+assert_eq "$RC" 1 "a sibling home is the hit the gate defines"
+assert_contains "$BODY" '/Users/someoneelse/x' "the body is not rewritten into nonsense"
+
+echo "scan: a bare own home is blocked rather than half-redacted"
+new_sandbox
+scan 'at /Users/someone in prose'
+assert_eq "$RC" 1 "fail-closed on what the rewrite cannot anchor"
+
 echo "scan: provider keys with inner hyphens are caught"
 for key in sk-ant-api03-AbCdEfGhIjKlMnOpQrStUv sk-proj-AbCdEfGhIjKlMnOpQrStUv sk-AbCdEfGhIjKlMnOpQrStUv; do
   new_sandbox
@@ -377,6 +388,14 @@ printf 'see /Users/someone/x\n' >"$WS/body.md"
 HOME=/Users/someone /bin/bash "$SCAN" "$WS/body.md" >/dev/null 2>&1
 assert_eq "$?" 0 "exits 0"
 assert_not_contains "$(cat "$WS/body.md")" '\~' "no literal backslash before the tilde"
+
+echo "scan: an unreadable body is a scan failure, not a phantom hit"
+new_sandbox
+printf 'see x\n' >"$WS/body.md"
+chmod 000 "$WS/body.md"
+OUT="$("$SCAN" "$WS/body.md" 2>&1)"; RC=$?
+assert_eq "$RC" 2 "exits 2 per the documented contract"
+chmod 644 "$WS/body.md"
 
 echo "scan: no file is a usage error"
 new_sandbox
