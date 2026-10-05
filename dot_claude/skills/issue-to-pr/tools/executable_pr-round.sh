@@ -15,7 +15,8 @@
 #                dispositions (read from this loop's own round comments
 #                unless --dispositions names a file), and the directory
 #                path on stdout.
-# Exit codes: 0 the round ran; 2 usage; 3 identity mismatch; 4 the PR is
+# Exit codes: 0 the round ran; 2 usage, or the environment is unusable
+# (HOME unset); 3 identity mismatch; 4 the PR is
 # missing, not open, or not resolvable; 5 the repository or its refs could
 # not be resolved on the network; 6 the round dir already holds
 # evidence and --rerun was not passed; 127 a dependency is missing. A
@@ -55,6 +56,14 @@ fi
 command -v gh >/dev/null || { printf 'gh: not found\n' >&2; exit 127; }
 command -v jq >/dev/null || { printf 'jq: not found\n' >&2; exit 127; }
 command -v git >/dev/null || { printf 'git: not found\n' >&2; exit 127; }
+
+# Like the scan gate: the round dir lives under HOME, so an unset HOME is a
+# classified failure callers can act on, not an unbound abort with an
+# undocumented code.
+if [[ -z "${HOME:-}" ]]; then
+  printf 'HOME is not set; the round dir cannot live anywhere\n' >&2
+  exit 2
+fi
 
 here="$(cd "$(dirname "$0")" && pwd)"
 manifest="$here/manifest.json"
@@ -152,7 +161,9 @@ if [[ ${#leftovers[@]} -gt 0 ]]; then
     printf 'round dir already holds evidence; pass --rerun to supersede it\n' >&2
     exit 6
   fi
-  keep="$round_dir/superseded-$(date +%Y%m%d-%H%M%S)"
+  # The PID in the name keeps two reruns of the same round in one
+  # wall-clock second from overwriting each other's archive.
+  keep="$round_dir/superseded-$(date +%Y%m%d-%H%M%S)-$$"
   mkdir -p "$keep"
   mv "${leftovers[@]}" "$keep/"
 fi

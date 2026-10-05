@@ -657,6 +657,14 @@ rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
 assert_json '.reviewer_complete == true' "$rd/round.json" "the retry recovers a missing range"
 assert_eq "$(jq '.runs | length' "$rd/round.json")" 2 "range plus one commit run"
 
+echo "pr-round: an unset HOME is a classified failure"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+env -u HOME PATH="$stub:$PATH" "$PRR" --repo "$repo" --pr 39 --round 1 >/dev/null 2>&1
+rc=$?
+assert_eq "$rc" 2 "exits 2, not an unbound abort"
+
 echo "pr-round: an identity mismatch stops before anything runs"
 new_sandbox
 make_pr_round_env
