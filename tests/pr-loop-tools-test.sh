@@ -1016,6 +1016,28 @@ run_prr --repo "$repo" --pr 39 --round 3 >/dev/null
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-3"
 assert_eq "$(cat "$rd/delta.txt")" "kept.txt:2-2" "only the edited line is new"
 
+echo "pr-round: a failed listing is a classified failure, not an unchanged head"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+advance_head f.txt 'changed\n'
+cat >"$stub/git" <<'GITSTUB'
+#!/usr/bin/env bash
+# Fail only the changed-file listing; everything else is real git.
+for a in "$@"; do
+  if [[ "$a" == "--name-status" ]]; then exit 128; fi
+done
+exec /usr/bin/git "$@"
+GITSTUB
+chmod +x "$stub/git"
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null 2>&1
+rc=$?
+rm -f "$stub/git"
+assert_eq "$rc" 5 "the listing failure exits 5"
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
+assert_eq "$([[ -e "$rd/round.json" ]] && printf yes || printf no)" "no" "no round record off a failed listing"
+
 SCOPE="$TOOLS/executable_finding-scope.sh"
 
 echo "finding-scope: a finding on a changed line is new, elsewhere reviewed"
