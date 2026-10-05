@@ -73,6 +73,8 @@ flowchart LR
     M --> R["tools/ocr<br/>review.sh runs the tool<br/>render.sh renders its output"]
     M --> C["tools/subagent<br/>binding.md: how to spawn<br/>critic-prompt.md: what it attacks"]
     P --> O["round dir under<br/>HOME/.cache/pr-loop:<br/>review.json per run,<br/>round.json for the round"]
+    S --> SC["tools/scan.sh<br/>the leak gate every round<br/>comment passes before posting"]
+    S --> BN["tools/branch-name.sh<br/>deterministic loop branch names<br/>for intake and resume"]
 ```
 
 ## Where things live
@@ -85,6 +87,8 @@ flowchart LR
 | Report template | `~/.claude/skills/pr-review/report-template.md` |
 | Implementer prompt | `~/.claude/skills/issue-to-pr/dispatch-prompt-template.md` |
 | Slot manifest and bindings | `~/.claude/skills/issue-to-pr/tools/` |
+| Leak gate | `~/.claude/skills/issue-to-pr/tools/scan.sh` |
+| Branch-name tool | `~/.claude/skills/issue-to-pr/tools/branch-name.sh` |
 | Round artifacts | `$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/round-<N>/` |
 | Final report | `$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/final-report.md` |
 | workmux layouts | `~/.config/workmux/config.yaml` (chezmoi: `dot_config/workmux/config.yaml`) |
