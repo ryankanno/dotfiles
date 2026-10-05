@@ -50,7 +50,7 @@ Visible, in this order:
 
 **Reviewer:** <unrecovered: <its message, verbatim> |  (this line appears only when the reviewer produced no review text; a coverage gap never lives only inside a collapsed block)>
 
-**Verdict:** <No issues found. | N finding(s). | unrecovered (the reviewer produced no review text)>
+**Verdict:** <No issues found. | N finding(s). | unrecovered (the reviewer produced no review text) | converged (all findings low and dispositioned)>
 
 **Gate:** <command> printed <its final result>   (refine and convergence rounds only)
 
@@ -63,9 +63,11 @@ Visible, in this order:
 Each finding is one line, tagged with its source: `[reviewer]` for the
 reviewer binding's output, `[critic]` for the adversarial subagent,
 `[read]` for the caller's own read. Number across all sources, highest
-severity first. A finding the caller rejected while validating the diff
-does not appear in Findings; it appears in the Dispositions block with
-its reason, so no later round re-litigates it.
+severity first. A named finding's disposition is a record, not a
+preference: fixed carries the commit and what proves it, rejected
+carries the refuting evidence, accepted carries the reason a human
+would give. Every disposition is one structured line in the
+Dispositions block, so no later round re-litigates it.
 
 Then, collapsed, each with blank lines inside the block (without them
 GitHub renders the content as literal text):
@@ -89,10 +91,11 @@ GitHub renders the content as literal text):
 
 </details>
 
-<details><summary>Dispositions</summary>   (whenever a finding was rejected or accepted, never silently dropped)
+<details><summary>Dispositions</summary>   (whenever a named finding was fixed, rejected, or accepted; never silently dropped)
 
-- Rejected: <finding, one line> — <the reason, with the evidence>
-- Accepted: <finding, one line> — <the reason>
+- Fixed: [reviewer|critic|read] <finding, one line> — in <short-sha>, <the test or gate result that proves it>
+- Rejected: [reviewer|critic|read] <finding, one line> — <the reason, with the evidence>
+- Accepted: [reviewer|critic|read] <finding, one line> — <the reason>
 
 </details>
 

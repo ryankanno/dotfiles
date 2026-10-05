@@ -81,7 +81,11 @@ gh pr list --state open --head <branch-name>
 ```
 
 An existing PR means a previous run: do not create anything. Verify its
-state and resume the loop at step 5. A task whose source text was edited
+state and resume the loop at step 5. If the prior run left
+`$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/final-report.md`, read it and
+carry its verdict forward into the resume: a capped-unrecovered resume
+inherits the remaining findings instead of rediscovering them, and a
+blocked resume inherits its reason. A task whose source text was edited
 re-keys the hash; if an older PR for the same source surfaces, say so in
 the final report rather than orphaning it silently.
 
@@ -192,6 +196,11 @@ The last message of the run, verbatim to the future runner:
   `review.json`), reviewer and critic bindings used, ocr version
 - the PR comment links, one per round
 
+Before the final message is spoken, write the report verbatim to
+`$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/final-report.md`, the same
+directory that holds the round dirs. The final message remains the
+report; the file is its durable copy, the exact text, no summary layer.
+
 ## Failure policies
 
 - **Pane death or failed pane check:** redispatch once by reopening the
@@ -206,9 +215,11 @@ The last message of the run, verbatim to the future runner:
 - **PR creation failed:** capture the pane's error, report blocked. Do
   not redispatch the whole task.
 - **Degraded critic harness:** if your own critic subagent cannot run,
-  commissioning findings elsewhere does not create a round. The
-  commissioned findings enter the next round as caller-supplied input,
-  the round numbering never moves, and no partial comment posts.
+  relay the critic through the implementer's pane: `workmux send` the
+  critic prompt, and read the findings from its report-back. The
+  commissioned findings still do not create a round: they enter the next
+  round as caller-supplied input, the round numbering never moves, and
+  no partial comment posts.
 
 ## Never
 

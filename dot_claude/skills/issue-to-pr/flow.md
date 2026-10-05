@@ -38,7 +38,7 @@ flowchart TD
     E -- "no: a real number, someone else's PR" --> X["Blocked: report and stop"]
     E -- "yes" --> R["Review round<br/>pr-round.sh: range resolved from the PR,<br/>identity check, reviewer binding,<br/>per-commit empty-retry"]
     R --> F["Adversarial critic: fresh clean-context subagent<br/>plus the caller's own read"]
-    F --> G["Assemble the comment per report-template<br/>marker first line, three-state verdict"]
+    F --> G["Assemble the comment per report-template<br/>marker first line, four-state verdict"]
     G --> S{"Scan before posting"}
     S -- "hit: do not leak" --> Y["Abort the post, record it,<br/>the final report surfaces it"]
     S -- "clean" --> H["Post the round comment<br/>append per round"]
@@ -86,5 +86,6 @@ flowchart LR
 | Implementer prompt | `~/.claude/skills/issue-to-pr/dispatch-prompt-template.md` |
 | Slot manifest and bindings | `~/.claude/skills/issue-to-pr/tools/` |
 | Round artifacts | `$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/round-<N>/` |
+| Final report | `$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/final-report.md` |
 | workmux layouts | `~/.config/workmux/config.yaml` (chezmoi: `dot_config/workmux/config.yaml`) |
 | opencode stack agents | `~/.config/opencode/agent/sp.md`, `mp.md` (not chezmoi-managed yet) |

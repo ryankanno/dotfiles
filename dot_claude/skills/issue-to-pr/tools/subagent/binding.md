@@ -17,10 +17,10 @@ Give the subagent, as its entire input:
 2. the unified diff of the PR range
    (`git -C <repo> diff <resolved-base>...<resolved-head>`),
 3. the task brief file, so it knows what the change claimed to do,
-4. the prior rounds' dispositions (rejected and accepted findings with
-   their reasons, from the Dispositions blocks of the previous round
-   comments): re-flagging a dispositioned finding without materially
-   new evidence is out of contract.
+4. the prior rounds' dispositions (fixed, rejected, and accepted
+   findings with their evidence, from the Dispositions blocks of the
+   previous round comments): re-flagging a dispositioned finding
+   without materially new evidence is out of contract.
 
 The subagent also gets **read access to the repository at the PR head
 SHA** (`git -C <repo> show <headRefOid>:<path>`), so it can verify

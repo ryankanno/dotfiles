@@ -82,9 +82,10 @@ git diff origin/<base>...<head>
   Dispositions blocks; a re-flag without materially new evidence is
   rejected with a pointer to the recorded reason.
 
-Rejected findings appear in this round's comment, in the Dispositions
-block, with their reasons — durable on the PR where every later round
-reads them — and in the loop's final report.
+Every disposition of a named finding, fixed, rejected, or accepted,
+appears in this round's comment, in the Dispositions block, as one
+structured line with its evidence — durable on the PR where every later
+round reads them — and in the loop's final report.
 
 ## 3. Fix under TDD — only what the previous round named
 
