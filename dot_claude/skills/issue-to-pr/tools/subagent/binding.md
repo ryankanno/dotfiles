@@ -11,7 +11,11 @@ a subagent that has seen the code being reviewed: the critic's value is
 a context with no investment in the diff. Clean context means no prior
 discussion and no stake, not file-blindness.
 
-Give the subagent, as its entire input:
+Give the subagent, as its entire input and inline in its prompt, not
+as files for it to read: every read is one more turn over the whole
+context, and the context is what costs (measured on PR 40: the round 9
+critic's first turn cost 32k tokens before it read anything, and it
+grew to 98k by its fourteenth):
 
 1. this directory's `critic-prompt.md` as its instructions,
 2. the unified diff to attack: in round 1, the whole PR range
@@ -28,7 +32,11 @@ Give the subagent, as its entire input:
    findings with their evidence, from the Dispositions blocks of the
    previous round comments): re-flagging a dispositioned finding
    without materially new evidence is out of contract, and from round 2
-   on the Fixed lines are what the delta claims to fix.
+   on the Fixed lines are what the delta claims to fix. Only those three
+   kinds of line: never a round's follow-ups or any follow-up register.
+   A follow-up cannot block, so a critic handed them re-raises them and
+   spends turns that change nothing (round 9 on PR 40: 7 of its 10
+   findings were register items).
 
 The subagent also gets **read access to the repository at the PR head
 SHA** (`git -C <repo> show <headRefOid>:<path>`), so it can verify

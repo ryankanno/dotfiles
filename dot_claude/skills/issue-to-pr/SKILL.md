@@ -207,8 +207,10 @@ The last message of the run, verbatim to the future runner:
 - reviewer session ids and token totals (the newest round comment's
   Cost line: the `cumulative_tokens` its round.json carried when it was
   written; a rerun of an earlier round afterwards does not recompute
-  later rounds' round.json, so say so plainly when one happened),
-  reviewer and critic bindings used, ocr version
+  later rounds' round.json, so say so plainly when one happened), the
+  critic's tokens summed from every round comment's Cost line (naming
+  any round whose critic tokens were not reported), reviewer and critic
+  bindings used, ocr version
 - the PR comment links, one per round
 
 Before the final message is spoken, write the report verbatim to

@@ -42,8 +42,11 @@ comments with the file's content.
 
 From round 2 on, `round.json` carries `range.prior_head` (the previous
 round's head) and the round directory holds `delta.txt`, the
-`path:start-end` hunks changed since that head. The background tells
-the reviewer which hunks are new.
+`path:start-end` hunks changed since that head. The reviewer then
+reviews only the delta, from `range.reviewed_from` (the prior head) to
+the PR head: a finding outside it could only be a follow-up. An empty
+delta (the same head again, as in a convergence round) reviews the
+whole PR from the merge base instead, never an empty range.
 
 `--expect-branch` binds the round to this loop's branch: a PR whose
 head is any other branch is a hallucinated number, and the script exits
@@ -51,8 +54,9 @@ head is any other branch is a hallucinated number, and the script exits
 cannot know the branch (a human's standalone review). The script
 resolves the range from the PR (never the checkout's `HEAD`), fetches
 the refs, runs the active reviewer binding over
-`origin/<base>..<headRefOid>`, applies the per-commit empty-retry
-policy once per commit in the range, and prints the round directory
+`<range.reviewed_from>..<headRefOid>`, applies the per-commit
+empty-retry policy once per commit in that range, and prints the round
+directory
 whose `round.json` carries the range, the identity, every run (mode,
 directory, status, session id, exit code), and `reviewer_complete`.
 
@@ -80,15 +84,20 @@ that round.
 
 The round's cost is a fact the comment carries: `round.json`'s
 `cumulative_tokens` becomes the template's Cost line, so a reader can
-see what the loop has spent to date.
+see what the loop has spent to date. The critic's tokens are not in
+`round.json` (the critic is a subagent, not the reviewer binding): take
+them from the usage the harness reports when the subagent returns, and
+put them on the Cost line beside the reviewer's. When the harness
+reports none, the line says so; a guessed number is never written.
 
 ## 3. The adversarial critic
 
 Resolve the critic from the manifest and follow its binding file
 (`~/.claude/skills/issue-to-pr/tools/<critic>/binding.md`) for how to
-spawn it: a fresh, clean-context subagent, given the binding's critic
-prompt, the brief, the dispositions, and one diff: the whole PR in
-round 1, only the delta since the prior round's head from round 2 on.
+spawn it: a fresh, clean-context subagent, given inline the binding's
+critic prompt, the brief, the dispositions (never the follow-ups), and
+one diff: the whole PR in round 1, only the delta since the prior
+round's head from round 2 on.
 Its findings arrive numbered with file, line, the claim, the break, and
 severity. Findings that do not reference that diff are dropped, per the
 binding's contract.

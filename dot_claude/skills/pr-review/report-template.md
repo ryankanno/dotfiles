@@ -64,7 +64,7 @@ Visible, in this order:
 
 **Gate:** <command> printed <its final result>   (refine and convergence rounds only)
 
-**Cost:** <cumulative_tokens> reviewer tokens to date, across rounds 1..N (from round.json)
+**Cost:** <cumulative_tokens> reviewer tokens to date, across rounds 1..N (from round.json); critic <n> tokens this round (from the harness's reported usage, or "critic tokens not reported")
 
 **Findings:**
 <N. **[reviewer|critic|read] category/severity** `file:line`: claim>   (blocking only)

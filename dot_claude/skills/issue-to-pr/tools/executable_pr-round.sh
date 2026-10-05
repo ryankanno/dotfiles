@@ -11,7 +11,9 @@
 # Interface out: the round directory under
 #                $HOME/.cache/pr-loop/<owner/repo>/pr-<n>/round-<N>/ with
 #                each run's outputs plus round.json (range, identity, runs,
-#                reviewer_complete, range.prior_head), delta.txt (the
+#                reviewer_complete, range.prior_head, range.reviewed_from:
+#                the merge base in round 1 or on an empty delta, the
+#                prior head otherwise), delta.txt (the
 #                path:start-end hunks changed since the prior round's head,
 #                from round 2 on), background.md when there are prior
 #                dispositions (read from this loop's own round comments
@@ -264,8 +266,16 @@ status_of() { # dir
   else printf 'missing\n'; fi
 }
 
+# From round 2 on the reviewer reads only the delta: a finding outside it
+# can only be a follow-up, and the whole-PR review cost 1.7M to 4.6M
+# tokens a round on PR 40 to yield one or two blocking findings. An empty
+# delta (the same head as the prior round, as in a convergence round)
+# reviews the whole PR again: an empty range is no review at all.
+review_from="origin/$base" reviewed_from="$base_sha"
+if [[ -n "$delta" ]]; then review_from="$prior_head" reviewed_from="$prior_head"; fi
+
 set +e
-"$review" --repo "$repo" --out "$round_dir" ${brief:+--brief "$brief"} --base "origin/$base" --head "$head"
+"$review" --repo "$repo" --out "$round_dir" ${brief:+--brief "$brief"} --base "$review_from" --head "$head"
 rc=$?
 set -e
 range_status=$(status_of "$round_dir")
@@ -294,7 +304,7 @@ elif [[ "$range_status" == missing || "$range_status" == skipped ]]; then
     record "commit:$sha" "$commit_dir" "$cstatus" "$(cat "$commit_dir/session.txt" 2>/dev/null || true)" "$crc"
     commit_runs=$((commit_runs + 1))
     [[ "$cstatus" == complete ]] || recovered=0
-  done < <(git -C "$repo" log --format=%H "origin/$base..$head")
+  done < <(git -C "$repo" log --format=%H "$review_from..$head")
   if [[ $commit_runs -gt 0 && $recovered -eq 1 ]]; then complete=true; fi
 else
   # partial or any other non-complete status: review text exists, some
@@ -335,14 +345,14 @@ for sibling in "$HOME/.cache/pr-loop/$owner_repo/pr-$pr"/round-*/round.json; do
 done
 
 jq -n --arg pr "$pr" --arg url "$url" --arg base "$base" --arg base_sha "$base_sha" --arg head "$head" \
-     --arg hb "$head_branch" --arg expect "$expect" --arg prior "$prior_head" \
+     --arg hb "$head_branch" --arg expect "$expect" --arg prior "$prior_head" --arg from "$reviewed_from" \
      --argjson round "$((10#$round))" --argjson runs "$runs" --argjson complete "$complete" \
      --argjson rt "$current_tokens" --argjson ct "$((current_tokens + prior_tokens))" '
   {pr: $pr, url: $url, round: $round,
    identity: {expected_branch: (if $expect == "" then null else $expect end),
               head_branch: $hb},
    range: {base: $base_sha, base_branch: $base, head: $head, exact: "\($base_sha)..\($head)",
-           prior_head: (if $prior == "" then null else $prior end)},
+           prior_head: (if $prior == "" then null else $prior end), reviewed_from: $from},
    runs: $runs, reviewer_complete: $complete,
    round_tokens: $rt, cumulative_tokens: $ct}' > "$round_dir/round.json"
 printf '%s\n' "$round_dir"

@@ -43,6 +43,8 @@ Rules:
    concretely how it breaks. "Could be cleaner" is not a finding.
 2. Report only what is in this diff or directly broken by it. The
    pre-existing mess is out of scope unless the diff makes it worse.
+   From round 2 on, a finding on code outside the delta is reported
+   only if it is high: anything less there cannot block the round.
 3. Do not praise. Do not summarize the diff. Do not suggest how to
    write the code better unless the suggestion is the fix for a
    finding.

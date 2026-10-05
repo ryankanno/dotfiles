@@ -906,6 +906,8 @@ run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
 assert_json '.range.prior_head == null' "$rd/round.json" "no prior head on round 1"
 assert_eq "$([[ -e "$rd/delta.txt" ]] && printf yes || printf no)" "no" "no delta on round 1"
+assert_contains "$(cat "$rd/cmd.txt")" "--from origin/main --to $FR_HEAD" "round 1 reviews the whole PR"
+assert_eq "$(jq -r '.range.reviewed_from' "$rd/round.json")" "$FR_BASE" "round 1 reviews from the merge base"
 
 echo "pr-round: a later round records the prior head and the lines changed since it"
 new_sandbox
@@ -919,6 +921,21 @@ rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
 assert_eq "$(jq -r '.range.prior_head' "$rd/round.json")" "$FR_HEAD" "the prior round's head is recorded"
 assert_eq "$(cat "$rd/delta.txt")" $'f.txt:2-3\ng.txt:1-1' "the delta lists each changed hunk at the new head"
 assert_contains "$(cat "$rd/background.md")" "f.txt:2-3" "the reviewer is told what changed since the last round"
+assert_contains "$(cat "$rd/cmd.txt")" "--from $FR_HEAD --to $FR_NEXT" "a later round reviews only the delta"
+assert_eq "$(jq -r '.range.reviewed_from' "$rd/round.json")" "$FR_HEAD" "the reviewed range starts at the prior head"
+
+echo "pr-round: a delta round's per-commit retry covers only the delta's commits"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+advance_head f.txt 'b\nc\n'
+advance_head g.txt 'new\n'
+export STUB_RANGE_STATUS=skipped STUB_COMMIT_STATUS=complete
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
+assert_eq "$(jq '.runs | length' "$rd/round.json")" 3 "the range plus the two delta commits, not the round 1 commit"
+assert_json '.reviewer_complete == true' "$rd/round.json" "the delta's commits recover the round"
 
 echo "pr-round: an unchanged head since the prior round leaves an empty delta"
 new_sandbox
@@ -929,6 +946,8 @@ run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
 assert_eq "$(jq -r '.range.prior_head' "$rd/round.json")" "$FR_HEAD" "the prior head is recorded"
 assert_eq "$(wc -c <"$rd/delta.txt" | tr -d ' ')" "0" "nothing changed, nothing is new"
+assert_contains "$(cat "$rd/cmd.txt")" "--from origin/main --to $FR_HEAD" "an empty delta falls back to the whole PR, never an empty review"
+assert_eq "$(jq -r '.range.reviewed_from' "$rd/round.json")" "$FR_BASE" "the fallback reviews from the merge base"
 
 echo "pr-round: a content line that looks like a diff header does not mislabel the delta"
 new_sandbox
