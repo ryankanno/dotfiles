@@ -59,6 +59,10 @@ gh api user --jq .login
 gh pr view <n> --json comments --jq '[.comments[] | select(.author.login == "<login>") | select(.body | startswith("<!-- pr-loop-comment -->"))] | last | .body'
 ```
 
+If the jq prints `null`, no round comment exists: there is nothing to
+refine yet. Say so and stop; producing findings is /pr-review's round,
+not this one.
+
 The verdict line is one of
 `No issues found.`, `<n> finding(s).`,
 `partial (the reviewer's coverage has a gap)`,
