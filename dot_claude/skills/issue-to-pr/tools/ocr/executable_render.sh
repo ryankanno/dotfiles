@@ -9,7 +9,18 @@
 set -euo pipefail
 
 dir="${1:-}"
-[[ -n "$dir" && -f "$dir/review.json" ]] || {
+[[ -n "$dir" ]] || {
+  printf 'usage: render.sh <dir containing review.json>\n' >&2
+  exit 2
+}
+if [[ -d "$dir" && ! -f "$dir/review.json" ]]; then
+  # A failed binding run leaves a directory but no review.json (ocr failed
+  # or is missing); the run still renders, as the gap it is, so a reviewer
+  # section never goes missing from a round comment.
+  printf -- '- **Status:** `missing`. The run produced no review output.\n'
+  exit 0
+fi
+[[ -f "$dir/review.json" ]] || {
   printf 'usage: render.sh <dir containing review.json>\n' >&2
   exit 2
 }
@@ -31,15 +42,16 @@ jq -r '
     | ("~" * (([$t | scan("~+") | length] + [3] | max) + 1)) as $f
     | "\($f)\n\($t)\n\($f)";
 
-  (.llm | obj) as $llm
-  | (.summary | obj) as $s
+  # The llm identity stays in review.json on disk; PR comments never
+  # publish the provider or model the loop runs on.
+  (.summary | obj) as $s
   | (.tool_calls | obj) as $tc
   | (($tc.by_tool) | obj) as $bt
   | (.comments | arr) as $cs
   | ((.manifest | obj).input | obj) as $in
   | ((.manifest | obj).execution | obj) as $ex
   | ((.manifest | obj).coverage | obj) as $cov
-  | "- **Reviewer:** OpenCodeReview \($ex.ocr_version // "unknown" | code), \($llm.provider // "unknown" | code)/\($llm.model // "unknown" | code).\n"
+  | "- **Reviewer:** OpenCodeReview \($ex.ocr_version // "unknown" | code).\n"
   + "- **Status:** \(.status // "unknown" | code). \(.message // "No message." | text | safe | oneline)\n"
   + "- **Range:** \($in.exact_range // "unknown" | code) (mode \($in.mode // "unknown" | code)), resolved by the orchestrator from the PR.\n"
   + (if ($s.total_tokens == null) then "- **Tokens:** unknown\n"

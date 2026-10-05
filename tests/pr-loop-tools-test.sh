@@ -84,7 +84,9 @@ new_sandbox
 fixture_full
 render
 assert_eq "$RC" 0 "exits 0"
-assert_contains "$OUT" '- **Reviewer:** OpenCodeReview `v1.12.11`, `test-provider`/`test-model`.' "identity"
+assert_contains "$OUT" '- **Reviewer:** OpenCodeReview `v1.12.11`.' "identity"
+assert_not_contains "$OUT" 'test-provider' "the llm provider never reaches the comment"
+assert_not_contains "$OUT" 'test-model' "the llm model never reaches the comment"
 assert_contains "$OUT" '- **Status:** `complete`. Review complete: 2 finding(s) across 1 selected item(s).' "status with message"
 assert_contains "$OUT" '- **Range:** `aaaa..bbbb` (mode `range`), resolved by the orchestrator from the PR.' "range and mode"
 assert_contains "$OUT" '- **Tokens:** 17248 total (16456 input, 792 output, 8832 cache read), elapsed 4s.' "tokens"
@@ -104,14 +106,14 @@ assert_eq "$RC" 0 "exits 0"
 assert_contains "$OUT" '- **Findings:** none.' "clean says none"
 assert_not_contains "$OUT" 'null' "no null in output"
 
-echo "renderer: missing summary, llm and tool_calls say unknown"
+echo "renderer: missing summary and tool_calls say unknown"
 new_sandbox
 fixture_minimal '{"status":"complete","comments":[],"manifest":{"input":{}}}'
 render
 assert_eq "$RC" 0 "exits 0"
 assert_contains "$OUT" '- **Tokens:** unknown' "tokens unknown"
 assert_contains "$OUT" '- **Tool calls:** unknown (unknown failed)' "tool calls unknown"
-assert_contains "$OUT" '- **Reviewer:** OpenCodeReview `unknown`, `unknown`/`unknown`.' "identity unknown"
+assert_contains "$OUT" '- **Reviewer:** OpenCodeReview `unknown`.' "version unknown"
 assert_not_contains "$OUT" 'null' "no null in output"
 
 echo "renderer: a finding cannot close the collapsed block"
@@ -175,10 +177,14 @@ fixture_minimal '{"status":"complete","comments":[],
 render
 assert_contains "$OUT" '- **Failed files:** big.py, small.py' "failed files listed"
 
-echo "renderer: no review.json is a usage error"
+echo "renderer: a run with no review.json renders the gap, not a usage error"
 new_sandbox
-OUT="$("$RENDER" "$WS" 2>&1)"; RC=$?
-assert_eq "$RC" 2 "usage error exits 2"
+mkdir -p "$WS/failed-run"
+OUT="$("$RENDER" "$WS/failed-run" 2>&1)"; RC=$?
+assert_eq "$RC" 0 "exits 0"
+assert_contains "$OUT" '- **Status:** `missing`. The run produced no review output.' "a failed run reads as the gap it is"
+OUT="$("$RENDER" "$WS/nope" 2>&1)"; RC=$?
+assert_eq "$RC" 2 "a missing directory is still a usage error"
 
 make_stub() {
   stub="$WS/stub"
