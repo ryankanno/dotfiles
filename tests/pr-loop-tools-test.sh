@@ -341,7 +341,9 @@ scan 'at /Users/someone in prose'
 assert_eq "$RC" 1 "fail-closed on what the rewrite cannot anchor"
 
 echo "scan: provider keys with inner hyphens are caught"
-for key in sk-ant-api03-AbCdEfGhIjKlMnOpQrStUv sk-proj-AbCdEfGhIjKlMnOpQrStUv sk-AbCdEfGhIjKlMnOpQrStUv; do
+# Assembled at runtime like the other fakes: no token-shaped literal in source.
+p=AbCdEfGhIjKlMnOpQrStUv
+for key in "sk-ant-api03-${p}" "sk-proj-${p}" "sk-${p}"; do
   new_sandbox
   scan "leaked $key here"
   assert_eq "$RC" 1 "blocks ${key%%-A*}"
@@ -393,6 +395,15 @@ env HOME= "$SCAN" "$WS/body.md" >/dev/null 2>&1
 assert_eq "$?" 2 "an empty HOME exits 2"
 env HOME=/ "$SCAN" "$WS/body.md" >/dev/null 2>&1
 assert_eq "$?" 2 "a root HOME exits 2"
+
+echo "scan: live credential formats are caught"
+b2='AbCdEfGhIjKlMnOpQrStUvWxYz0123456789'
+jwt="eyJ${b2}${b2}.${b2}${b2:0:8}.${b2:0:12}"
+for tok in "$jwt" "whsec_${b2:0:24}"; do
+  new_sandbox
+  scan "leaked $tok here"
+  assert_eq "$RC" 1 "blocks ${tok:0:10}"
+done
 
 echo "scan: a forty-hex sha is not a secret"
 new_sandbox
