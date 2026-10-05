@@ -341,11 +341,22 @@ echo "scan: secret key formats are caught"
 # The fakes are assembled at runtime so the source holds no key-shaped
 # literal for the repo's own scanners to flag.
 b='AbCdEfGhIjKlMnOpQrStUvWxYz0123456789'
-for tok in "AIza${b:0:35}" "sk_live_${b:0:24}" "aws_secret_access_key = ${b}${b:0:4}"; do
+for tok in "AIza${b:0:35}" "sk_live_${b:0:24}" "aws_secret_access_key = ${b}${b:0:4}" \
+  "aws_secret_access_key = '${b}${b:0:4}'" "AWS_SECRET_ACCESS_KEY: '${b}${b:0:4}'"; do
   new_sandbox
   scan "leaked $tok here"
   assert_eq "$RC" 1 "blocks ${tok:0:14}"
 done
+
+echo "scan: a degenerate HOME is a scan failure, not a silent pass"
+new_sandbox
+printf 'see /Users/someone/x\n' >"$WS/body.md"
+env -u HOME "$SCAN" "$WS/body.md" >/dev/null 2>&1
+assert_eq "$?" 2 "an unset HOME exits 2"
+HOME= "$SCAN" "$WS/body.md" >/dev/null 2>&1
+assert_eq "$?" 2 "an empty HOME exits 2"
+HOME=/ "$SCAN" "$WS/body.md" >/dev/null 2>&1
+assert_eq "$?" 2 "a root HOME exits 2"
 
 echo "scan: a forty-hex sha is not a secret"
 new_sandbox

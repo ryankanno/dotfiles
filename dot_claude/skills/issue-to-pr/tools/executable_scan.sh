@@ -17,6 +17,14 @@ file="${1:-}"
   exit 2
 }
 
+# The home rewrite needs a real HOME: unset or empty aborts under set -u
+# with a code callers misread as hits, and a root HOME would replace every
+# slash in the body. Both are scan failures, never silent passes.
+if [[ -z "${HOME:-}" || "$HOME" == "/" ]]; then
+  printf 'HOME is %s; the home rewrite cannot run\n' "${HOME:-unset}" >&2
+  exit 2
+fi
+
 # The tilde rides in a variable: bash 3.2 keeps the escaped form literal in
 # the replacement, and every posted comment from a stock macOS would carry
 # a stray backslash before the redacted path.
@@ -33,7 +41,7 @@ pattern='/Users/[A-Za-z0-9._-]+|/home/[A-Za-z0-9._-]+|/tmp/[A-Za-z0-9._-]+|/root
 pattern+='|/run/user/[0-9]+|/private/|/var/folders/'
 pattern+='|sk-[A-Za-z0-9_-]{20,}|sk_live_[0-9a-zA-Z]{24,}|AIza[0-9A-Za-z_-]{35}'
 pattern+='|(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}'
-pattern+='|(aws_secret_access_key|AWS_SECRET_ACCESS_KEY)[[:space:]]*[=:][[:space:]]*["]?[A-Za-z0-9/+=]{40}'
+pattern+="|(aws_secret_access_key|AWS_SECRET_ACCESS_KEY)[[:space:]]*[=:][[:space:]]*[\"']?[A-Za-z0-9/+=]{40}"
 pattern+='|AKIA[0-9A-Z]{16}|ASIA[0-9A-Z]{16}|xox[baprs]-[A-Za-z0-9-]{10,}|glpat-[A-Za-z0-9_-]{20,}'
 pattern+='|npm_[A-Za-z0-9]{20,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|[Bb]earer [A-Za-z0-9._~+/=-]{20,}'
 
