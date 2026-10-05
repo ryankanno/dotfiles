@@ -42,7 +42,7 @@ assert_json() {
 fixture_full() {
   jq -cn '{
     status: "complete",
-    llm: {provider: "lunaroute", model: "deepseek-4.1-flash"},
+    llm: {provider: "test-provider", model: "test-model"},
     message: "Review complete: 2 finding(s) across 1 selected item(s).",
     summary: {files_reviewed: 1, comments: 2, total_tokens: 17248,
       input_tokens: 16456, output_tokens: 792, cache_read_tokens: 8832,
@@ -78,7 +78,7 @@ new_sandbox
 fixture_full
 render
 assert_eq "$RC" 0 "exits 0"
-assert_contains "$OUT" '- **Reviewer:** OpenCodeReview `v1.12.11`, `lunaroute`/`deepseek-4.1-flash`.' "identity"
+assert_contains "$OUT" '- **Reviewer:** OpenCodeReview `v1.12.11`, `test-provider`/`test-model`.' "identity"
 assert_contains "$OUT" '- **Status:** `complete`. Review complete: 2 finding(s) across 1 selected item(s).' "status with message"
 assert_contains "$OUT" '- **Range:** `aaaa..bbbb` (mode `range`), resolved by the orchestrator from the PR.' "range and mode"
 assert_contains "$OUT" '- **Tokens:** 17248 total (16456 input, 792 output, 8832 cache read), elapsed 4s.' "tokens"

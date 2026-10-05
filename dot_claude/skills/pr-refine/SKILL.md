@@ -26,7 +26,7 @@ The objective is the reader's value, not the critic's zero.
 - When fixing a finding would make the artifact worse (bloat,
   over-formalization, complexity the brief never asked for), do not fix
   it. Record it as a judgment call with the reason. Measured live
-  (2026-10-03, ryankanno/dotfiles#39): adversarial findings ran 4, 6,
+  (2026-10-03): adversarial findings ran 4, 6,
   6, 4 across four rounds while severity slid from real defects to
   definitional regress; the critic on prose is asymptotic, and a loop
   that optimizes its zero grows the artifact until the human reverts
