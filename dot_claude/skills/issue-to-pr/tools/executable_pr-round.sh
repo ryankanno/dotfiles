@@ -197,7 +197,7 @@ delta=""
 if [[ -n "$prior_head" ]]; then
   git -C "$repo" -c core.quotePath=false diff -U0 --no-color --no-ext-diff \
       --src-prefix=a/ --dst-prefix=b/ "$prior_head" "$head" \
-    | awk '/^\+\+\+ / { p = substr($0, 5); if (p == "/dev/null") p = ""; else sub(/^b\//, "", p); next }
+    | awk '/^diff --git / { p = ""; if (match($0, / b\/.*$/)) p = substr($0, RSTART + 3); next }
            /^@@ / && p != "" {
              n = split(substr($3, 2), a, ",")
              cnt = (n > 1) ? a[2] : 1
@@ -232,11 +232,13 @@ status_of() { # dir
   # A corrupt review.json (truncated mid-write by a failing reviewer) reads
   # as missing, so the round records the gap instead of aborting after the
   # billed run with no round.json at all. A complete run whose group lost a
-  # review pass (review_round_failed) still reports every file completed;
-  # it is partial coverage and reads as such.
+  # review pass (review_round_failed) or left failed files still reports
+  # every other file completed; both are partial coverage and read as such.
   if [[ -f "$1/review.json" ]]; then
-    jq -r 'if .status == "complete" and ([.warnings[]? | select(.type == "review_round_failed")] | length) > 0
-           then "partial" else .status // "missing" end' "$1/review.json" 2>/dev/null || printf 'missing\n'
+    jq -r 'if .status == "complete"
+              and (([.warnings[]? | select(.type == "review_round_failed")] | length) > 0
+                   or ((.manifest.coverage.failed // []) | length) > 0)
+            then "partial" else .status // "missing" end' "$1/review.json" 2>/dev/null || printf 'missing\n'
   else printf 'missing\n'; fi
 }
 

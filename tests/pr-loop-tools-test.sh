@@ -531,12 +531,12 @@ if [[ -n "$STUB_GARBAGE" ]]; then
 fi
 status="$STUB_RANGE_STATUS"
 if [[ "$mode" == "commit" ]]; then status="$STUB_COMMIT_STATUS"; fi
-printf '{"status":"%s","session_id":"stub-session","comments":[],"summary":{"total_tokens":%s},"warnings":%s}' "$status" "${STUB_TOKENS:-0}" "${STUB_WARNINGS:-[]}" >"$out"
+printf '{"status":"%s","session_id":"stub-session","comments":[],"summary":{"total_tokens":%s},"warnings":%s,"manifest":{"coverage":{"failed":%s}}}' "$status" "${STUB_TOKENS:-0}" "${STUB_WARNINGS:-[]}" "${STUB_COVERAGE_FAILED:-[]}" >"$out"
 OCRSTUB
   chmod +x "$stub/gh" "$stub/ocr"
   export STUB_RANGE_STATUS=complete STUB_COMMIT_STATUS=complete STUB_FAIL_ON_COMMIT=""
   export GH_COMMENTS_JSON='[]'
-  export STUB_GARBAGE="" STUB_WARNINGS=""
+  export STUB_GARBAGE="" STUB_WARNINGS="" STUB_COVERAGE_FAILED=""
 }
 
 make_fixture_repo() {
@@ -630,6 +630,16 @@ run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
 assert_json '.reviewer_complete == false' "$rd/round.json" "partial is incomplete coverage"
 assert_eq "$(jq '.runs | length' "$rd/round.json")" 1 "no per-commit retry storm"
+
+echo "pr-round: a complete run with failed files is partial coverage"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+export STUB_COVERAGE_FAILED='[{"path":"b.py"}]'
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
+assert_json '.runs[0].status == "partial"' "$rd/round.json" "failed files demote a complete run"
+assert_json '.reviewer_complete == false' "$rd/round.json" "failed files never read as a clean round"
 
 echo "pr-round: a complete run that lost a review pass is partial"
 new_sandbox
@@ -920,6 +930,24 @@ rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
 assert_eq "$(jq -r '.range.prior_head' "$rd/round.json")" "$FR_HEAD" "the prior head is recorded"
 assert_eq "$(wc -c <"$rd/delta.txt" | tr -d ' ')" "0" "nothing changed, nothing is new"
 
+echo "pr-round: a content line that looks like a diff header does not mislabel the delta"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+advance_head f.txt 'keep1
+keep2
+keep3'
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+advance_head f.txt 'keep1
+++ b/bogus.txt
+keep2
+CHANGED
+keep3'
+run_prr --repo "$repo" --pr 39 --round 3 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-3"
+assert_eq "$(cat "$rd/delta.txt")" $'f.txt:2-2\nf.txt:4-4' "both hunks stay on the real file"
+
 SCOPE="$TOOLS/executable_finding-scope.sh"
 
 echo "finding-scope: a finding on a changed line is new, elsewhere reviewed"
@@ -940,6 +968,12 @@ new_sandbox
 mkdir -p "$WS/r"
 printf '{"range":{"prior_head":null}}' >"$WS/r/round.json"
 assert_eq "$("$SCOPE" "$WS/r" f.txt:1)" "new" "round 1 reviews everything"
+
+echo "finding-scope: a missing delta blocks, never silently demotes"
+new_sandbox
+mkdir -p "$WS/r"
+printf '{"range":{"prior_head":"abc"}}' >"$WS/r/round.json"
+assert_eq "$("$SCOPE" "$WS/r" f.txt:2)" "new" "no delta to place against, so it blocks"
 
 echo "finding-scope: a round dir without round.json is a usage error"
 new_sandbox
