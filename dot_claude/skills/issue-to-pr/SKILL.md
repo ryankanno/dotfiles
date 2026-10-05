@@ -52,6 +52,17 @@ One interactive moment. Collect and confirm, then go silent:
    by manifest. Still nothing: later rounds report blocked rather than
    inventing one.
 5. **The reviewer.** Default from the manifest. Override only if asked.
+6. **The grill.** On or off. On when the task leaves decisions to the
+   human (product calls, open questions in the source): the implementer
+   writes its plan, then grills it with the human in the workmux window,
+   using the grill-me skill, before any code. The human answers there,
+   not here, so intake stays the one moment with the orchestrator. Off
+   for tasks whose source already settles every decision.
+
+The grill is the one sanctioned pause after intake. While it runs, the
+pane waits on the human: `workmux status` shows it waiting, and that is
+not pane death. Do not redispatch, nudge, or answer for the human; wait
+until the pane moves on to code or files the PR.
 
 **The loop never closes anything.** `Closes #<n>` goes in the PR body for
 gh sources and closes on merge. Markdown and HTML sources are never

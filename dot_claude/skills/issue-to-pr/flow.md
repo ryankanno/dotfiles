@@ -26,10 +26,14 @@ unrecovered reviewer with nothing from any source).
 
 ```mermaid
 flowchart TD
-    A["Intake: a task ref<br/>gh issue, markdown todo, or HTML file<br/>confirm brief, layout, gate, reviewer"] --> B{"Open PR with head<br/>branch-name already?"}
+    A["Intake: a task ref<br/>gh issue, markdown todo, or HTML file<br/>confirm brief, layout, gate, reviewer, grill"] --> B{"Open PR with head<br/>branch-name already?"}
     B -- "yes: resume" --> R
     B -- "no" --> C["Dispatch<br/>workmux add branch-name -b -l layout -P prompt-file<br/>verify the pane binary with tmux list-panes"]
-    C --> D["Implementer pane<br/>TDD, gate, conventional commits,<br/>push, gh pr create with Closes for gh issues"]
+    C --> G1{"Grill on?"}
+    G1 -- "yes" --> G2["In the pane: plan, grill-me with the human,<br/>restate decisions, get a yes<br/>(the pane waits on the human; not pane death)"]
+    G2 --> D
+    G1 -- "no" --> D
+    D["Implementer pane<br/>TDD, gate, conventional commits,<br/>push, gh pr create with Closes for gh issues"]
     D --> E{"PR verified and bound<br/>to branch-name?"}
     E -- "no: a real number, someone else's PR" --> X["Blocked: report and stop"]
     E -- "yes" --> R["Review round<br/>pr-round.sh: range resolved from the PR,<br/>identity check, reviewer binding,<br/>per-commit empty-retry"]

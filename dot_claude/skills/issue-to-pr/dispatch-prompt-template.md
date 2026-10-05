@@ -6,6 +6,21 @@
 
 Source: <source locator>
 
+<Only when the grill is on; omit this section entirely when it is off:>
+## Before any code: plan, then grill it here
+
+1. Write the implementation plan (the writing-plans skill).
+2. Run the grill-me skill on that plan with the human, in this window.
+   Ask each open decision with the AskUserQuestion tool, in terms of what
+   a user sees, and render options where the question is visual. Every
+   decision the brief leaves open is a branch to walk.
+3. Before writing code, verify: restate every decision as the human
+   answered it, and get a yes. Write the agreed decisions into the spec
+   or plan the change ships with.
+4. Only then start the work below. Do not ask the human anything after
+   this point unless a fact contradicts a decision they made; say so
+   plainly when it does.
+
 ## How to work
 
 - Work test-first: write the failing test that mirrors the user-facing
