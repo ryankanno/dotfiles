@@ -77,7 +77,7 @@ for cand in "$here/$reviewer/review.sh" "$here/$reviewer/executable_review.sh"; 
 done
 [[ -n "$review" ]] || { printf 'reviewer binding has no review.sh: %s\n' "$reviewer" >&2; exit 2; }
 
-pr_json=$(cd "$repo" && gh pr view "$pr" --json state,baseRefName,headRefOid,headRefName,isCrossRepository,url,comments) || {
+pr_json=$(cd "$repo" && gh pr view "$pr" --json state,baseRefName,headRefOid,headRefName,isCrossRepository,url) || {
   printf 'cannot view PR %s\n' "$pr" >&2
   exit 4
 }
@@ -141,11 +141,17 @@ else
     printf 'cannot resolve the gh user for the prior round comments\n' >&2
     exit 5
   }
-  settled=$(jq -r --arg me "$me" '.comments[]? | select(.author.login == $me)
-      | .body | select(startswith("<!-- pr-loop-comment -->"))' <<<"$pr_json" \
+  # The pr view comments field is capped at its first page; the issue
+  # comments endpoint paginates, so a long PR cannot silently lose the
+  # standing dispositions.
+  settled=$(gh api --paginate "repos/$owner_repo/issues/$pr/comments" \
+      --jq '.[] | select(.user.login == "'"$me"'") | select(.body | startswith("<!-- pr-loop-comment -->")) | .body' \
     | awk '/<summary>Dispositions<\/summary>/ { on = 1; next }
            on && /^<\/details>/ { on = 0 }
-           on && /^- (Rejected|Accepted):/')
+           on && /^- (Rejected|Accepted):/') || {
+    printf 'cannot read the PR comments\n' >&2
+    exit 5
+  }
 fi
 
 # Evidence is never silently overwritten or reused: a re-invocation into a
