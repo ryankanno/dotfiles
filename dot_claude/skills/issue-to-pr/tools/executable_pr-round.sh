@@ -102,11 +102,11 @@ git -C "$repo" fetch -q origin "$base" "refs/pull/$pr/head" || {
   printf 'cannot fetch the PR refs from origin\n' >&2
   exit 5
 }
-# round.json records the base by SHA, not by a moving branch name: two
-# rounds over the same head must name the same range whatever main did
-# in between.
-base_sha=$(git -C "$repo" rev-parse "origin/$base") || {
-  printf 'cannot resolve origin/%s\n' "$base" >&2
+# round.json records the base by SHA, not by a moving branch name: the
+# reviewer runs in merge-base mode, so the recorded base is the merge
+# base, which stays put for a given head whatever main did in between.
+base_sha=$(git -C "$repo" merge-base "origin/$base" "$head") || {
+  printf 'cannot resolve the merge base of origin/%s and %s\n' "$base" "$head" >&2
   exit 5
 }
 

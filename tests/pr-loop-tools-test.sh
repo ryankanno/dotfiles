@@ -537,6 +537,24 @@ export STUB_TOKENS=100
 run_prr --repo "$repo" --pr 39 --round 9 >/dev/null
 assert_json '.cumulative_tokens == 150' "$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-9/round.json" "round 08 is counted"
 
+echo "pr-round: the recorded base does not move when main advances"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+prev_branch=$(git -C "$repo" rev-parse --abbrev-ref HEAD)
+git -C "$repo" checkout -q "$FR_BASE"
+printf 'm\n' >"$repo/g.txt"
+git -C "$repo" add g.txt
+git -C "$repo" commit -qm "on main"
+git -C "$repo" push -q origin HEAD:refs/heads/main
+git -C "$repo" checkout -q "$prev_branch"
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+b1=$(jq -r '.range.base' "$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1/round.json")
+b2=$(jq -r '.range.base' "$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2/round.json")
+assert_eq "$b2" "$b1" "the same head records the same base"
+assert_eq "$b1" "$FR_BASE" "the base is the merge base, not the tip"
+
 echo "pr-round: leftovers from an interrupted run are never read as this run's evidence"
 new_sandbox
 make_pr_round_env
