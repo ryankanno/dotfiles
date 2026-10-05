@@ -172,22 +172,24 @@ else
   if [[ $commit_runs -gt 0 && $recovered -eq 1 ]]; then complete=true; fi
 fi
 
-tokens_in() { # round.json -> the round's reviewer tokens
+# One summing helper for both shapes, the in-memory runs array and a prior
+# round.json's runs: two copies of the arithmetic drift apart, and a
+# miscounted cumulative cost never announces itself.
+runs_tokens() { # <runs array json> -> the runs' reviewer tokens
   local total=0 t d
   while IFS= read -r d; do
     [[ -n "$d" ]] || continue
     t=$(jq -r '.summary.total_tokens // 0' "$d/review.json" 2>/dev/null || printf '0')
     total=$((total + t))
-  done < <(jq -r '.runs[].dir' "$1" 2>/dev/null)
+  done < <(jq -r '.[].dir' <<<"$1" 2>/dev/null)
   printf '%s\n' "$total"
 }
 
-current_tokens=0
-while IFS= read -r d; do
-  [[ -n "$d" ]] || continue
-  t=$(jq -r '.summary.total_tokens // 0' "$d/review.json" 2>/dev/null || printf '0')
-  current_tokens=$((current_tokens + t))
-done < <(jq -r '.[].dir' <<<"$runs")
+tokens_in() { # round.json -> the round's reviewer tokens (legacy, no round_tokens field)
+  runs_tokens "$(jq -c '.runs // []' "$1" 2>/dev/null || printf '[]')"
+}
+
+current_tokens=$(runs_tokens "$runs")
 
 prior_tokens=0
 for sibling in "$HOME/.cache/pr-loop/$owner_repo/pr-$pr"/round-*/round.json; do

@@ -583,6 +583,18 @@ run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
 rd2="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
 assert_json '.round_tokens == 250 and .cumulative_tokens == 350' "$rd2/round.json" "round 2 cumulative is 350 across both rounds"
 
+echo "pr-round: a legacy round.json without round_tokens still counts"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+export STUB_TOKENS=100
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+rj="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1/round.json"
+jq 'del(.round_tokens)' "$rj" >"$rj.tmp" && mv "$rj.tmp" "$rj"
+export STUB_TOKENS=250
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+assert_json '.cumulative_tokens == 350' "$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2/round.json" "the fallback sums the runs"
+
 echo "pr-round: a zero-padded round still counts toward the cumulative cost"
 new_sandbox
 make_pr_round_env
