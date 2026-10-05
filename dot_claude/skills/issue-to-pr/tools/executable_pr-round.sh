@@ -150,11 +150,15 @@ range_status=$(status_of "$round_dir")
 record range "$round_dir" "$range_status" "$(cat "$round_dir/session.txt" 2>/dev/null || true)" "$rc"
 if [[ "$range_status" == complete ]]; then
   complete=true
-else
+elif [[ "$range_status" == missing || "$range_status" == skipped ]]; then
   complete=false
-  # Empty or incomplete range result: retry once per commit in the range.
-  # The round is complete only when every commit run completed; one
-  # success among failures is partial coverage, never a clean review.
+  # The range produced no review text, or the tool declined it (a
+  # docs-only range): retry once per commit in the range. The round is
+  # complete only when every commit run completed; one success among
+  # failures is partial coverage, never a clean review.
+  # A partial range is NOT retried here: it produced review text, the
+  # coverage gap is a fact the comment shows, and one billed commit
+  # review per commit in the range does not repair it.
   i=0 recovered=1 commit_runs=0
   while read -r sha; do
     [[ -n "$sha" ]] || continue
@@ -170,6 +174,11 @@ else
     [[ "$cstatus" == complete ]] || recovered=0
   done < <(git -C "$repo" log --format=%H "origin/$base..$head")
   if [[ $commit_runs -gt 0 && $recovered -eq 1 ]]; then complete=true; fi
+else
+  # partial or any other non-complete status: review text exists, some
+  # files were not covered. The round records the gap and stays
+  # incomplete; it does not re-bill the whole range one commit at a time.
+  complete=false
 fi
 
 # One summing helper for both shapes, the in-memory runs array and a prior

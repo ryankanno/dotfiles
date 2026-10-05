@@ -530,6 +530,26 @@ assert_json '.reviewer_complete == false' "$rd/round.json" "one unreviewed commi
 assert_eq "$(jq '.runs | length' "$rd/round.json")" 3 "range plus two commit runs"
 assert_eq "$(jq -r '.runs[2].status' "$rd/round.json")" "missing" "the failed retry is recorded verbatim"
 
+echo "pr-round: a partial range run is recorded, not retried per commit"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+export STUB_RANGE_STATUS=partial
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
+assert_json '.reviewer_complete == false' "$rd/round.json" "partial is incomplete coverage"
+assert_eq "$(jq '.runs | length' "$rd/round.json")" 1 "no per-commit retry storm"
+
+echo "pr-round: a missing range still retries per commit"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+export STUB_RANGE_STATUS=missing STUB_COMMIT_STATUS=complete
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
+assert_json '.reviewer_complete == true' "$rd/round.json" "the retry recovers a missing range"
+assert_eq "$(jq '.runs | length' "$rd/round.json")" 2 "range plus one commit run"
+
 echo "pr-round: an identity mismatch stops before anything runs"
 new_sandbox
 make_pr_round_env
