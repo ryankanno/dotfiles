@@ -125,6 +125,15 @@ assert_eq "$RC" 0 "exits 0"
 assert_not_contains "$OUT" '</details>' "no raw close tag"
 assert_contains "$OUT" '&lt;/details&gt;' "escaped close tag"
 
+echo "renderer: a finding path cannot inject markup"
+new_sandbox
+fixture_minimal '{"status":"complete","comments":[
+  {"path":"evil<details open>x.py","content":"c","start_line":1,"category":"bug","severity":"high"}]}'
+render
+assert_eq "$RC" 0 "exits 0"
+assert_not_contains "$OUT" '<details open>' "no raw opening tag from a path"
+assert_contains "$OUT" '&lt;details&gt;' "the path tag is entity-escaped"
+
 echo "renderer: details tags are entity-escaped in every form"
 new_sandbox
 fixture_minimal '{"status":"complete","comments":[
