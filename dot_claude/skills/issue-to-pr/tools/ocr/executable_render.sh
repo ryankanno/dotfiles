@@ -36,9 +36,10 @@ out="$(jq -r '
   def code: text | gsub("`"; "") | "`" + . + "`";
   # Tag names are case-insensitive in HTML and tolerate inner whitespace, and
   # an opening tag breaks the collapsed block as surely as a closing one, so
-  # every details tag is entity-escaped whatever its form.
-  def safe: gsub("(?i)</[[:space:]]*details[[:space:]]*>"; "&lt;/details&gt;")
-    | gsub("(?i)<details([[:space:]][^>]*)?>"; "&lt;details&gt;");
+  # every details tag is entity-escaped whatever its form, including the
+  # self-closing solidus forms HTML5 treats as opening tags.
+  def safe: gsub("(?i)</[[:space:]]*details[[:space:]]*/?[[:space:]]*>"; "&lt;/details&gt;")
+    | gsub("(?i)<details([[:space:]/][^>]*)?>"; "&lt;details&gt;");
   # The fence must be longer than any tilde run inside the text, and never
   # shorter than three, or the block closes early.
   def fenced: text | . as $t
@@ -88,7 +89,7 @@ out="$(jq -r '
            else "" end)]
          | join("\n")) + "\n"
      end)
-  + "- **Session:** \(.session_id // "unknown" | code)"
+  + "- **Session:** \(.session_id // "unknown" | text | safe | oneline | code)"
 ' "$dir/review.json" 2>/dev/null)" || {
   printf -- '- **Status:** `unparseable`. The run left review output that does not parse.\n'
   exit 0

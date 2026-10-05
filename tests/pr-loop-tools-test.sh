@@ -146,6 +146,23 @@ assert_not_contains "$OUT" '</details >' "no raw spaced close tag"
 assert_contains "$OUT" '&lt;details&gt;' "opening tag entity-escaped"
 assert_contains "$OUT" '&lt;/details&gt;' "close tag entity-escaped"
 
+echo "renderer: self-closing details forms are escaped too"
+new_sandbox
+fixture_minimal '{"status":"complete","comments":[
+  {"path":"a.md","content":"self-closing <details/> and closed </details/> forms","start_line":1,"category":"bug","severity":"high"}]}'
+render
+assert_eq "$RC" 0 "exits 0"
+assert_not_contains "$OUT" '<details/>' "no raw self-closing opening tag"
+assert_not_contains "$OUT" '</details/>' "no raw self-closing closing tag"
+assert_contains "$OUT" '&lt;details&gt;' "the self-closing form is entity-escaped"
+
+echo "renderer: a session id cannot break the comment"
+new_sandbox
+fixture_minimal '{"status":"complete","comments":[],"session_id":"abc\ndef","manifest":{"input":{}}}'
+render
+assert_eq "$RC" 0 "exits 0"
+assert_eq "$(printf '%s\n' "$OUT" | grep -c '^- \*\*Session:\*\* `abc def`$')" 1 "the session id stays inline"
+
 echo "renderer: null content reads unknown, not the literal null"
 new_sandbox
 fixture_minimal '{"status":"complete","comments":[{"path":"a.md","content":null,"start_line":1}]}'
