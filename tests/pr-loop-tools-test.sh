@@ -186,6 +186,14 @@ fixture_minimal '{"status":"complete","comments":[],
 render
 assert_contains "$OUT" '- **Failed files:** big.py, small.py' "failed files listed"
 
+echo "renderer: a lost review pass is visible, not hidden behind full coverage"
+new_sandbox
+fixture_minimal '{"status":"complete","comments":[],
+  "warnings":[{"type":"review_round_failed","file":"a.sh,b.sh","message":"round 2: LLM completion error: context deadline exceeded"}]}'
+render
+assert_eq "$RC" 0 "exits 0"
+assert_contains "$OUT" '- **Warning:** `review_round_failed` on a.sh,b.sh: round 2: LLM completion error: context deadline exceeded' "the warning is rendered"
+
 echo "renderer: a run with no review.json renders the gap, not a usage error"
 new_sandbox
 mkdir -p "$WS/failed-run"
@@ -441,11 +449,11 @@ if [[ -n "$STUB_GARBAGE" ]]; then
 fi
 status="$STUB_RANGE_STATUS"
 if [[ "$mode" == "commit" ]]; then status="$STUB_COMMIT_STATUS"; fi
-printf '{"status":"%s","session_id":"stub-session","comments":[],"summary":{"total_tokens":%s}}' "$status" "${STUB_TOKENS:-0}" >"$out"
+printf '{"status":"%s","session_id":"stub-session","comments":[],"summary":{"total_tokens":%s},"warnings":%s}' "$status" "${STUB_TOKENS:-0}" "${STUB_WARNINGS:-[]}" >"$out"
 OCRSTUB
   chmod +x "$stub/gh" "$stub/ocr"
   export STUB_RANGE_STATUS=complete STUB_COMMIT_STATUS=complete STUB_FAIL_ON_COMMIT=""
-  export STUB_GARBAGE=""
+  export STUB_GARBAGE="" STUB_WARNINGS=""
 }
 
 make_fixture_repo() {
@@ -539,6 +547,17 @@ run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
 assert_json '.reviewer_complete == false' "$rd/round.json" "partial is incomplete coverage"
 assert_eq "$(jq '.runs | length' "$rd/round.json")" 1 "no per-commit retry storm"
+
+echo "pr-round: a complete run that lost a review pass is partial"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+export STUB_WARNINGS='[{"type":"review_round_failed","file":"a.sh","message":"round 2: LLM completion error: context deadline exceeded"}]'
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
+assert_json '.runs[0].status == "partial"' "$rd/round.json" "a lost pass is recorded as partial"
+assert_json '.reviewer_complete == false' "$rd/round.json" "a lost pass is never a complete review"
+assert_eq "$(jq '.runs | length' "$rd/round.json")" 1 "a lost pass is not retried per commit"
 
 echo "pr-round: a missing range still retries per commit"
 new_sandbox

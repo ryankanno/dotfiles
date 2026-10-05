@@ -9,6 +9,9 @@ gets fixed.
 
 - `No issues found.` — every source ran and produced zero findings.
 - `<n> finding(s).` — findings exist, counted across the sources that ran.
+- `partial (the reviewer's coverage has a gap)` — review text exists but
+  part of the range went unreviewed; neither clean nor failing; the
+  loop cannot declare the branch clean off that round.
 - `unrecovered (the reviewer produced no review text)` — neither clean
   nor failing; the loop cannot declare the branch clean off that round.
 - `converged (all findings low and dispositioned)` — the orchestrator's
@@ -19,8 +22,8 @@ gets fixed.
 **Loop end states** (the final message, the runner's contract): `clean`,
 `converged` (all findings low and dispositioned; accepted judgment calls
 listed), `capped-unrecovered` (findings remain after 3 refine rounds),
-`blocked` (pane death after redispatch, no gate, scan hit, or an
-unrecovered reviewer with nothing from any source).
+`blocked` (pane death after redispatch, no gate, scan hit, or a partial
+or unrecovered reviewer with nothing from any source).
 
 ## The loop
 
@@ -38,7 +41,7 @@ flowchart TD
     E -- "no: a real number, someone else's PR" --> X["Blocked: report and stop"]
     E -- "yes" --> R["Review round<br/>pr-round.sh: range resolved from the PR,<br/>identity check, reviewer binding,<br/>per-commit empty-retry"]
     R --> F["Adversarial critic: fresh clean-context subagent<br/>plus the caller's own read"]
-    F --> G["Assemble the comment per report-template<br/>marker first line, four-state verdict"]
+    F --> G["Assemble the comment per report-template<br/>marker first line, five-state verdict"]
     G --> S{"Scan before posting"}
     S -- "hit: do not leak" --> Y["Abort the post, record it,<br/>the final report surfaces it"]
     S -- "clean" --> H["Post the round comment<br/>append per round"]
@@ -49,7 +52,7 @@ flowchart TD
     L --> RC{"All findings low and<br/>all dispositioned?"}
     RC -- "yes: converged candidate" --> J
     RC -- "no" --> R
-    I -- "unrecovered" --> P["Neither clean nor failing;<br/>nothing to fix, no clean claim"]
+    I -- "partial or unrecovered" --> P["Neither clean nor failing;<br/>nothing to fix, no clean claim"]
     K -- "no" --> M["Capped-unrecovered:<br/>findings remain after 3 rounds"]
     J --> N{"Convergence round clean<br/>and the gate green?"}
     N -- "yes" --> O["Clean: the loop ends"]

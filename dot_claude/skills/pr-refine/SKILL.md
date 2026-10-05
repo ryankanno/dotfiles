@@ -61,8 +61,10 @@ gh pr view <n> --json comments --jq '[.comments[] | select(.author.login == "<lo
 
 The verdict line is one of
 `No issues found.`, `<n> finding(s).`,
+`partial (the reviewer's coverage has a gap)`,
 `unrecovered (the reviewer produced no review text)`, or
-`converged (all findings low and dispositioned)`. A converged verdict
+`converged (all findings low and dispositioned)`. Partial and
+unrecovered mean nothing to fix and no clean claim. A converged verdict
 means the orchestrator closed the loop: nothing to fix, no new round.
 
 ## 2. Validate every finding

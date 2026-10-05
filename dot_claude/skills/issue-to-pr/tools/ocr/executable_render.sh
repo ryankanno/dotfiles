@@ -67,6 +67,11 @@ out="$(jq -r '
   + (if (($cov.failed | arr) | length) > 0 then
        "- **Failed files:** \(($cov.failed | arr) | map((.path // "?") | text | safe) | join(", "))\n"
      else "" end)
+  # A lost review pass leaves every file counted completed; the warning is
+  # the only trace of the gap, so it renders.
+  + ([.warnings | arr | .[] | obj
+      | "- **Warning:** \(.type // "unknown" | code) on \(.file // "unknown files" | text | safe | oneline): \(.message // "No message." | text | safe | oneline)\n"]
+     | join(""))
   + (if ($cs | length) == 0 then
        "- **Findings:** none.\n"
      else

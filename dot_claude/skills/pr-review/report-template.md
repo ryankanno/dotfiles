@@ -21,6 +21,11 @@ reads quickly and loses nothing.
     findings.
   - `**Verdict:** <n> finding(s).` — findings exist, counted across the
     sources that ran.
+  - `**Verdict:** partial (the reviewer's coverage has a gap).` — the
+    reviewer produced review text but left part of the range unreviewed,
+    and no source produced a finding. Neither clean nor failed;
+    /pr-refine has nothing to fix, and the loop cannot declare the
+    branch clean off this round.
   - `**Verdict:** unrecovered (the reviewer produced no review text).` —
     the reviewer binding ended unrecovered and no other source produced
     a finding. Neither clean nor failed; /pr-refine has nothing to fix,
@@ -37,7 +42,9 @@ reads quickly and loses nothing.
 - **The reviewer's status is visible when it changes what the verdict
   means.** If the binding produced no review text, a line
   `**Reviewer:** unrecovered: <its message, verbatim>` sits above the
-  verdict. A coverage gap never lives only inside a collapsed block.
+  verdict. If a run ended partial, a line `**Reviewer:** partial: <the
+  failed files or the rendered warning, verbatim>` sits there instead.
+  A coverage gap never lives only inside a collapsed block.
 
 ## Layout
 
@@ -48,9 +55,9 @@ Visible, in this order:
 
 ## Review round <N>: <short-sha>
 
-**Reviewer:** <unrecovered: <its message, verbatim> |  (this line appears only when the reviewer produced no review text; a coverage gap never lives only inside a collapsed block)>
+**Reviewer:** <unrecovered: <its message, verbatim> | partial: <the failed files or the rendered warning, verbatim>>   (this line appears only when the reviewer ended unrecovered or partial; a coverage gap never lives only inside a collapsed block)
 
-**Verdict:** <No issues found. | N finding(s). | unrecovered (the reviewer produced no review text) | converged (all findings low and dispositioned)>
+**Verdict:** <No issues found. | N finding(s). | partial (the reviewer's coverage has a gap) | unrecovered (the reviewer produced no review text) | converged (all findings low and dispositioned)>
 
 **Gate:** <command> printed <its final result>   (refine and convergence rounds only)
 

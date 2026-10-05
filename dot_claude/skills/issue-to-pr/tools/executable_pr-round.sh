@@ -136,9 +136,12 @@ record() { # mode dir status session exit_code
 status_of() { # dir
   # A corrupt review.json (truncated mid-write by a failing reviewer) reads
   # as missing, so the round records the gap instead of aborting after the
-  # billed run with no round.json at all.
+  # billed run with no round.json at all. A complete run whose group lost a
+  # review pass (review_round_failed) still reports every file completed;
+  # it is partial coverage and reads as such.
   if [[ -f "$1/review.json" ]]; then
-    jq -r '.status // "missing"' "$1/review.json" 2>/dev/null || printf 'missing\n'
+    jq -r 'if .status == "complete" and ([.warnings[]? | select(.type == "review_round_failed")] | length) > 0
+           then "partial" else .status // "missing" end' "$1/review.json" 2>/dev/null || printf 'missing\n'
   else printf 'missing\n'; fi
 }
 

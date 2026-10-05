@@ -46,14 +46,24 @@ directory, status, session id, exit code), and `reviewer_complete`.
 ## 2. Read round.json
 
 **`reviewer_complete: true`** with zero findings is a clean review:
-report it as clean. **`reviewer_complete: false`** is an empty
-result: the reviewer produced no review text, whatever runs it
-attempted. That is never clean and never a failure. The visible
-`**Reviewer:**` line and the verdict follow report-template.md: with
-findings from the critic or the caller's read, the verdict counts them;
-with nothing from any source, the verdict is `unrecovered (the reviewer
-produced no review text)`, which /pr-refine reads as neither clean nor
-failing, and the loop cannot declare the branch clean off that round.
+report it as clean. **`reviewer_complete: false`** takes one of two
+shapes, read from `runs[].status`:
+
+- **Partial** (a run is `partial`): the reviewer produced review text,
+  but part of the range went unreviewed (failed files, or a group that
+  lost a review pass). Its findings count like any other source's.
+  With nothing from any source, the verdict is `partial (the
+  reviewer's coverage has a gap)`.
+- **Unrecovered** (no run is `partial`): the reviewer produced no
+  review text, whatever runs it attempted. With nothing from any
+  source, the verdict is `unrecovered (the reviewer produced no review
+  text)`.
+
+Either way, findings from any source make the verdict count them, and
+the visible `**Reviewer:**` line names the gap per report-template.md.
+Neither shape is clean and neither is a failure: /pr-refine reads both
+as nothing to fix, and the loop cannot declare the branch clean off
+that round.
 
 The round's cost is a fact the comment carries: `round.json`'s
 `cumulative_tokens` becomes the template's Cost line, so a reader can
@@ -101,8 +111,10 @@ thin coverage and a skipped run must read as what they are.
 The verdict line is machine-read by /pr-refine; keep the protocol exact,
 one of: `**Verdict:** No issues found.` when every source ran and
 produced zero findings, `**Verdict:** <n> finding(s).` when findings
-exist, or `**Verdict:** unrecovered (the reviewer produced no review
-text).` when the binding ended unrecovered with nothing else to report.
+exist, `**Verdict:** partial (the reviewer's coverage has a gap).` when
+the binding ended partial with nothing else to report, or
+`**Verdict:** unrecovered (the reviewer produced no review text).` when
+the binding ended unrecovered with nothing else to report.
 
 ## 6. Scan before posting
 
