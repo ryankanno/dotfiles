@@ -15,14 +15,15 @@
 #                the merge base in round 1 or on an empty delta, the
 #                prior head otherwise), delta.txt (the
 #                path:start-end hunks changed since the prior round's head,
-#                from round 2 on), background.md when there are prior
+#                from round 2 on) with names.txt (the listing the hunks
+#                enumerate over), background.md when there are prior
 #                dispositions (read from this loop's own round comments
 #                unless --dispositions names a file) or a delta, and the
 #                directory path on stdout.
 # Exit codes: 0 the round ran; 2 usage, or the environment is unusable
 # (HOME unset); 3 identity mismatch; 4 the PR is
-# missing, not open, or not resolvable; 5 the repository or its refs could
-# not be resolved on the network; 6 the round dir already holds
+# missing, not open, or not resolvable; 5 the repository, its refs, or
+# the changed-file listing could not be resolved; 6 the round dir already holds
 # evidence and --rerun was not passed; 127 a dependency is missing. A
 # review run's own failure is recorded in round.json, not propagated.
 set -euo pipefail
