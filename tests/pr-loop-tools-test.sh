@@ -186,6 +186,14 @@ assert_contains "$OUT" '- **Status:** `missing`. The run produced no review outp
 OUT="$("$RENDER" "$WS/nope" 2>&1)"; RC=$?
 assert_eq "$RC" 2 "a missing directory is still a usage error"
 
+echo "renderer: an unparseable review.json renders the gap, not nothing"
+new_sandbox
+mkdir -p "$WS/corrupt-run"
+printf '{"status": "complete", tri' >"$WS/corrupt-run/review.json"
+OUT="$("$RENDER" "$WS/corrupt-run" 2>&1)"; RC=$?
+assert_eq "$RC" 0 "exits 0"
+assert_contains "$OUT" 'unparseable' "a corrupt run reads as the gap it is"
+
 make_stub() {
   stub="$WS/stub"
   mkdir -p "$stub"
@@ -383,12 +391,19 @@ done
 if [[ "$mode" == "commit" && -n "$STUB_FAIL_ON_COMMIT" && "$csha" == "$STUB_FAIL_ON_COMMIT" ]]; then
   exit 3
 fi
+if [[ -n "$STUB_GARBAGE" ]]; then
+  # ocr exited 0 but the output is truncated mid-write: the corrupt-file
+  # class the round must absorb, not crash on.
+  printf '{"status": "complete", tri' >"$out"
+  exit 0
+fi
 status="$STUB_RANGE_STATUS"
 if [[ "$mode" == "commit" ]]; then status="$STUB_COMMIT_STATUS"; fi
 printf '{"status":"%s","session_id":"stub-session","comments":[],"summary":{"total_tokens":%s}}' "$status" "${STUB_TOKENS:-0}" >"$out"
 OCRSTUB
   chmod +x "$stub/gh" "$stub/ocr"
   export STUB_RANGE_STATUS=complete STUB_COMMIT_STATUS=complete STUB_FAIL_ON_COMMIT=""
+  export STUB_GARBAGE=""
 }
 
 make_fixture_repo() {
@@ -554,6 +569,19 @@ b1=$(jq -r '.range.base' "$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/rou
 b2=$(jq -r '.range.base' "$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2/round.json")
 assert_eq "$b2" "$b1" "the same head records the same base"
 assert_eq "$b1" "$FR_BASE" "the base is the merge base, not the tip"
+
+echo "pr-round: a corrupt review.json degrades to a missing run, not a crash"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+export STUB_GARBAGE=1
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null 2>&1
+rc=$?
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
+assert_eq "$rc" 0 "the round completes and records the gap"
+assert_json '.runs[0].status == "missing"' "$rd/round.json" "the corrupt run reads as missing"
+assert_json '.reviewer_complete == false' "$rd/round.json" "a corrupt run is never complete"
+assert_json '.range.base' "$rd/round.json" "the round record is written at all"
 
 echo "pr-round: leftovers from an interrupted run are never read as this run's evidence"
 new_sandbox

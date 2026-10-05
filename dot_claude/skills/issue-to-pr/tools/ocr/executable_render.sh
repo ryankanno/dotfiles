@@ -25,7 +25,10 @@ fi
   exit 2
 }
 
-jq -r '
+# The jq can still fail on a review.json that exists but does not parse
+# (a truncated mid-write from a failing reviewer); the run must render as
+# the gap it is, never abort with no reviewer section at all.
+out="$(jq -r '
   def obj: if type == "object" then . else {} end;
   def arr: if type == "array" then . else [] end;
   def text: if type == "string" then . elif type == "null" then "unknown" else tojson end;
@@ -81,4 +84,8 @@ jq -r '
          | join("\n")) + "\n"
      end)
   + "- **Session:** \(.session_id // "unknown" | code)"
-' "$dir/review.json"
+' "$dir/review.json" 2>/dev/null)" || {
+  printf -- '- **Status:** `unparseable`. The run left review output that does not parse.\n'
+  exit 0
+}
+printf '%s\n' "$out"

@@ -134,7 +134,12 @@ record() { # mode dir status session exit_code
     '$r + [{mode: $m, dir: $d, status: $s, session_id: $sid, exit_code: $e}]')
 }
 status_of() { # dir
-  if [[ -f "$1/review.json" ]]; then jq -r '.status // "missing"' "$1/review.json"; else printf 'missing\n'; fi
+  # A corrupt review.json (truncated mid-write by a failing reviewer) reads
+  # as missing, so the round records the gap instead of aborting after the
+  # billed run with no round.json at all.
+  if [[ -f "$1/review.json" ]]; then
+    jq -r '.status // "missing"' "$1/review.json" 2>/dev/null || printf 'missing\n'
+  else printf 'missing\n'; fi
 }
 
 set +e
