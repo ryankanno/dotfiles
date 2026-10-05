@@ -136,10 +136,17 @@ step.
 **Cap: 3 refine rounds.** After a third round with findings remaining,
 stop and report unrecovered.
 
+**Converged candidate.** When the implementer reports a converged
+candidate (a round whose findings were all low and every one fixed,
+rejected, or accepted with a recorded reason, per pr-refine's value
+brake), send no further refine instructions; go straight to
+convergence. The asymptote ends where the dispositions do.
+
 ## 7. Convergence
 
-Only this skill declares the branch clean, and only on its own evidence.
-When the implementer reports clean (or the cap hits), run the full review
+Only this skill declares the branch clean or converged, and only on its
+own evidence. When the implementer reports clean, a converged
+candidate, or the cap hits, run the full review
 round yourself on the final SHA, and run the gate yourself. Gate the
 PR's code, not your checkout: run the gate in the implementer's
 worktree (`workmux path <handle>` prints it), after verifying the
@@ -148,9 +155,13 @@ worktree's HEAD equals the PR's headRefOid
 declares nothing.
 
 - both clean: the loop ends clean.
-- findings: one more refine round while rounds remain under the cap;
-  otherwise the loop ends unrecovered, with your findings quoted in the
-  report.
+- findings all low and every one dispositioned: your convergence
+  comment's verdict is `converged (all findings low and
+  dispositioned)` and the loop ends converged, with the accepted
+  judgment calls listed in the final report.
+- findings otherwise: one more refine round while rounds remain under
+  the cap; when the cap is spent, the loop ends unrecovered, with your
+  findings quoted in the report.
 
 ## 8. The final report
 
@@ -158,7 +169,9 @@ The last message of the run, verbatim to the future runner:
 
 - task ref (source locator and title), PR link
 - verdict: `clean` (convergence round found nothing and the gate printed
-  green), `capped-unrecovered` (findings remain after 3 rounds), or
+  green), `converged` (findings existed but the convergence round found
+  every one low and dispositioned; the accepted judgment calls are
+  listed), `capped-unrecovered` (findings remain after 3 rounds), or
   `blocked` (pane death after redispatch, no gate found, scan hit, or
   two empty reviewer results)
 - per-round one-liners: round number, short SHA, verdict, who ran it
@@ -181,6 +194,10 @@ The last message of the run, verbatim to the future runner:
   never failing.
 - **PR creation failed:** capture the pane's error, report blocked. Do
   not redispatch the whole task.
+- **Degraded critic harness:** if your own critic subagent cannot run,
+  commissioning findings elsewhere does not create a round. The
+  commissioned findings enter the next round as caller-supplied input,
+  the round numbering never moves, and no partial comment posts.
 
 ## Never
 

@@ -33,6 +33,11 @@ assert_not_contains() {
     FAIL=$((FAIL + 1)); printf 'FAIL: %s\n  unexpectedly present: %s\n' "$3" "$2"
   else PASS=$((PASS + 1)); fi
 }
+assert_json() {
+  if jq -e "$1" "$2" >/dev/null 2>&1; then PASS=$((PASS + 1)); else
+    FAIL=$((FAIL + 1)); printf 'FAIL: %s\n  expression: %s\n  file: %s\n' "$3" "$1" "$2"
+  fi
+}
 
 fixture_full() {
   jq -cn '{
@@ -275,7 +280,7 @@ for ((i = 0; i < $#; i++)); do
 done
 status="$STUB_RANGE_STATUS"
 if [[ "$mode" == "commit" ]]; then status="$STUB_COMMIT_STATUS"; fi
-printf '{"status":"%s","session_id":"stub-session","comments":[]}' "$status" >"$out"
+printf '{"status":"%s","session_id":"stub-session","comments":[],"summary":{"total_tokens":%s}}' "$status" "${STUB_TOKENS:-0}" >"$out"
 OCRSTUB
   chmod +x "$stub/gh" "$stub/ocr"
   export STUB_RANGE_STATUS=complete STUB_COMMIT_STATUS=complete
@@ -317,8 +322,7 @@ make_fixture_repo
 out=$(run_prr --repo "$repo" --pr 39 --round 1 --expect-branch loop/x-y-abc12345)
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
 assert_eq "$out" "$rd" "prints the round dir"
-jq -e '.reviewer_complete == true' "$rd/round.json" >/dev/null
-assert_eq "$?" 0 "reviewer_complete true"
+assert_json '.reviewer_complete == true' "$rd/round.json" "reviewer_complete true"
 assert_eq "$(jq '.runs | length' "$rd/round.json")" 1 "one run"
 assert_eq "$(jq -r '.runs[0].mode' "$rd/round.json")" "range" "range mode"
 assert_eq "$(jq -r '.range.head' "$rd/round.json")" "$FR_HEAD" "range head recorded"
@@ -331,8 +335,7 @@ make_fixture_repo
 export STUB_RANGE_STATUS=skipped STUB_COMMIT_STATUS=complete
 out=$(run_prr --repo "$repo" --pr 39 --round 1)
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
-jq -e '.reviewer_complete == true' "$rd/round.json" >/dev/null
-assert_eq "$?" 0 "reviewer_complete true after the commit retry"
+assert_json '.reviewer_complete == true' "$rd/round.json" "reviewer_complete true after the commit retry"
 assert_eq "$(jq '.runs | length' "$rd/round.json")" 2 "range plus one commit run"
 assert_eq "$(jq -r '.runs[0].status' "$rd/round.json")" "skipped" "the skip is recorded verbatim"
 
@@ -343,8 +346,7 @@ make_fixture_repo
 export STUB_RANGE_STATUS=skipped STUB_COMMIT_STATUS=skipped
 out=$(run_prr --repo "$repo" --pr 39 --round 1)
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
-jq -e '.reviewer_complete == false' "$rd/round.json" >/dev/null
-assert_eq "$?" 0 "reviewer_complete false"
+assert_json '.reviewer_complete == false' "$rd/round.json" "reviewer_complete false"
 assert_eq "$(jq '.runs | length' "$rd/round.json")" 2 "both runs recorded"
 
 echo "pr-round: an identity mismatch stops before anything runs"
@@ -368,5 +370,42 @@ run_prr --repo "$repo" --pr 39 --round 1 >/dev/null 2>&1
 rc=$?
 set -e
 assert_eq "$rc" 4 "merged PR exits 4"
+
+echo "pr-round: a second invocation into the same round is refused"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+export STUB_TOKENS=100
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+set +e
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null 2>&1
+rc=$?
+set -e
+assert_eq "$rc" 6 "second invocation exits 6 without --rerun"
+assert_eq "$(jq -r '.cumulative_tokens' "$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1/round.json")" "100" "the first run's evidence is intact"
+
+echo "pr-round: --rerun supersedes instead of clobbering"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+export STUB_TOKENS=100
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+export STUB_TOKENS=250
+out=$(run_prr --repo "$repo" --pr 39 --round 1 --rerun)
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
+assert_eq "$(find "$rd" -maxdepth 2 -name round.json | wc -l | tr -d ' ')" 2 "old and new round.json both exist"
+assert_json '.cumulative_tokens == 250' "$rd/round.json" "the fresh round.json is the active one"
+assert_json '.summary.total_tokens == 100' "$rd"/superseded-*/review.json "the superseded evidence is retained"
+
+echo "pr-round: cumulative tokens span rounds"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+export STUB_TOKENS=100
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+export STUB_TOKENS=250
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+rd2="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
+assert_json '.round_tokens == 250 and .cumulative_tokens == 350' "$rd2/round.json" "round 2 cumulative is 350 across both rounds"
 
 report

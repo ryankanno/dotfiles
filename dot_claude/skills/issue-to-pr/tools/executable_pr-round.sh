@@ -18,11 +18,11 @@
 set -euo pipefail
 
 usage() {
-  printf 'usage: pr-round.sh --repo <dir> --pr <n> --round <N> [--brief <file>] [--expect-branch <branch-name>]\n' >&2
+  printf 'usage: pr-round.sh --repo <dir> --pr <n> --round <N> [--brief <file>] [--expect-branch <branch-name>] [--rerun]\n' >&2
   exit 2
 }
 
-repo="" pr="" round="" brief="" expect=""
+repo="" pr="" round="" brief="" expect="" rerun=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --repo) [[ $# -ge 2 ]] || usage; repo="$2"; shift 2 ;;
@@ -30,6 +30,7 @@ while [[ $# -gt 0 ]]; do
     --round) [[ $# -ge 2 ]] || usage; round="$2"; shift 2 ;;
     --brief) [[ $# -ge 2 ]] || usage; brief="$2"; shift 2 ;;
     --expect-branch) [[ $# -ge 2 ]] || usage; expect="$2"; shift 2 ;;
+    --rerun) rerun=1; shift ;;
     *) usage ;;
   esac
 done
@@ -83,6 +84,24 @@ owner_repo=$(cd "$repo" && gh repo view --json nameWithOwner --jq .nameWithOwner
 round_dir="$HOME/.cache/pr-loop/$owner_repo/pr-$pr/round-$round"
 mkdir -p "$round_dir"
 
+# Evidence is never silently overwritten: a re-invocation into a round that
+# already holds a round.json is refused unless --rerun moves the old run
+# into a superseded-*/ subdirectory first.
+if [[ -f "$round_dir/round.json" ]]; then
+  if [[ -z "$rerun" ]]; then
+    printf 'round dir already holds a round.json; pass --rerun to supersede it\n' >&2
+    exit 6
+  fi
+  keep="$round_dir/superseded-$(date +%Y%m%d-%H%M%S)"
+  mkdir -p "$keep"
+  for f in round.json review.json stdout.txt stderr.txt cmd.txt exit.txt session.txt; do
+    if [[ -e "$round_dir/$f" ]]; then mv "$round_dir/$f" "$keep/"; fi
+  done
+  for d in "$round_dir"/commit-*; do
+    if [[ -e "$d" ]]; then mv "$d" "$keep/"; fi
+  done
+fi
+
 git -C "$repo" fetch -q origin "$base" "refs/pull/$pr/head"
 
 runs="[]"
@@ -120,12 +139,39 @@ else
   done < <(git -C "$repo" log --format=%H "origin/$base..$head")
 fi
 
+tokens_in() { # round.json -> the round's reviewer tokens
+  local total=0 t d
+  while IFS= read -r d; do
+    [[ -n "$d" ]] || continue
+    t=$(jq -r '.summary.total_tokens // 0' "$d/review.json" 2>/dev/null || printf '0')
+    total=$((total + t))
+  done < <(jq -r '.runs[].dir' "$1" 2>/dev/null)
+  printf '%s\n' "$total"
+}
+
+current_tokens=0
+while IFS= read -r d; do
+  [[ -n "$d" ]] || continue
+  t=$(jq -r '.summary.total_tokens // 0' "$d/review.json" 2>/dev/null || printf '0')
+  current_tokens=$((current_tokens + t))
+done < <(jq -r '.[].dir' <<<"$runs")
+
+prior_tokens=0
+for sibling in "$HOME/.cache/pr-loop/$owner_repo/pr-$pr"/round-*/round.json; do
+  [[ -f "$sibling" ]] || continue
+  t=$(jq -r '.round_tokens // 0' "$sibling" 2>/dev/null || printf '0')
+  if [[ "$t" == 0 ]]; then t=$(tokens_in "$sibling"); fi
+  prior_tokens=$((prior_tokens + t))
+done
+
 jq -n --arg pr "$pr" --arg url "$url" --arg base "$base" --arg head "$head" \
      --arg hb "$head_branch" --arg expect "$expect" \
-     --argjson round "$round" --argjson runs "$runs" --argjson complete "$complete" '
+     --argjson round "$round" --argjson runs "$runs" --argjson complete "$complete" \
+     --argjson rt "$current_tokens" --argjson ct "$((current_tokens + prior_tokens))" '
   {pr: $pr, url: $url, round: $round,
    identity: {expected_branch: (if $expect == "" then null else $expect end),
               head_branch: $hb},
    range: {base: $base, head: $head, exact: "\($base)..\($head)"},
-   runs: $runs, reviewer_complete: $complete}' > "$round_dir/round.json"
+   runs: $runs, reviewer_complete: $complete,
+   round_tokens: $rt, cumulative_tokens: $ct}' > "$round_dir/round.json"
 printf '%s\n' "$round_dir"

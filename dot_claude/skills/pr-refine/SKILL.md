@@ -40,6 +40,12 @@ The objective is the reader's value, not the critic's zero.
   implementer's recorded judgment: fix them when the fix is cheap and
   harmless, accept them with a reason otherwise. An accepted finding is
   never silently dropped.
+- **Converged candidate.** When a round's findings are all low and
+  every one is fixed, rejected, or accepted with a recorded reason,
+  report "converged candidate" to the orchestrator with the
+  Dispositions block attached, and start no further fixes. The
+  orchestrator decides; only its convergence round writes the converged
+  verdict.
 
 ## 1. Read the round
 
@@ -54,8 +60,10 @@ gh pr view <n> --json comments --jq '[.comments[] | select(.author.login == "<lo
 ```
 
 The verdict line is one of
-`No issues found.`, `<n> finding(s).`, or
-`unrecovered (the reviewer produced no review text)`.
+`No issues found.`, `<n> finding(s).`,
+`unrecovered (the reviewer produced no review text)`, or
+`converged (all findings low and dispositioned)`. A converged verdict
+means the orchestrator closed the loop: nothing to fix, no new round.
 
 ## 2. Validate every finding
 
@@ -70,11 +78,20 @@ git diff origin/<base>...<head>
   recorded.
 - The finding describes a defect or a real risk, not a preference.
 - Fixing it stays inside the brief's scope.
+- The finding is not already dispositioned: check the prior rounds'
+  Dispositions blocks; a re-flag without materially new evidence is
+  rejected with a pointer to the recorded reason.
 
-Rejected findings never reach the PR comment; they go in the loop's
-final report.
+Rejected findings appear in this round's comment, in the Dispositions
+block, with their reasons — durable on the PR where every later round
+reads them — and in the loop's final report.
 
-## 3. Fix under TDD
+## 3. Fix under TDD — only what the previous round named
+
+Fix only the findings named by the previous round's comment. Anything
+this round's own sources discover mid-round is recorded as input for
+the next round, not fixed here: one instruction, one fix pass, one
+re-run.
 
 Behavior findings: write the failing test that mirrors the user-facing
 entrypoint first, then the code that passes it. Minimize mocks; no
@@ -95,22 +112,26 @@ Conventional commits (`type(scope): description`), behavioral and
 structural changes in separate commits, no attribution trailers. Push,
 never force.
 
-## 6. Re-run the round
+## 6. Re-run the round — once
 
 Run the full review round exactly as
 `~/.claude/skills/pr-review/SKILL.md` defines it, over the new head
-SHA, and post the round's comment per `report-template.md` with the
-round number incremented.
+SHA — once, at the end, over the final head, never once per
+intermediate head. Post the round's comment per `report-template.md`
+with the round number incremented, the Dispositions block, and the
+cumulative cost line from round.json.
 
 ## 7. Report back
 
-Clean or findings-remaining, to the orchestrator or the human, with
-the judgment calls listed. The convergence decision is never this
-skill's: only the orchestrator's own review plus gate declares the
-branch clean.
+Clean, findings-remaining, or converged candidate, to the orchestrator
+or the human, with the judgment calls listed. The convergence decision
+is never this skill's: only the orchestrator's own review plus gate
+declares the branch clean or converged.
 
 ## Never
 
+- Never fix a finding the previous round's comment did not name.
+- Never re-run the reviewer twice in one round.
 - Never fix a finding by adding machinery beyond it.
 - Never force-push, and never push before the round's gate is green.
 - Never report an empty reviewer result as clean or as a failure.

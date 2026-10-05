@@ -55,6 +55,10 @@ with nothing from any source, the verdict is `unrecovered (the reviewer
 produced no review text)`, which /pr-refine reads as neither clean nor
 failing, and the loop cannot declare the branch clean off that round.
 
+The round's cost is a fact the comment carries: `round.json`'s
+`cumulative_tokens` becomes the template's Cost line, so a reader can
+see what the loop has spent to date.
+
 ## 3. The adversarial critic
 
 Resolve the critic from the manifest and follow its binding file
@@ -79,6 +83,11 @@ Read the diff against the brief yourself:
   high-severity finding.
 - **Gate output:** in refine and convergence rounds, scrutinize the
   gate transcript, not its exit code alone.
+- **Corroboration:** agreement between two sources counts only when
+  both could see the code the claim is about. A factual dispute
+  settles against the code, not by counting sources.
+- **Same head:** if this round runs over the same head as the prior
+  round, cite new evidence against that verdict or defer to it.
 
 ## 5. Assemble the comment
 

@@ -11,11 +11,16 @@ gets fixed.
 - `<n> finding(s).` — findings exist, counted across the sources that ran.
 - `unrecovered (the reviewer produced no review text)` — neither clean
   nor failing; the loop cannot declare the branch clean off that round.
+- `converged (all findings low and dispositioned)` — the orchestrator's
+  convergence round only: findings existed, every one low and fixed,
+  rejected, or accepted with a recorded reason. The loop ends unless a
+  human names a finding.
 
 **Loop end states** (the final message, the runner's contract): `clean`,
-`capped-unrecovered` (findings remain after 3 refine rounds), `blocked`
-(pane death after redispatch, no gate, scan hit, or an unrecovered
-reviewer with nothing from any source).
+`converged` (all findings low and dispositioned; accepted judgment calls
+listed), `capped-unrecovered` (findings remain after 3 refine rounds),
+`blocked` (pane death after redispatch, no gate, scan hit, or an
+unrecovered reviewer with nothing from any source).
 
 ## The loop
 
@@ -36,8 +41,10 @@ flowchart TD
     H --> I{"Verdict"}
     I -- "No issues found" --> J["Convergence<br/>the orchestrator runs pr-round.sh itself<br/>and gates in the implementer worktree,<br/>after rev-parse HEAD equals headRefOid"]
     I -- "findings" --> K{"Refine rounds<br/>under the cap of 3?"}
-    K -- "yes" --> L["workmux send: run pr-refine<br/>validate findings, value brake,<br/>severity gates effort, TDD fix,<br/>gate, commit, push, re-run the round"]
-    L --> R
+    K -- "yes" --> L["workmux send: run pr-refine<br/>named findings only, one re-run,<br/>validate, value brake, severity gates,<br/>TDD fix, gate, commit, push"]
+    L --> RC{"All findings low and<br/>all dispositioned?"}
+    RC -- "yes: converged candidate" --> J
+    RC -- "no" --> R
     I -- "unrecovered" --> P["Neither clean nor failing;<br/>nothing to fix, no clean claim"]
     K -- "no" --> M["Capped-unrecovered:<br/>findings remain after 3 rounds"]
     J --> N{"Convergence round clean<br/>and the gate green?"}

@@ -25,6 +25,15 @@ reads quickly and loses nothing.
     the reviewer binding ended unrecovered and no other source produced
     a finding. Neither clean nor failed; /pr-refine has nothing to fix,
     and the loop cannot declare the branch clean off this round.
+  - `**Verdict:** converged (all findings low and dispositioned).` —
+    only the orchestrator's convergence round writes this: findings
+    exist, every one is low, and every one is fixed, rejected, or
+    accepted with a recorded reason in the Dispositions block. The loop
+    ends here unless a human names a specific finding.
+- **A round over an unchanged head must address the prior verdict:**
+  cite new evidence against it, or defer to it. Two comments on the
+  same SHA that disagree, with nothing reconciling them, corrupt the
+  record a human reads.
 - **The reviewer's status is visible when it changes what the verdict
   means.** If the binding produced no review text, a line
   `**Reviewer:** unrecovered: <its message, verbatim>` sits above the
@@ -45,6 +54,8 @@ Visible, in this order:
 
 **Gate:** <command> printed <its final result>   (refine and convergence rounds only)
 
+**Cost:** <cumulative_tokens> reviewer tokens to date, across rounds 1..N (from round.json)
+
 **Findings:**
 <N. **[reviewer|critic|read] category/severity** `file:line`: claim>
 ```
@@ -53,8 +64,8 @@ Each finding is one line, tagged with its source: `[reviewer]` for the
 reviewer binding's output, `[critic]` for the adversarial subagent,
 `[read]` for the caller's own read. Number across all sources, highest
 severity first. A finding the caller rejected while validating the diff
-does not appear; the rejected list belongs to the loop's final report,
-not the PR.
+does not appear in Findings; it appears in the Dispositions block with
+its reason, so no later round re-litigates it.
 
 Then, collapsed, each with blank lines inside the block (without them
 GitHub renders the content as literal text):
@@ -75,6 +86,13 @@ GitHub renders the content as literal text):
 <details><summary>Caller's read</summary>
 
 <the caller's own findings, verbatim; "No findings." is a valid entry>
+
+</details>
+
+<details><summary>Dispositions</summary>   (whenever a finding was rejected or accepted, never silently dropped)
+
+- Rejected: <finding, one line> — <the reason, with the evidence>
+- Accepted: <finding, one line> — <the reason>
 
 </details>
 
