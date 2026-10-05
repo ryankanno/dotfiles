@@ -351,7 +351,8 @@ ln -s "$WS/victim.md" "$WS/body.md"
 HOME=/Users/someone "$SCAN" "$WS/body.md" >/dev/null 2>&1
 assert_eq "$?" 0 "exits 0"
 assert_contains "$(cat "$WS/victim.md")" '/Users/someone/x' "the symlink target is untouched"
-assert_contains "$(cat "$WS/body.md")" '~/x' "the link itself now carries the redacted body"
+assert_not_contains "$(cat "$WS/body.md")" '/Users/someone' "the redacted body carries no raw home"
+assert_contains "$(cat "$WS/body.md")" '~' "the redacted body carries the tilde"
 
 echo "scan: a bare own home is blocked rather than half-redacted"
 new_sandbox
