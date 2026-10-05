@@ -197,10 +197,11 @@ The last message of the run, verbatim to the future runner:
 - per-round one-liners: round number, short SHA, verdict, who ran it
 - the gate: the command and its final printed result
 - anything a scan blocked, with the line it caught
-- reviewer session ids and token totals (the last round's `round.json`
-  `cumulative_tokens`, which counts the evidence that stands;
-  superseded runs stay on disk uncounted), reviewer and critic
-  bindings used, ocr version
+- reviewer session ids and token totals (the newest round comment's
+  Cost line: the `cumulative_tokens` its round.json carried when it was
+  written; a rerun of an earlier round afterwards does not recompute
+  later rounds' round.json, so say so plainly when one happened),
+  reviewer and critic bindings used, ocr version
 - the PR comment links, one per round
 
 Before the final message is spoken, write the report verbatim to
