@@ -109,10 +109,10 @@ blocks when they contain markup.
 ## Scan before posting
 
 ```bash
-grep -nE "$HOME|$USER|/Users/|/home/|/private/|/var/folders/|127\.0\.0\.1|localhost|(sk|ghp|gho|ghu|ghs|ghr|github_pat)[-_][A-Za-z0-9_]{10,}|AKIA[0-9A-Z]{16}|ASIA[0-9A-Z]{16}|xox[baprs]-[A-Za-z0-9-]{10,}|glpat-[A-Za-z0-9_-]{20,}|npm_[A-Za-z0-9]{20,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|[Bb]earer " <file>
+~/.claude/skills/issue-to-pr/tools/scan.sh <file>
 ```
 
-Replace a home-directory path with `~`. Anything else it finds (a temp
-path, a local URL, a token): do not post; record the line and surface it
-in the loop's final report. In an interactive round, show the lines and
-wait instead.
+The script replaces home-directory paths with `~` in place. Exit 1
+means a hit remains (another home path, a temp path, a token): do not
+post; record the printed lines and surface them in the loop's final
+report. In an interactive round, show the lines and wait instead.

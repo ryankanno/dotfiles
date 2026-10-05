@@ -254,6 +254,59 @@ assert_eq "$rc1" 2 "relative out rejected"
 assert_eq "$rc2" 2 "relative brief rejected"
 assert_not_contains "$(cat "$WS/args.txt")" "review" "never invoked the tool"
 
+SCAN="$TOOLS/executable_scan.sh"
+scan() { # body text -> OUT, RC, BODY (the file after the scan)
+  printf '%s\n' "$1" >"$WS/body.md"
+  set +e; OUT="$(HOME=/Users/someone "$SCAN" "$WS/body.md" 2>&1)"; RC=$?; set -e
+  BODY="$(cat "$WS/body.md")"
+}
+
+echo "scan: a clean body passes untouched"
+new_sandbox
+scan 'Review round 1: no issues found.'
+assert_eq "$RC" 0 "exits 0"
+assert_eq "$BODY" 'Review round 1: no issues found.' "body untouched"
+
+echo "scan: the home path becomes ~ and passes"
+new_sandbox
+scan 'see /Users/someone/src/app/main.py:4'
+assert_eq "$RC" 0 "exits 0"
+assert_eq "$BODY" 'see ~/src/app/main.py:4' "home redacted in place"
+
+echo "scan: provider keys with inner hyphens are caught"
+for key in sk-ant-api03-AbCdEfGhIjKlMnOpQrStUv sk-proj-AbCdEfGhIjKlMnOpQrStUv sk-AbCdEfGhIjKlMnOpQrStUv; do
+  new_sandbox
+  scan "leaked $key here"
+  assert_eq "$RC" 1 "blocks ${key%%-A*}"
+  assert_contains "$OUT" "1:leaked $key here" "prints the hit line for ${key%%-A*}"
+done
+
+echo "scan: other token formats are caught"
+for tok in ghp_AbCdEfGhIjKlMnOpQrStUvWxYz012345 github_pat_11AbCdEfGhIjKlMnOpQrSt AKIAABCDEFGHIJKLMNOP \
+  xoxb-1234567890-abcdef glpat-AbCdEfGhIjKlMnOpQrSt npm_AbCdEfGhIjKlMnOpQrStUvWx \
+  '-----BEGIN OPENSSH PRIVATE KEY-----' 'Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.abcdef'; do
+  new_sandbox
+  scan "x $tok"
+  assert_eq "$RC" 1 "blocks ${tok:0:12}"
+done
+
+echo "scan: other home and temp paths are caught"
+for p in /Users/other/x /home/other/x /private/tmp/x /var/folders/ab/x; do
+  new_sandbox
+  scan "at $p"
+  assert_eq "$RC" 1 "blocks $p"
+done
+
+echo "scan: ordinary code under review is not a leak"
+new_sandbox
+scan 'the owner someone/repo serves http://localhost:3000 on 127.0.0.1; a bearer token check; grep -E "/Users/|/home/|sk-[A-Za-z0-9_-]{20,}"'
+assert_eq "$RC" 0 "exits 0"
+
+echo "scan: no file is a usage error"
+new_sandbox
+set +e; OUT="$("$SCAN" "$WS/nope.md" 2>&1)"; RC=$?; set -e
+assert_eq "$RC" 2 "usage error exits 2"
+
 PRR="$TOOLS/executable_pr-round.sh"
 
 make_pr_round_env() {

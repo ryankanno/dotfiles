@@ -106,10 +106,16 @@ text).` when the binding ended unrecovered with nothing else to report.
 
 ## 6. Scan before posting
 
-Write the body to a file, never inline. Search it before it leaves the
-machine (the pattern from [`report-template.md`](report-template.md)):
-home paths become `~`. Any other hit, a temp path, a local URL, or a
-token: **do not post**. Record the line. Unattended does not mean
+Write the body to a file, never inline. Scan it before it leaves the
+machine:
+
+```bash
+~/.claude/skills/issue-to-pr/tools/scan.sh <file>
+```
+
+The script rewrites home paths to `~` in place. Exit 0: post the file.
+Exit 1: it printed each remaining hit (another home path, a temp path,
+or a token); **do not post**. Record the lines. Unattended does not mean
 leaked; the blocked post surfaces in the loop's final report.
 
 ## 7. Post
