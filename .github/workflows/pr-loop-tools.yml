@@ -17,7 +17,12 @@ concurrency:
 
 jobs:
   tests:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # The tools deploy to macOS with its bash 3.2; the suite's
+        # system-shell assertions only bite on that runner.
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
