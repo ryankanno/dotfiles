@@ -31,7 +31,7 @@ fi
 # touch stays for the patterns to block: fail-closed, never silently
 # half-redacted. The replacement rides quoted so no shell expands it.
 body="$(<"$file")" || { printf 'scan failed (unreadable body)\n' >&2; exit 2; }
-printf '%s\n' "${body//"$HOME\/"/"~/"}" >"$file"
+printf '%s\n' "${body//"$HOME/"/"~/"}" >"$file"
 
 # Token patterns require the variable part (a key body). Home and temp
 # patterns require the first path segment (a username, a scratch name,
