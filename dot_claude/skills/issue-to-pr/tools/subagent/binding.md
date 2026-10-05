@@ -14,16 +14,21 @@ discussion and no stake, not file-blindness.
 Give the subagent, as its entire input:
 
 1. this directory's `critic-prompt.md` as its instructions,
-2. the unified diff of the PR range
-   (`git -C <repo> diff <resolved-base>...<resolved-head>`),
+2. the unified diff to attack: in round 1, the whole PR range
+   (`git -C <repo> diff <resolved-base>...<resolved-head>`); from round
+   2 on, only the delta since the prior round's head
+   (`git -C <repo> diff <range.prior_head> <headRefOid>`, both from
+   `round.json`). Code outside the delta was reviewed in earlier rounds
+   and a finding there can only be a follow-up, so handing the critic
+   the whole PR again buys nothing that changes the round (measured on
+   PR 40: 1.0M to 2.4M tokens per refine round, with the delta 8 to 28
+   percent of the full diff),
 3. the task brief file, so it knows what the change claimed to do,
 4. the prior rounds' dispositions (fixed, rejected, and accepted
    findings with their evidence, from the Dispositions blocks of the
    previous round comments): re-flagging a dispositioned finding
-   without materially new evidence is out of contract,
-5. from round 2 on, the delta since the prior round's head
-   (`git -C <repo> diff <range.prior_head> <headRefOid>`, both from
-   `round.json`): what the last refine changed.
+   without materially new evidence is out of contract, and from round 2
+   on the Fixed lines are what the delta claims to fix.
 
 The subagent also gets **read access to the repository at the PR head
 SHA** (`git -C <repo> show <headRefOid>:<path>`), so it can verify

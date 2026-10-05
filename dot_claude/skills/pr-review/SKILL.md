@@ -87,13 +87,15 @@ see what the loop has spent to date.
 Resolve the critic from the manifest and follow its binding file
 (`~/.claude/skills/issue-to-pr/tools/<critic>/binding.md`) for how to
 spawn it: a fresh, clean-context subagent, given the binding's critic
-prompt, the diff, the brief, and from round 2 on the delta since the
-prior round's head. Its findings arrive numbered with
-file, line, the claim, the break, and severity. Findings that do not
-reference the diff are dropped, per the binding's contract.
+prompt, the brief, the dispositions, and one diff: the whole PR in
+round 1, only the delta since the prior round's head from round 2 on.
+Its findings arrive numbered with file, line, the claim, the break, and
+severity. Findings that do not reference that diff are dropped, per the
+binding's contract.
 
 ```bash
-git -C <repo> diff origin/<baseRefName>...<headRefOid>
+git -C <repo> diff origin/<baseRefName>...<headRefOid>   # round 1
+git -C <repo> diff <range.prior_head> <headRefOid>       # round 2 on
 ```
 
 ## 4. The caller's own read
