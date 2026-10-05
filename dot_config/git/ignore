@@ -25,3 +25,5 @@ Thumbs.db
 tags
 
 **/.claude/settings.local.json
+
+.worktrees/
