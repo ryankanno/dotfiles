@@ -948,6 +948,17 @@ run_prr --repo "$repo" --pr 39 --round 3 >/dev/null
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-3"
 assert_eq "$(cat "$rd/delta.txt")" $'f.txt:2-2\nf.txt:4-4' "both hunks stay on the real file"
 
+echo "pr-round: a path containing the header split sequence stays whole in the delta"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+mkdir -p "$repo/dir b"
+advance_head 'dir b/name.txt' 'x\ny\n'
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
+assert_eq "$(cat "$rd/delta.txt")" "dir b/name.txt:1-2" "the spaced path keeps its hunk"
+
 SCOPE="$TOOLS/executable_finding-scope.sh"
 
 echo "finding-scope: a finding on a changed line is new, elsewhere reviewed"

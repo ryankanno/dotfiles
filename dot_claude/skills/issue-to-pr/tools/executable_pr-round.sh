@@ -195,14 +195,21 @@ if [[ -n "$prior_head" ]] && ! git -C "$repo" cat-file -e "$prior_head^{commit}"
 fi
 delta=""
 if [[ -n "$prior_head" ]]; then
-  git -C "$repo" -c core.quotePath=false diff -U0 --no-color --no-ext-diff \
-      --src-prefix=a/ --dst-prefix=b/ "$prior_head" "$head" \
-    | awk '/^diff --git / { p = ""; if (match($0, / b\/.*$/)) p = substr($0, RSTART + 3); next }
-           /^@@ / && p != "" {
-             n = split(substr($3, 2), a, ",")
-             cnt = (n > 1) ? a[2] : 1
-             if (cnt > 0) print p ":" a[1] "-" (a[1] + cnt - 1)
-           }' >"$round_dir/delta.txt"
+  # The git header line is inherently ambiguous for paths holding the
+  # header split sequence itself, so the hunks enumerate per file: the
+  # name list is unambiguous, and each diff then belongs to exactly one
+  # path with nothing left to parse out of a header.
+  : >"$round_dir/delta.txt"
+  while IFS= read -r p; do
+    [[ -n "$p" ]] || continue
+    git -C "$repo" -c core.quotePath=false diff -U0 --no-color --no-ext-diff \
+        "$prior_head" "$head" -- "$p" \
+      | awk -v p="$p" '/^@@ / {
+          n = split(substr($3, 2), a, ",")
+          cnt = (n > 1) ? a[2] : 1
+          if (cnt > 0) print p ":" a[1] "-" (a[1] + cnt - 1)
+        }' >>"$round_dir/delta.txt"
+  done < <(git -C "$repo" -c core.quotePath=false diff --name-only --no-color "$prior_head" "$head")
   delta=$(cat "$round_dir/delta.txt")
 fi
 
