@@ -157,6 +157,16 @@ render
 assert_eq "$RC" 0 "exits 0"
 assert_contains "$OUT" '~~~~' "fence beats the longest run"
 
+echo "renderer: a multi-line suggestion keeps the whole block in the list item"
+new_sandbox
+fixture_minimal '{"status":"complete","comments":[
+  {"path":"a.py","content":"c","suggestion_code":"line one\nline two","start_line":1,"category":"bug","severity":"low"}]}'
+render
+assert_eq "$RC" 0 "exits 0"
+assert_eq "$(printf '%s\n' "$OUT" | grep -cE '^~~~~$')" 0 "no fence at column 0"
+assert_eq "$(printf '%s\n' "$OUT" | grep -cE '^  ~~~+$')" 2 "open and close fences are indented"
+assert_contains "$OUT" '  line two' "content lines are indented"
+
 echo "renderer: failed files are listed"
 new_sandbox
 fixture_minimal '{"status":"complete","comments":[],

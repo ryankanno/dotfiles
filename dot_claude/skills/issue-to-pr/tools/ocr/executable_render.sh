@@ -58,7 +58,14 @@ jq -r '
        "- **Findings:**\n"
        + ([$cs | to_entries[]
            | "- \(.key + 1). **\(.value.category // "uncategorized" | text | safe)/\(.value.severity // "unknown" | text | safe)** \(.value.path // "unknown file" | code):\(.value.start_line // "?")-\(.value.end_line // .value.start_line // "?"): \(.value.content | text | safe | oneline)"
-             + (if (.value.suggestion_code // null) != null then "\n\n  " + (.value.suggestion_code | text | safe | fenced) else "" end)]
+         + (if (.value.suggestion_code // null) != null then
+             # Every line of the fenced block carries the list indent;
+             # content or a closing fence at column 0 ends the list item
+             # and leaves a fence open that swallows the rest of the
+             # comment.
+             "\n\n" + ((.value.suggestion_code | text | safe | fenced)
+                        | split("\n") | map("  " + .) | join("\n"))
+           else "" end)]
          | join("\n")) + "\n"
      end)
   + "- **Session:** \(.session_id // "unknown" | code)"
