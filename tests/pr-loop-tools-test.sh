@@ -307,6 +307,37 @@ new_sandbox
 set +e; OUT="$("$SCAN" "$WS/nope.md" 2>&1)"; RC=$?; set -e
 assert_eq "$RC" 2 "usage error exits 2"
 
+BRANCH="$TOOLS/executable_branch-name.sh"
+branch() { # stdin text, args -> OUT, RC
+  set +e; OUT="$("$BRANCH" "$@" 2>&1)"; RC=$?; set -e
+}
+
+echo "branch-name: slug and hash follow the documented rule"
+branch --type gh --locator 'owner/repo#12' --title 'Fix: the Thing (v2)!' <<<'Fix the thing'
+assert_eq "$RC" 0 "exits 0"
+assert_eq "$OUT" "loop/gh-fix-the-thing-v2-e29971a8" "slug lowercased and hyphenated, hash over locator, newline, text"
+
+echo "branch-name: trailing newlines in the item text do not re-key"
+OUT1="$(printf 'Fix the thing\n\n\n' | "$BRANCH" --type gh --locator 'owner/repo#12' --title t)"
+OUT2="$(printf 'Fix the thing' | "$BRANCH" --type gh --locator 'owner/repo#12' --title t)"
+assert_eq "$OUT1" "$OUT2" "same name either way"
+
+echo "branch-name: an edited source re-keys the hash"
+OUT1="$("$BRANCH" --type md --locator 'todo.md:4' --title t <<<'one')"
+OUT2="$("$BRANCH" --type md --locator 'todo.md:4' --title t <<<'two')"
+assert_eq "$([[ "$OUT1" != "$OUT2" ]] && printf differ || printf same)" "differ" "different hash"
+
+echo "branch-name: a long or symbol-only title stays a valid ref"
+branch --type html --locator 'a.html#x' --title "$(printf 'word %.0s' {1..20})" <<<'x'
+slug="${OUT#loop/html-}"; slug="${slug%-*}"
+assert_eq "$([[ ${#slug} -le 40 && "$slug" != *- ]] && printf ok || printf "bad:$slug")" "ok" "slug capped at 40, no trailing hyphen"
+branch --type html --locator 'a.html#x' --title '!!!' <<<'x'
+assert_contains "$OUT" "loop/html-task-" "empty slug falls back to task"
+
+echo "branch-name: an unknown source type is a usage error"
+branch --type jira --locator x --title t <<<'x'
+assert_eq "$RC" 2 "usage error exits 2"
+
 PRR="$TOOLS/executable_pr-round.sh"
 
 make_pr_round_env() {

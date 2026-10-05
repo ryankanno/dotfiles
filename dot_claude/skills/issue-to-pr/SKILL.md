@@ -70,15 +70,20 @@ mutated; checkboxes stay unticked; the PR is the record.
 
 ## 2. Idempotency before creation
 
-The `<branch-name>` is deterministic:
-`loop/<source-type>-<slug>-<hash8>`, where `<hash8>` is the first 8
-hex characters of sha256 over the UTF-8 bytes of the source locator, a
-newline, then the item text, in that order. Every step below spells the
-full `<branch-name>`; there is no shorter form to substitute.
+The `<branch-name>` is deterministic,
+`loop/<source-type>-<slug>-<hash8>`, and computed by the tool, never by
+hand. `<source-type>` is `gh`, `md`, or `html`; the item text is the
+extracted task from the brief.
 
 ```bash
+~/.claude/skills/issue-to-pr/tools/branch-name.sh \
+  --type <source-type> --locator <source locator> --title <title> \
+  < <item-text-file>
 gh pr list --state open --head <branch-name>
 ```
+
+Every step below spells the full `<branch-name>` it printed; there is no
+shorter form to substitute.
 
 An existing PR means a previous run: do not create anything. Verify its
 state and resume the loop at step 5. If the prior run left
