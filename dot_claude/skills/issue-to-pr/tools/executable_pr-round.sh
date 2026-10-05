@@ -13,7 +13,8 @@
 #                each run's outputs plus round.json (range, identity, runs,
 #                reviewer_complete), and the directory path on stdout.
 # Exit codes: 0 the round ran; 2 usage; 3 identity mismatch; 4 the PR is
-# missing, not open, or not resolvable; 6 the round dir already holds
+# missing, not open, or not resolvable; 5 the repository or its refs could
+# not be resolved on the network; 6 the round dir already holds
 # evidence and --rerun was not passed; 127 a dependency is missing. A
 # review run's own failure is recorded in round.json, not propagated.
 set -euo pipefail
@@ -87,9 +88,27 @@ if [[ -n "$expect" && "$cross" == true ]]; then
   exit 3
 fi
 
-owner_repo=$(cd "$repo" && gh repo view --json nameWithOwner --jq .nameWithOwner)
+owner_repo=$(cd "$repo" && gh repo view --json nameWithOwner --jq .nameWithOwner) || {
+  printf 'cannot resolve the repository at %s\n' "$repo" >&2
+  exit 5
+}
 round_dir="$HOME/.cache/pr-loop/$owner_repo/pr-$pr/round-$round"
 mkdir -p "$round_dir"
+
+# The refs resolve before any prior evidence is touched: a network or
+# resolution failure must leave the round dir exactly as it was, not
+# half-superseded with the old round.json already moved away.
+git -C "$repo" fetch -q origin "$base" "refs/pull/$pr/head" || {
+  printf 'cannot fetch the PR refs from origin\n' >&2
+  exit 5
+}
+# round.json records the base by SHA, not by a moving branch name: two
+# rounds over the same head must name the same range whatever main did
+# in between.
+base_sha=$(git -C "$repo" rev-parse "origin/$base") || {
+  printf 'cannot resolve origin/%s\n' "$base" >&2
+  exit 5
+}
 
 # Evidence is never silently overwritten or reused: a re-invocation into a
 # round that already holds anything besides superseded runs, including the
@@ -108,12 +127,6 @@ if [[ ${#leftovers[@]} -gt 0 ]]; then
   mkdir -p "$keep"
   mv "${leftovers[@]}" "$keep/"
 fi
-
-git -C "$repo" fetch -q origin "$base" "refs/pull/$pr/head"
-# round.json records the base by SHA, not by a moving branch name: two
-# rounds over the same head must name the same range whatever main did
-# in between.
-base_sha=$(git -C "$repo" rev-parse "origin/$base")
 
 runs="[]"
 record() { # mode dir status session exit_code

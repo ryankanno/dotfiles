@@ -563,6 +563,19 @@ export STUB_TOKENS=50
 run_prr --repo "$repo" --pr 39 --round 1 --rerun >/dev/null
 assert_json '.cumulative_tokens == 50' "$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1/round.json" "round 2 is not to date for round 1"
 
+echo "pr-round: a failed fetch supersedes nothing and exits 5"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+export STUB_TOKENS=100
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+git -C "$repo" remote set-url origin "$WS/nowhere.git"
+run_prr --repo "$repo" --pr 39 --round 1 --rerun >/dev/null 2>&1
+rc=$?
+assert_eq "$rc" 5 "an unresolvable origin exits 5"
+assert_json '.cumulative_tokens == 100' "$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1/round.json" "the prior evidence is untouched"
+assert_eq "$(find "$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1" -maxdepth 1 -name 'superseded-*' | wc -l | tr -d ' ')" 0 "nothing was superseded"
+
 echo "pr-round: a fork PR with the loop's branch name fails the identity check"
 new_sandbox
 make_pr_round_env
