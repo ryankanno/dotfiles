@@ -18,6 +18,7 @@ concurrency:
 jobs:
   tests:
     strategy:
+      fail-fast: false
       matrix:
         # The tools deploy to macOS with its bash 3.2; the suite's
         # system-shell assertions only bite on that runner.
