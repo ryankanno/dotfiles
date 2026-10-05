@@ -131,7 +131,10 @@ if [[ "$range_status" == complete ]]; then
 else
   complete=false
   # Empty or incomplete range result: retry once per commit in the range.
-  i=0
+  # The round is complete only when every commit run completed; one
+  # success among failures is partial coverage, never a clean review.
+  recovered=1
+  commit_runs=0
   while read -r sha; do
     [[ -n "$sha" ]] || continue
     i=$((i + 1))
@@ -142,8 +145,10 @@ else
     set -e
     cstatus=$(status_of "$commit_dir")
     record "commit:$sha" "$commit_dir" "$cstatus" "$(cat "$commit_dir/session.txt" 2>/dev/null || true)" "$crc"
-    if [[ "$cstatus" == complete ]]; then complete=true; fi
+    commit_runs=$((commit_runs + 1))
+    [[ "$cstatus" == complete ]] || recovered=0
   done < <(git -C "$repo" log --format=%H "origin/$base..$head")
+  if [[ $commit_runs -gt 0 && $recovered -eq 1 ]]; then complete=true; fi
 fi
 
 tokens_in() { # round.json -> the round's reviewer tokens

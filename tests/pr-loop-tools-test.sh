@@ -370,21 +370,24 @@ esac
 GHSTUB
   cat >"$stub/ocr" <<'OCRSTUB'
 #!/usr/bin/env bash
-out=""; mode="range"
+out=""; mode="range"; csha=""
 args=("$@")
 for ((i = 0; i < $#; i++)); do
   case "${args[$i]}" in
     --output) out="${args[$((i + 1))]}" ;;
     --from) mode="range" ;;
-    --commit) mode="commit" ;;
+    --commit) mode="commit"; csha="${args[$((i + 1))]}" ;;
   esac
 done
+if [[ "$mode" == "commit" && -n "$STUB_FAIL_ON_COMMIT" && "$csha" == "$STUB_FAIL_ON_COMMIT" ]]; then
+  exit 3
+fi
 status="$STUB_RANGE_STATUS"
 if [[ "$mode" == "commit" ]]; then status="$STUB_COMMIT_STATUS"; fi
 printf '{"status":"%s","session_id":"stub-session","comments":[],"summary":{"total_tokens":%s}}' "$status" "${STUB_TOKENS:-0}" >"$out"
 OCRSTUB
   chmod +x "$stub/gh" "$stub/ocr"
-  export STUB_RANGE_STATUS=complete STUB_COMMIT_STATUS=complete
+  export STUB_RANGE_STATUS=complete STUB_COMMIT_STATUS=complete STUB_FAIL_ON_COMMIT=""
 }
 
 make_fixture_repo() {
@@ -449,6 +452,22 @@ out=$(run_prr --repo "$repo" --pr 39 --round 1)
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
 assert_json '.reviewer_complete == false' "$rd/round.json" "reviewer_complete false"
 assert_eq "$(jq '.runs | length' "$rd/round.json")" 2 "both runs recorded"
+
+echo "pr-round: a partial per-commit recovery is reviewer_complete false"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+printf 'c\n' >"$repo/f.txt"
+git -C "$repo" commit -qam third
+FR_HEAD3=$(git -C "$repo" rev-parse HEAD)
+git -C "$repo" push -q origin "HEAD:refs/pull/39/head"
+export GH_PR_JSON='{"state":"OPEN","baseRefName":"main","headRefOid":"'"$FR_HEAD3"'","headRefName":"loop/x-y-abc12345","url":"https://example.test/39"}'
+export STUB_RANGE_STATUS=skipped STUB_COMMIT_STATUS=complete STUB_FAIL_ON_COMMIT="$FR_HEAD"
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
+assert_json '.reviewer_complete == false' "$rd/round.json" "one unreviewed commit keeps the round incomplete"
+assert_eq "$(jq '.runs | length' "$rd/round.json")" 3 "range plus two commit runs"
+assert_eq "$(jq -r '.runs[2].status' "$rd/round.json")" "missing" "the failed retry is recorded verbatim"
 
 echo "pr-round: an identity mismatch stops before anything runs"
 new_sandbox
