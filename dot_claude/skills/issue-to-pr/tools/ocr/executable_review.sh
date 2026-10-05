@@ -60,7 +60,11 @@ else
   args+=(--from "$base" --to "$head")
 fi
 
-printf 'ocr %s\n' "${args[*]}" >"$out/cmd.txt"
+# The audit record quotes each argument (%q), so a copied line reproduces
+# the real argv even when a path carries spaces.
+printf 'ocr' >"$out/cmd.txt"
+printf ' %q' "${args[@]}" >>"$out/cmd.txt"
+printf '\n' >>"$out/cmd.txt"
 cd "$repo"
 set +e
 ocr "${args[@]}" >"$out/stdout.txt" 2>"$out/stderr.txt"

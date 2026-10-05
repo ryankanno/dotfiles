@@ -271,6 +271,15 @@ PATH="$WS/stub:$PATH" "$REVIEW" --repo "$WS/repo" --out "$WS/out" --commit c946c
 assert_contains "$(cat "$WS/args.txt")" "--commit c946c58" "passes the commit"
 assert_not_contains "$(cat "$WS/args.txt")" "--from" "no range in commit mode"
 
+echo "wrapper: cmd.txt records the exact invocation for spaced paths"
+new_sandbox
+make_stub
+mkdir -p "$WS/repo" "$WS/out" "$WS/with space"
+printf 'brief\n' >"$WS/with space/brief.md"
+PATH="$WS/stub:$PATH" "$REVIEW" --repo "$WS/repo" --out "$WS/out" --brief "$WS/with space/brief.md" --commit x
+assert_eq "$?" 0 "exits 0"
+assert_contains "$(cat "$WS/out/cmd.txt")" 'with\ space' "the spaced path is recorded escaped"
+
 echo "wrapper: an ocr failure propagates and is recorded"
 new_sandbox
 make_stub
