@@ -38,7 +38,10 @@ fi
 text="$(cat)"
 hash=$(printf '%s\n%s' "$locator" "$text" | "${sha[@]}" | cut -c1-8)
 
-slug=$(printf '%s' "$title" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-')
+# The slug must be byte-identical on every machine: tr maps characters by
+# the active locale, so the translation runs pinned and a rerun elsewhere
+# computes the same name (idempotency rests on it).
+slug=$(printf '%s' "$title" | LC_ALL=C tr '[:upper:]' '[:lower:]' | LC_ALL=C tr -cs 'a-z0-9' '-')
 slug="${slug#-}"
 slug="${slug:0:40}"
 while [[ "$slug" == *- ]]; do slug="${slug%-}"; done

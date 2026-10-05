@@ -450,6 +450,11 @@ echo "branch-name: an unknown source type is a usage error"
 branch --type jira --locator x --title t <<<'x'
 assert_eq "$RC" 2 "usage error exits 2"
 
+echo "branch-name: the slug is locale-independent"
+o1="$(LC_ALL= LANG=en_US.UTF-8 "$BRANCH" --type gh --locator x --title 'Café Crème' <<<t)"
+o2="$(LC_ALL= LANG=C "$BRANCH" --type gh --locator x --title 'Café Crème' <<<t)"
+assert_eq "$o1" "$o2" "same slug under any locale"
+
 PRR="$TOOLS/executable_pr-round.sh"
 
 make_pr_round_env() {
