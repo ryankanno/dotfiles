@@ -193,7 +193,7 @@ The last message of the run, verbatim to the future runner:
   every one low and dispositioned; the accepted judgment calls are
   listed), `capped-unrecovered` (findings remain after 3 rounds), or
   `blocked` (pane death after redispatch, no gate found, scan hit, or
-  two empty reviewer results)
+  an unrecovered reviewer with nothing from any source)
 - per-round one-liners: round number, short SHA, verdict, who ran it
 - the gate: the command and its final printed result
 - anything a scan blocked, with the line it caught
