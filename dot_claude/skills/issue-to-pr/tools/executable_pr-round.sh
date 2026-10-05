@@ -195,21 +195,36 @@ if [[ -n "$prior_head" ]] && ! git -C "$repo" cat-file -e "$prior_head^{commit}"
 fi
 delta=""
 if [[ -n "$prior_head" ]]; then
-  # The git header line is inherently ambiguous for paths holding the
-  # header split sequence itself, so the hunks enumerate per file: the
-  # name list is unambiguous, and each diff then belongs to exactly one
-  # path with nothing left to parse out of a header.
+  # Hunks enumerate per file because the git header line is inherently
+  # ambiguous for paths holding the split sequence itself. Three rules
+  # keep the delta exact: the listing's failure is fatal (an unreadable
+  # listing is not an unchanged head), every path is passed literally
+  # (glob and magic metacharacters in a filename are not pathspec
+  # syntax), and a rename's two paths are diffed together so an edit
+  # reports as edited ranges, never a whole-file add.
+  names="$round_dir/names.txt"
+  git -C "$repo" -c core.quotePath=false diff --name-status -M --no-color \
+      "$prior_head" "$head" >"$names" || {
+    printf 'cannot list the changed files\n' >&2
+    exit 5
+  }
   : >"$round_dir/delta.txt"
-  while IFS= read -r p; do
-    [[ -n "$p" ]] || continue
-    git -C "$repo" -c core.quotePath=false diff -U0 --no-color --no-ext-diff \
-        "$prior_head" "$head" -- "$p" \
-      | awk -v p="$p" '/^@@ / {
+  while IFS=$'\t' read -r status old new; do
+    [[ -n "$old" ]] || continue
+    # The path reaches awk through the environment, not -v: -v expands
+    # escape sequences in the value, and a filename may hold one.
+    p="$old"
+    paths=("$old")
+    if [[ "$status" == R* ]]; then p="$new"; paths+=("$new"); fi
+    GIT_LITERAL_PATHSPECS=1 \
+      git -C "$repo" -c core.quotePath=false diff -U0 -M --no-color --no-ext-diff \
+          "$prior_head" "$head" -- "${paths[@]}" \
+      | p="$p" awk '/^@@ / {
           n = split(substr($3, 2), a, ",")
           cnt = (n > 1) ? a[2] : 1
-          if (cnt > 0) print p ":" a[1] "-" (a[1] + cnt - 1)
+          if (cnt > 0) print ENVIRON["p"] ":" a[1] "-" (a[1] + cnt - 1)
         }' >>"$round_dir/delta.txt"
-  done < <(git -C "$repo" -c core.quotePath=false diff --name-only --no-color "$prior_head" "$head")
+  done <"$names"
   delta=$(cat "$round_dir/delta.txt")
 fi
 

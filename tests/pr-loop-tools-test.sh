@@ -959,6 +959,44 @@ run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
 assert_eq "$(cat "$rd/delta.txt")" "dir b/name.txt:1-2" "the spaced path keeps its hunk"
 
+echo "pr-round: a bracket in a filename is not pathspec syntax"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+advance_head 'input [x].txt' 'x\ny\n'
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
+assert_eq "$(cat "$rd/delta.txt")" "input [x].txt:1-2" "the bracketed path keeps its hunk"
+
+echo "pr-round: pathspec magic in a filename is not syntax"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+advance_head third.txt 'z\n'
+advance_head ':!plain.txt' 'x\ny\n'
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
+assert_eq "$(cat "$rd/delta.txt")" $':!plain.txt:1-2\nthird.txt:1-1' "no other file's hunk lands under a magic name"
+
+echo "pr-round: a rename and edit reports edited ranges, not a whole-file add"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+advance_head keep.txt 'one\ntwo\nthree\n'
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+git -C "$repo" mv keep.txt kept.txt
+printf 'one\nTWO\nthree\n' >"$repo/kept.txt"
+git -C "$repo" commit -qam "rename and edit"
+FR_NEXT=$(git -C "$repo" rev-parse HEAD)
+git -C "$repo" push -q -f origin "HEAD:refs/pull/39/head"
+GH_PR_JSON="$(jq -c --arg h "$FR_NEXT" '.headRefOid = $h' <<<"$GH_PR_JSON")"
+run_prr --repo "$repo" --pr 39 --round 3 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-3"
+assert_eq "$(cat "$rd/delta.txt")" "kept.txt:2-2" "only the edited line is new"
+
 SCOPE="$TOOLS/executable_finding-scope.sh"
 
 echo "finding-scope: a finding on a changed line is new, elsewhere reviewed"
