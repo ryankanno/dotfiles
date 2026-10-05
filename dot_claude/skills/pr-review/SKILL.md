@@ -40,6 +40,11 @@ Fixed lines stay out: a fix the reviewer still flags is a fix to
 re-check. `--dispositions <file>` replaces the lines read from the
 comments with the file's content.
 
+From round 2 on, `round.json` carries `range.prior_head` (the previous
+round's head) and the round directory holds `delta.txt`, the
+`path:start-end` hunks changed since that head. The background tells
+the reviewer which hunks are new.
+
 `--expect-branch` binds the round to this loop's branch: a PR whose
 head is any other branch is a hallucinated number, and the script exits
 3 before anything reviews or posts. Omit it only when the caller
@@ -82,7 +87,8 @@ see what the loop has spent to date.
 Resolve the critic from the manifest and follow its binding file
 (`~/.claude/skills/issue-to-pr/tools/<critic>/binding.md`) for how to
 spawn it: a fresh, clean-context subagent, given the binding's critic
-prompt, the diff, and the brief. Its findings arrive numbered with
+prompt, the diff, the brief, and from round 2 on the delta since the
+prior round's head. Its findings arrive numbered with
 file, line, the claim, the break, and severity. Findings that do not
 reference the diff are dropped, per the binding's contract.
 
@@ -107,7 +113,26 @@ Read the diff against the brief yourself:
 - **Same head:** if this round runs over the same head as the prior
   round, cite new evidence against that verdict or defer to it.
 
-## 5. Assemble the comment
+## 5. Blocking or follow-up
+
+Classify every finding from every source against the round's delta:
+
+```bash
+~/.claude/skills/issue-to-pr/tools/finding-scope.sh <round-dir> <path>:<start>[-<end>]
+```
+
+- **Blocking:** high severity anywhere, or `new`: on a line changed
+  since the prior round's head. Every finding in round 1 and every
+  finding without a line prints `new`.
+- **Follow-up:** medium or low, and `reviewed`: on code an earlier
+  round already reviewed. Fresh-context reviewers find new edge cases
+  in reviewed code every round, so letting those block keeps the loop
+  from ever converging (measured on PR 40: 24 of 32 findings in rounds
+  3 to 6 sat on reviewed code). Follow-ups are listed, never fixed in
+  the loop and never dispositioned; the final report hands them to the
+  human.
+
+## 6. Assemble the comment
 
 Follow [`report-template.md`](report-template.md) exactly: marker first
 line, heading, verdict, visible consolidated findings tagged by source,
@@ -118,13 +143,13 @@ thin coverage and a skipped run must read as what they are.
 
 The verdict line is machine-read by /pr-refine; keep the protocol exact,
 one of: `**Verdict:** No issues found.` when every source ran and
-produced zero findings, `**Verdict:** <n> finding(s).` when findings
-exist, `**Verdict:** partial (the reviewer's coverage has a gap).` when
+produced no blocking finding, `**Verdict:** <n> finding(s).` when <n>
+blocking findings exist, `**Verdict:** partial (the reviewer's coverage has a gap).` when
 the binding ended partial with nothing else to report, or
 `**Verdict:** unrecovered (the reviewer produced no review text).` when
 the binding ended unrecovered with nothing else to report.
 
-## 6. Scan before posting
+## 7. Scan before posting
 
 Write the body to a file, never inline. Scan it before it leaves the
 machine:
@@ -138,7 +163,7 @@ Exit 1: it printed each remaining hit (another home path, a temp path,
 or a token); **do not post**. Record the lines. Unattended does not mean
 leaked; the blocked post surfaces in the loop's final report.
 
-## 7. Post
+## 8. Post
 
 ```bash
 gh pr comment <n> --body-file <file>

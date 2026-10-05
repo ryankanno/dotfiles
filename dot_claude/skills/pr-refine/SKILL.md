@@ -35,13 +35,16 @@ The objective is the reader's value, not the critic's zero.
   judgment. When the remaining findings are matters of taste or
   formalization, say so and stop; the report marks them as judgment
   calls instead of fixes.
+- Only blocking findings are refine work. Follow-ups sit on code an
+  earlier round already reviewed; they are listed for the human, never
+  fixed or dispositioned here.
 - Severity gates effort. High and medium findings are fixed or rejected
   with reasons; both outcomes are reported. Low findings are the
   implementer's recorded judgment: fix them when the fix is cheap and
   harmless, accept them with a reason otherwise. An accepted finding is
   never silently dropped.
-- **Converged candidate.** When a round's findings are all low and
-  every one is fixed, rejected, or accepted with a recorded reason,
+- **Converged candidate.** When a round's blocking findings are all low
+  and every one is fixed, rejected, or accepted with a recorded reason,
   report "converged candidate" to the orchestrator with the
   Dispositions block attached, and start no further fixes. The
   orchestrator decides; only its convergence round writes the converged
@@ -67,7 +70,7 @@ The verdict line is one of
 `No issues found.`, `<n> finding(s).`,
 `partial (the reviewer's coverage has a gap)`,
 `unrecovered (the reviewer produced no review text)`, or
-`converged (all findings low and dispositioned)`. Partial and
+`converged (all blocking findings low and dispositioned)`. Partial and
 unrecovered mean nothing to fix and no clean claim. A converged verdict
 means the orchestrator closed the loop: nothing to fix, no new round.
 
@@ -95,7 +98,9 @@ round reads them — and in the loop's final report.
 
 ## 3. Fix under TDD — only what the previous round named
 
-Fix only the findings named by the previous round's comment. Anything
+Fix only the blocking findings named by the previous round's comment,
+under its **Findings:** heading; its **Follow-ups:** are not this
+round's work. Anything
 this round's own sources discover mid-round is recorded as input for
 the next round, not fixed here: one instruction, one fix pass, one
 re-run.
@@ -137,7 +142,8 @@ declares the branch clean or converged.
 
 ## Never
 
-- Never fix a finding the previous round's comment did not name.
+- Never fix a finding the previous round's comment did not name as
+  blocking.
 - Never re-run the reviewer twice in one round.
 - Never fix a finding by adding machinery beyond it.
 - Never force-push, and never push before the round's gate is green.

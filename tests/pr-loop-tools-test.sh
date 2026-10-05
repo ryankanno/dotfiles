@@ -877,4 +877,72 @@ run_prr --repo "$repo" --pr 39 --round 1 --expect-branch loop/x-y-abc12345 >/dev
 rc=$?
 assert_eq "$rc" 3 "cross-repository head exits 3"
 
+advance_head() { # file content -> a new PR head committed and pushed
+  printf '%b' "$2" >"$repo/$1"
+  git -C "$repo" add "$1"
+  git -C "$repo" commit -qm "refine $1"
+  FR_NEXT=$(git -C "$repo" rev-parse HEAD)
+  git -C "$repo" push -q -f origin "HEAD:refs/pull/39/head"
+  GH_PR_JSON="$(jq -c --arg h "$FR_NEXT" '.headRefOid = $h' <<<"$GH_PR_JSON")"
+  export GH_PR_JSON
+}
+
+echo "pr-round: round 1 has no prior head and no delta"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
+assert_json '.range.prior_head == null' "$rd/round.json" "no prior head on round 1"
+assert_eq "$([[ -e "$rd/delta.txt" ]] && printf yes || printf no)" "no" "no delta on round 1"
+
+echo "pr-round: a later round records the prior head and the lines changed since it"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+advance_head f.txt 'b\nc\nd\n'
+advance_head g.txt 'new\n'
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
+assert_eq "$(jq -r '.range.prior_head' "$rd/round.json")" "$FR_HEAD" "the prior round's head is recorded"
+assert_eq "$(cat "$rd/delta.txt")" $'f.txt:2-3\ng.txt:1-1' "the delta lists each changed hunk at the new head"
+assert_contains "$(cat "$rd/background.md")" "f.txt:2-3" "the reviewer is told what changed since the last round"
+
+echo "pr-round: an unchanged head since the prior round leaves an empty delta"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
+assert_eq "$(jq -r '.range.prior_head' "$rd/round.json")" "$FR_HEAD" "the prior head is recorded"
+assert_eq "$(wc -c <"$rd/delta.txt" | tr -d ' ')" "0" "nothing changed, nothing is new"
+
+SCOPE="$TOOLS/executable_finding-scope.sh"
+
+echo "finding-scope: a finding on a changed line is new, elsewhere reviewed"
+new_sandbox
+mkdir -p "$WS/r"
+printf '{"range":{"prior_head":"abc"}}' >"$WS/r/round.json"
+printf 'f.txt:2-3\ng.txt:1-1\n' >"$WS/r/delta.txt"
+assert_eq "$("$SCOPE" "$WS/r" f.txt:2)" "new" "inside a hunk"
+assert_eq "$("$SCOPE" "$WS/r" f.txt:1)" "reviewed" "outside every hunk"
+assert_eq "$("$SCOPE" "$WS/r" f.txt:1-2)" "new" "a range overlapping a hunk"
+assert_eq "$("$SCOPE" "$WS/r" f.txt:4-9)" "reviewed" "a range past the hunk"
+assert_eq "$("$SCOPE" "$WS/r" h.txt:2)" "reviewed" "a file the round did not touch"
+assert_eq "$("$SCOPE" "$WS/r" f.txt)" "new" "no line cannot be placed, so it counts as new"
+assert_eq "$("$SCOPE" "$WS/r" ff.txt:2)" "reviewed" "a path prefix is not the path"
+
+echo "finding-scope: without a prior head every finding is new"
+new_sandbox
+mkdir -p "$WS/r"
+printf '{"range":{"prior_head":null}}' >"$WS/r/round.json"
+assert_eq "$("$SCOPE" "$WS/r" f.txt:1)" "new" "round 1 reviews everything"
+
+echo "finding-scope: a round dir without round.json is a usage error"
+new_sandbox
+"$SCOPE" "$WS" f.txt:1 >/dev/null 2>&1
+assert_eq "$?" 2 "exits 2"
+
 report

@@ -20,7 +20,10 @@ Give the subagent, as its entire input:
 4. the prior rounds' dispositions (fixed, rejected, and accepted
    findings with their evidence, from the Dispositions blocks of the
    previous round comments): re-flagging a dispositioned finding
-   without materially new evidence is out of contract.
+   without materially new evidence is out of contract,
+5. from round 2 on, the delta since the prior round's head
+   (`git -C <repo> diff <range.prior_head> <headRefOid>`, both from
+   `round.json`): what the last refine changed.
 
 The subagent also gets **read access to the repository at the PR head
 SHA** (`git -C <repo> show <headRefOid>:<path>`), so it can verify

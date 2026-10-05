@@ -157,7 +157,7 @@ step.
 stop and report unrecovered.
 
 **Converged candidate.** When the implementer reports a converged
-candidate (a round whose findings were all low and every one fixed,
+candidate (a round whose blocking findings were all low and every one fixed,
 rejected, or accepted with a recorded reason, per pr-refine's value
 brake), send no further refine instructions; go straight to
 convergence. The asymptote ends where the dispositions do.
@@ -174,14 +174,18 @@ worktree's HEAD equals the PR's headRefOid
 (`git -C <worktree> rev-parse HEAD`). A green gate on any other tree
 declares nothing.
 
+Your round classifies its findings like any other (pr-review step 5):
+on the head the last refine round already reviewed, only a high
+finding blocks.
+
 - both clean: the loop ends clean.
-- findings all low and every one dispositioned: your convergence
-  comment's verdict is `converged (all findings low and
-  dispositioned)` and the loop ends converged, with the accepted
-  judgment calls listed in the final report.
-- findings otherwise: one more refine round while rounds remain under
-  the cap; when the cap is spent, the loop ends unrecovered, with your
-  findings quoted in the report.
+- blocking findings all low and every one dispositioned: your
+  convergence comment's verdict is `converged (all blocking findings
+  low and dispositioned)` and the loop ends converged, with the
+  accepted judgment calls listed in the final report.
+- blocking findings otherwise: one more refine round while rounds
+  remain under the cap; when the cap is spent, the loop ends
+  unrecovered, with your findings quoted in the report.
 
 ## 8. The final report
 
@@ -189,12 +193,15 @@ The last message of the run, verbatim to the future runner:
 
 - task ref (source locator and title), PR link
 - verdict: `clean` (convergence round found nothing and the gate printed
-  green), `converged` (findings existed but the convergence round found
-  every one low and dispositioned; the accepted judgment calls are
-  listed), `capped-unrecovered` (findings remain after 3 rounds), or
+  green), `converged` (blocking findings existed but the convergence
+  round found every one low and dispositioned; the accepted judgment
+  calls are listed), `capped-unrecovered` (blocking findings remain
+  after 3 rounds), or
   `blocked` (pane death after redispatch, no gate found, scan hit, or
   a partial or unrecovered reviewer with nothing from any source)
 - per-round one-liners: round number, short SHA, verdict, who ran it
+- the follow-ups from the final round's comment, verbatim: findings on
+  reviewed code the loop left for the human
 - the gate: the command and its final printed result
 - anything a scan blocked, with the line it caught
 - reviewer session ids and token totals (the newest round comment's

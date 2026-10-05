@@ -11,10 +11,12 @@
 # Interface out: the round directory under
 #                $HOME/.cache/pr-loop/<owner/repo>/pr-<n>/round-<N>/ with
 #                each run's outputs plus round.json (range, identity, runs,
-#                reviewer_complete), background.md when there are prior
+#                reviewer_complete, range.prior_head), delta.txt (the
+#                path:start-end hunks changed since the prior round's head,
+#                from round 2 on), background.md when there are prior
 #                dispositions (read from this loop's own round comments
-#                unless --dispositions names a file), and the directory
-#                path on stdout.
+#                unless --dispositions names a file) or a delta, and the
+#                directory path on stdout.
 # Exit codes: 0 the round ran; 2 usage, or the environment is unusable
 # (HOME unset); 3 identity mismatch; 4 the PR is
 # missing, not open, or not resolvable; 5 the repository or its refs could
@@ -174,12 +176,49 @@ if [[ ${#leftovers[@]} -gt 0 ]]; then
   mv "${leftovers[@]}" "$keep/"
 fi
 
-if [[ -n "$settled" ]]; then
+# Each round reviews the whole PR afresh and keeps finding new edge cases
+# in code earlier rounds already reviewed, so the loop never converges
+# (measured on PR 40: 24 of 32 findings in rounds 3 to 6). The delta since
+# the prior round's head is what a refine round actually has to answer
+# for; finding-scope.sh classifies each finding against it.
+prior_head=""
+for sibling in "$HOME/.cache/pr-loop/$owner_repo/pr-$pr"/round-*/round.json; do
+  [[ -f "$sibling" ]] || continue
+  n="${sibling%/round.json}"; n="${n##*/round-}"
+  [[ "$n" =~ ^[0-9]+$ && $((10#$n)) -eq $((10#$round - 1)) ]] || continue
+  prior_head=$(jq -r '.range.head // empty' "$sibling" 2>/dev/null || true)
+done
+# A prior head this clone cannot resolve has no delta: every finding
+# counts as new, which blocks more, never less.
+if [[ -n "$prior_head" ]] && ! git -C "$repo" cat-file -e "$prior_head^{commit}" 2>/dev/null; then
+  prior_head=""
+fi
+delta=""
+if [[ -n "$prior_head" ]]; then
+  git -C "$repo" -c core.quotePath=false diff -U0 --no-color --no-ext-diff \
+      --src-prefix=a/ --dst-prefix=b/ "$prior_head" "$head" \
+    | awk '/^\+\+\+ / { p = substr($0, 5); if (p == "/dev/null") p = ""; else sub(/^b\//, "", p); next }
+           /^@@ / && p != "" {
+             n = split(substr($3, 2), a, ",")
+             cnt = (n > 1) ? a[2] : 1
+             if (cnt > 0) print p ":" a[1] "-" (a[1] + cnt - 1)
+           }' >"$round_dir/delta.txt"
+  delta=$(cat "$round_dir/delta.txt")
+fi
+
+if [[ -n "$settled" || -n "$delta" ]]; then
   {
     if [[ -n "$brief" ]]; then cat "$brief"; printf '\n'; fi
-    printf '## Findings already dispositioned in earlier rounds\n\n'
-    printf 'Each line was rejected or accepted with recorded evidence. Do not report it again unless the code it cites changed.\n\n'
-    printf '%s\n' "$settled"
+    if [[ -n "$settled" ]]; then
+      printf '## Findings already dispositioned in earlier rounds\n\n'
+      printf 'Each line was rejected or accepted with recorded evidence. Do not report it again unless the code it cites changed.\n\n'
+      printf '%s\n\n' "$settled"
+    fi
+    if [[ -n "$delta" ]]; then
+      printf '## Changed since the last review round\n\n'
+      printf 'The rest of the diff was reviewed in earlier rounds; these hunks are new.\n\n'
+      printf '%s\n' "$delta"
+    fi
   } >"$round_dir/background.md"
   brief="$round_dir/background.md"
 fi
@@ -272,13 +311,14 @@ for sibling in "$HOME/.cache/pr-loop/$owner_repo/pr-$pr"/round-*/round.json; do
 done
 
 jq -n --arg pr "$pr" --arg url "$url" --arg base "$base" --arg base_sha "$base_sha" --arg head "$head" \
-     --arg hb "$head_branch" --arg expect "$expect" \
+     --arg hb "$head_branch" --arg expect "$expect" --arg prior "$prior_head" \
      --argjson round "$((10#$round))" --argjson runs "$runs" --argjson complete "$complete" \
      --argjson rt "$current_tokens" --argjson ct "$((current_tokens + prior_tokens))" '
   {pr: $pr, url: $url, round: $round,
    identity: {expected_branch: (if $expect == "" then null else $expect end),
               head_branch: $hb},
-   range: {base: $base_sha, base_branch: $base, head: $head, exact: "\($base_sha)..\($head)"},
+   range: {base: $base_sha, base_branch: $base, head: $head, exact: "\($base_sha)..\($head)",
+           prior_head: (if $prior == "" then null else $prior end)},
    runs: $runs, reviewer_complete: $complete,
    round_tokens: $rt, cumulative_tokens: $ct}' > "$round_dir/round.json"
 printf '%s\n' "$round_dir"
