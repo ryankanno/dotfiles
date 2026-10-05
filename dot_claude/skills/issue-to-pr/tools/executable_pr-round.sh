@@ -13,7 +13,8 @@
 #                each run's outputs plus round.json (range, identity, runs,
 #                reviewer_complete), and the directory path on stdout.
 # Exit codes: 0 the round ran; 2 usage; 3 identity mismatch; 4 the PR is
-# missing, not open, or not resolvable; 127 a dependency is missing. A
+# missing, not open, or not resolvable; 6 the round dir already holds
+# evidence and --rerun was not passed; 127 a dependency is missing. A
 # review run's own failure is recorded in round.json, not propagated.
 set -euo pipefail
 
@@ -58,7 +59,7 @@ for cand in "$here/$reviewer/review.sh" "$here/$reviewer/executable_review.sh"; 
 done
 [[ -n "$review" ]] || { printf 'reviewer binding has no review.sh: %s\n' "$reviewer" >&2; exit 2; }
 
-pr_json=$(cd "$repo" && gh pr view "$pr" --json state,baseRefName,headRefOid,headRefName,url) || {
+pr_json=$(cd "$repo" && gh pr view "$pr" --json state,baseRefName,headRefOid,headRefName,isCrossRepository,url) || {
   printf 'cannot view PR %s\n' "$pr" >&2
   exit 4
 }
@@ -66,6 +67,7 @@ state=$(jq -r .state <<<"$pr_json")
 base=$(jq -r .baseRefName <<<"$pr_json")
 head=$(jq -r .headRefOid <<<"$pr_json")
 head_branch=$(jq -r .headRefName <<<"$pr_json")
+cross=$(jq -r '.isCrossRepository // false' <<<"$pr_json")
 url=$(jq -r .url <<<"$pr_json")
 if [[ "$state" != "OPEN" ]]; then
   printf 'PR %s is %s, not OPEN\n' "$pr" "$state" >&2
@@ -74,9 +76,14 @@ fi
 [[ -n "$base" && "$head" != "null" && "$head" != "" ]] || { printf 'PR %s not resolvable\n' "$pr" >&2; exit 4; }
 
 # Identity: the round must review this loop's branch, not merely some open
-# PR with the number the implementer reported.
+# PR with the number the implementer reported. A fork can carry the same
+# branch name, so the head must also live in this repository.
 if [[ -n "$expect" && "$head_branch" != "$expect" ]]; then
   printf 'identity mismatch: PR %s head is %s, expected %s\n' "$pr" "$head_branch" "$expect" >&2
+  exit 3
+fi
+if [[ -n "$expect" && "$cross" == true ]]; then
+  printf 'identity mismatch: PR %s head %s is on a fork\n' "$pr" "$head_branch" >&2
   exit 3
 fi
 
@@ -84,22 +91,22 @@ owner_repo=$(cd "$repo" && gh repo view --json nameWithOwner --jq .nameWithOwner
 round_dir="$HOME/.cache/pr-loop/$owner_repo/pr-$pr/round-$round"
 mkdir -p "$round_dir"
 
-# Evidence is never silently overwritten: a re-invocation into a round that
-# already holds a round.json is refused unless --rerun moves the old run
-# into a superseded-*/ subdirectory first.
-if [[ -f "$round_dir/round.json" ]]; then
+# Evidence is never silently overwritten or reused: a re-invocation into a
+# round that already holds anything besides superseded runs, including the
+# leftovers of an interrupted run with no round.json, is refused unless
+# --rerun moves it into a superseded-*/ subdirectory first.
+leftovers=()
+for f in "$round_dir"/*; do
+  if [[ -e "$f" && "$(basename "$f")" != superseded-* ]]; then leftovers+=("$f"); fi
+done
+if [[ ${#leftovers[@]} -gt 0 ]]; then
   if [[ -z "$rerun" ]]; then
-    printf 'round dir already holds a round.json; pass --rerun to supersede it\n' >&2
+    printf 'round dir already holds evidence; pass --rerun to supersede it\n' >&2
     exit 6
   fi
   keep="$round_dir/superseded-$(date +%Y%m%d-%H%M%S)"
   mkdir -p "$keep"
-  for f in round.json review.json stdout.txt stderr.txt cmd.txt exit.txt session.txt; do
-    if [[ -e "$round_dir/$f" ]]; then mv "$round_dir/$f" "$keep/"; fi
-  done
-  for d in "$round_dir"/commit-*; do
-    if [[ -e "$d" ]]; then mv "$d" "$keep/"; fi
-  done
+  mv "${leftovers[@]}" "$keep/"
 fi
 
 git -C "$repo" fetch -q origin "$base" "refs/pull/$pr/head"
@@ -159,6 +166,8 @@ done < <(jq -r '.[].dir' <<<"$runs")
 prior_tokens=0
 for sibling in "$HOME/.cache/pr-loop/$owner_repo/pr-$pr"/round-*/round.json; do
   [[ -f "$sibling" ]] || continue
+  n="${sibling%/round.json}"; n="${n##*/round-}"
+  [[ "$n" =~ ^[0-9]+$ && "$n" -lt "$round" ]] || continue
   t=$(jq -r '.round_tokens // 0' "$sibling" 2>/dev/null || printf '0')
   if [[ "$t" == 0 ]]; then t=$(tokens_in "$sibling"); fi
   prior_tokens=$((prior_tokens + t))

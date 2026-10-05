@@ -492,4 +492,44 @@ run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
 rd2="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
 assert_json '.round_tokens == 250 and .cumulative_tokens == 350' "$rd2/round.json" "round 2 cumulative is 350 across both rounds"
 
+echo "pr-round: leftovers from an interrupted run are never read as this run's evidence"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
+mkdir -p "$rd"
+printf '{"status":"complete","summary":{"total_tokens":999}}' >"$rd/review.json"
+set +e
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null 2>&1
+rc=$?
+set -e
+assert_eq "$rc" 6 "a round dir holding leftovers is refused without --rerun"
+export STUB_TOKENS=100
+run_prr --repo "$repo" --pr 39 --round 1 --rerun >/dev/null
+assert_json '.cumulative_tokens == 100' "$rd/round.json" "the fresh run is the only evidence counted"
+assert_json '.summary.total_tokens == 999' "$rd"/superseded-*/review.json "the leftover is kept aside"
+
+echo "pr-round: a rerun of an earlier round counts only rounds before it"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+export STUB_TOKENS=100
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+export STUB_TOKENS=250
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+export STUB_TOKENS=50
+run_prr --repo "$repo" --pr 39 --round 1 --rerun >/dev/null
+assert_json '.cumulative_tokens == 50' "$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1/round.json" "round 2 is not to date for round 1"
+
+echo "pr-round: a fork PR with the loop's branch name fails the identity check"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+export GH_PR_JSON="$(jq -c '.isCrossRepository = true' <<<"$GH_PR_JSON")"
+set +e
+run_prr --repo "$repo" --pr 39 --round 1 --expect-branch loop/x-y-abc12345 >/dev/null 2>&1
+rc=$?
+set -e
+assert_eq "$rc" 3 "cross-repository head exits 3"
+
 report
