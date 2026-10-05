@@ -11,8 +11,10 @@
 # Interface out: the round directory under
 #                $HOME/.cache/pr-loop/<owner/repo>/pr-<n>/round-<N>/ with
 #                each run's outputs plus round.json (range, identity, runs,
-#                reviewer_complete), background.md when --dispositions was
-#                given, and the directory path on stdout.
+#                reviewer_complete), background.md when there are prior
+#                dispositions (read from this loop's own round comments
+#                unless --dispositions names a file), and the directory
+#                path on stdout.
 # Exit codes: 0 the round ran; 2 usage; 3 identity mismatch; 4 the PR is
 # missing, not open, or not resolvable; 5 the repository or its refs could
 # not be resolved on the network; 6 the round dir already holds
@@ -66,7 +68,7 @@ for cand in "$here/$reviewer/review.sh" "$here/$reviewer/executable_review.sh"; 
 done
 [[ -n "$review" ]] || { printf 'reviewer binding has no review.sh: %s\n' "$reviewer" >&2; exit 2; }
 
-pr_json=$(cd "$repo" && gh pr view "$pr" --json state,baseRefName,headRefOid,headRefName,isCrossRepository,url) || {
+pr_json=$(cd "$repo" && gh pr view "$pr" --json state,baseRefName,headRefOid,headRefName,isCrossRepository,url,comments) || {
   printf 'cannot view PR %s\n' "$pr" >&2
   exit 4
 }
@@ -116,6 +118,27 @@ base_sha=$(git -C "$repo" merge-base "origin/$base" "$head") || {
   exit 5
 }
 
+# The reviewer sees only its background file, never the PR comments, so
+# without the prior rounds' dispositions it re-raises findings a refine
+# already rejected with evidence (measured on PR 40: the same rejected
+# finding came back twice in the next round). Only this loop's own round
+# comments count, the marker on line 1 and our own author, or anyone who
+# can comment on the PR could talk the reviewer out of a real finding.
+# Fixed lines stay out: a fix the reviewer still flags needs re-checking.
+if [[ -n "$dispositions" ]]; then
+  settled=$(cat "$dispositions")
+else
+  me=$(gh api user --jq .login) || {
+    printf 'cannot resolve the gh user for the prior round comments\n' >&2
+    exit 5
+  }
+  settled=$(jq -r --arg me "$me" '.comments[]? | select(.author.login == $me)
+      | .body | select(startswith("<!-- pr-loop-comment -->"))' <<<"$pr_json" \
+    | awk '/<summary>Dispositions<\/summary>/ { on = 1; next }
+           on && /^<\/details>/ { on = 0 }
+           on && /^- (Rejected|Accepted):/')
+fi
+
 # Evidence is never silently overwritten or reused: a re-invocation into a
 # round that already holds anything besides superseded runs, including the
 # leftovers of an interrupted run with no round.json, is refused unless
@@ -134,16 +157,12 @@ if [[ ${#leftovers[@]} -gt 0 ]]; then
   mv "${leftovers[@]}" "$keep/"
 fi
 
-# The reviewer sees only its background file, never the PR comments, so
-# without the prior rounds' dispositions it re-raises findings a refine
-# already rejected with evidence (measured on PR 40: the same rejected
-# finding came back twice in the next round).
-if [[ -n "$dispositions" ]]; then
+if [[ -n "$settled" ]]; then
   {
     if [[ -n "$brief" ]]; then cat "$brief"; printf '\n'; fi
     printf '## Findings already dispositioned in earlier rounds\n\n'
     printf 'Each line was rejected or accepted with recorded evidence. Do not report it again unless the code it cites changed.\n\n'
-    cat "$dispositions"
+    printf '%s\n' "$settled"
   } >"$round_dir/background.md"
   brief="$round_dir/background.md"
 fi
