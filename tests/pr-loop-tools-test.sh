@@ -430,6 +430,9 @@ assert_json '.reviewer_complete == true' "$rd/round.json" "reviewer_complete tru
 assert_eq "$(jq '.runs | length' "$rd/round.json")" 1 "one run"
 assert_eq "$(jq -r '.runs[0].mode' "$rd/round.json")" "range" "range mode"
 assert_eq "$(jq -r '.range.head' "$rd/round.json")" "$FR_HEAD" "range head recorded"
+assert_eq "$(jq -r '.range.base' "$rd/round.json")" "$FR_BASE" "range base is the resolved base SHA"
+assert_eq "$(jq -r '.range.exact' "$rd/round.json")" "$FR_BASE..$FR_HEAD" "exact is sha..sha"
+assert_eq "$(jq -r '.range.base_branch' "$rd/round.json")" "main" "the base branch name is kept"
 assert_eq "$(jq -r '.identity.head_branch' "$rd/round.json")" "loop/x-y-abc12345" "identity recorded"
 
 echo "pr-round: a skipped range retries per commit and recovers"
@@ -521,6 +524,17 @@ export STUB_TOKENS=250
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
 rd2="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
 assert_json '.round_tokens == 250 and .cumulative_tokens == 350' "$rd2/round.json" "round 2 cumulative is 350 across both rounds"
+
+echo "pr-round: a zero-padded round still counts toward the cumulative cost"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+rdp="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-08"
+mkdir -p "$rdp"
+printf '{"round_tokens":50}' >"$rdp/round.json"
+export STUB_TOKENS=100
+run_prr --repo "$repo" --pr 39 --round 9 >/dev/null
+assert_json '.cumulative_tokens == 150' "$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-9/round.json" "round 08 is counted"
 
 echo "pr-round: leftovers from an interrupted run are never read as this run's evidence"
 new_sandbox

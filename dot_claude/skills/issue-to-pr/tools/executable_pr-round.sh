@@ -110,6 +110,10 @@ if [[ ${#leftovers[@]} -gt 0 ]]; then
 fi
 
 git -C "$repo" fetch -q origin "$base" "refs/pull/$pr/head"
+# round.json records the base by SHA, not by a moving branch name: two
+# rounds over the same head must name the same range whatever main did
+# in between.
+base_sha=$(git -C "$repo" rev-parse "origin/$base")
 
 runs="[]"
 record() { # mode dir status session exit_code
@@ -171,20 +175,22 @@ prior_tokens=0
 for sibling in "$HOME/.cache/pr-loop/$owner_repo/pr-$pr"/round-*/round.json; do
   [[ -f "$sibling" ]] || continue
   n="${sibling%/round.json}"; n="${n##*/round-}"
-  [[ "$n" =~ ^[0-9]+$ && "$n" -lt "$round" ]] || continue
+  # Base 10: a zero-padded round-08 is a decimal 8, not an octal error the
+  # || continue would silently drop from the cumulative cost.
+  [[ "$n" =~ ^[0-9]+$ && $((10#$n)) -lt $((10#$round)) ]] || continue
   t=$(jq -r '.round_tokens // 0' "$sibling" 2>/dev/null || printf '0')
   if [[ "$t" == 0 ]]; then t=$(tokens_in "$sibling"); fi
   prior_tokens=$((prior_tokens + t))
 done
 
-jq -n --arg pr "$pr" --arg url "$url" --arg base "$base" --arg head "$head" \
+jq -n --arg pr "$pr" --arg url "$url" --arg base "$base" --arg base_sha "$base_sha" --arg head "$head" \
      --arg hb "$head_branch" --arg expect "$expect" \
      --argjson round "$round" --argjson runs "$runs" --argjson complete "$complete" \
      --argjson rt "$current_tokens" --argjson ct "$((current_tokens + prior_tokens))" '
   {pr: $pr, url: $url, round: $round,
    identity: {expected_branch: (if $expect == "" then null else $expect end),
               head_branch: $hb},
-   range: {base: $base, head: $head, exact: "\($base)..\($head)"},
+   range: {base: $base_sha, base_branch: $base, head: $head, exact: "\($base_sha)..\($head)"},
    runs: $runs, reviewer_complete: $complete,
    round_tokens: $rt, cumulative_tokens: $ct}' > "$round_dir/round.json"
 printf '%s\n' "$round_dir"
