@@ -10,8 +10,14 @@ REVIEW="$TOOLS/ocr/executable_review.sh"
 RENDER="$TOOLS/ocr/executable_render.sh"
 PASS=0 FAIL=0
 WS=""
+SANDBOXES=()
 
-new_sandbox() { WS="$(mktemp -d)"; }
+# The suite runs under set -u only: a failing command is tallied by the
+# assert_* helpers, never fatal. No helper may switch errexit on; one
+# leaked `set -e` silently turns every later failure into a truncated
+# run with no summary.
+new_sandbox() { WS="$(mktemp -d "${TMPDIR:-/tmp}/pr-loop-test.XXXXXXXX")"; SANDBOXES+=("$WS"); }
+trap '[[ ${#SANDBOXES[@]} -eq 0 ]] || rm -rf "${SANDBOXES[@]}"' EXIT
 render() { OUT="$("$RENDER" "$WS" 2>&1)"; RC=$?; }
 report() {
   echo
@@ -212,10 +218,8 @@ new_sandbox
 make_stub
 STUB_EXIT=3
 mkdir -p "$WS/repo" "$WS/out"
-set +e
 PATH="$WS/stub:$PATH" "$REVIEW" --repo "$WS/repo" --out "$WS/out" --commit x >/dev/null 2>&1
 rc=$?
-set -e
 assert_eq "$rc" 3 "propagates ocr's exit code"
 assert_eq "$(cat "$WS/out/exit.txt")" "3" "records the code"
 
@@ -223,10 +227,8 @@ echo "wrapper: a missing brief is a usage error, not a silent review"
 new_sandbox
 make_stub
 mkdir -p "$WS/repo" "$WS/out"
-set +e
 PATH="$WS/stub:$PATH" "$REVIEW" --repo "$WS/repo" --out "$WS/out" --brief "$WS/nope.md" --commit x >/dev/null 2>&1
 rc=$?
-set -e
 assert_eq "$rc" 2 "usage error exits 2"
 assert_not_contains "$(cat "$WS/args.txt")" "review" "never invoked the tool"
 
@@ -234,22 +236,18 @@ echo "wrapper: an option without its value is a usage error, not a crash"
 new_sandbox
 make_stub
 mkdir -p "$WS/repo"
-set +e
 PATH="$WS/stub:$PATH" "$REVIEW" --repo "$WS/repo" --out >/dev/null 2>&1
 rc=$?
-set -e
 assert_eq "$rc" 2 "missing value exits 2 via usage"
 
 echo "wrapper: relative out and brief paths are rejected before the cd"
 new_sandbox
 make_stub
 mkdir -p "$WS/repo" "$WS/out"
-set +e
 PATH="$WS/stub:$PATH" "$REVIEW" --repo "$WS/repo" --out out --commit x >/dev/null 2>&1
 rc1=$?
 PATH="$WS/stub:$PATH" "$REVIEW" --repo "$WS/repo" --out "$WS/out" --brief brief.md --commit x >/dev/null 2>&1
 rc2=$?
-set -e
 assert_eq "$rc1" 2 "relative out rejected"
 assert_eq "$rc2" 2 "relative brief rejected"
 assert_not_contains "$(cat "$WS/args.txt")" "review" "never invoked the tool"
@@ -257,7 +255,7 @@ assert_not_contains "$(cat "$WS/args.txt")" "review" "never invoked the tool"
 SCAN="$TOOLS/executable_scan.sh"
 scan() { # body text -> OUT, RC, BODY (the file after the scan)
   printf '%s\n' "$1" >"$WS/body.md"
-  set +e; OUT="$(HOME=/Users/someone "$SCAN" "$WS/body.md" 2>&1)"; RC=$?; set -e
+  OUT="$(HOME=/Users/someone "$SCAN" "$WS/body.md" 2>&1)"; RC=$?
   BODY="$(cat "$WS/body.md")"
 }
 
@@ -307,12 +305,12 @@ assert_eq "$RC" 0 "exits 0"
 
 echo "scan: no file is a usage error"
 new_sandbox
-set +e; OUT="$("$SCAN" "$WS/nope.md" 2>&1)"; RC=$?; set -e
+OUT="$("$SCAN" "$WS/nope.md" 2>&1)"; RC=$?
 assert_eq "$RC" 2 "usage error exits 2"
 
 BRANCH="$TOOLS/executable_branch-name.sh"
 branch() { # stdin text, args -> OUT, RC
-  set +e; OUT="$("$BRANCH" "$@" 2>&1)"; RC=$?; set -e
+  OUT="$("$BRANCH" "$@" 2>&1)"; RC=$?
 }
 
 echo "branch-name: slug and hash follow the documented rule"
@@ -440,10 +438,8 @@ echo "pr-round: an identity mismatch stops before anything runs"
 new_sandbox
 make_pr_round_env
 make_fixture_repo
-set +e
 out=$(run_prr --repo "$repo" --pr 39 --round 1 --expect-branch loop/someone-else 2>/dev/null)
 rc=$?
-set -e
 assert_eq "$rc" 3 "identity mismatch exits 3"
 assert_eq "$([[ -d "$WS/home/.cache/pr-loop" ]] && printf yes || printf no)" "no" "no round dir created"
 
@@ -452,10 +448,8 @@ new_sandbox
 make_pr_round_env
 make_fixture_repo
 export GH_PR_JSON='{"state":"MERGED","baseRefName":"main","headRefOid":"x","headRefName":"y","url":"z"}'
-set +e
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null 2>&1
 rc=$?
-set -e
 assert_eq "$rc" 4 "merged PR exits 4"
 
 echo "pr-round: a second invocation into the same round is refused"
@@ -464,10 +458,8 @@ make_pr_round_env
 make_fixture_repo
 export STUB_TOKENS=100
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
-set +e
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null 2>&1
 rc=$?
-set -e
 assert_eq "$rc" 6 "second invocation exits 6 without --rerun"
 assert_eq "$(jq -r '.cumulative_tokens' "$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1/round.json")" "100" "the first run's evidence is intact"
 
@@ -502,10 +494,8 @@ make_fixture_repo
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
 mkdir -p "$rd"
 printf '{"status":"complete","summary":{"total_tokens":999}}' >"$rd/review.json"
-set +e
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null 2>&1
 rc=$?
-set -e
 assert_eq "$rc" 6 "a round dir holding leftovers is refused without --rerun"
 export STUB_TOKENS=100
 run_prr --repo "$repo" --pr 39 --round 1 --rerun >/dev/null
@@ -529,10 +519,8 @@ new_sandbox
 make_pr_round_env
 make_fixture_repo
 export GH_PR_JSON="$(jq -c '.isCrossRepository = true' <<<"$GH_PR_JSON")"
-set +e
 run_prr --repo "$repo" --pr 39 --round 1 --expect-branch loop/x-y-abc12345 >/dev/null 2>&1
 rc=$?
-set -e
 assert_eq "$rc" 3 "cross-repository head exits 3"
 
 report
