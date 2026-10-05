@@ -47,6 +47,7 @@ mv "$tmp" "$file"
 # anchored on the key's own name, so a forty-hex sha is not a hit.
 pattern='/Users/[A-Za-z0-9._-]+|/home/[A-Za-z0-9._-]+|/tmp/[A-Za-z0-9._-]+|/root/[A-Za-z0-9._-]+'
 pattern+='|/run/user/[0-9]+|/private/|/var/folders/'
+pattern+='|/Volumes/[A-Za-z0-9._-]+|/mnt/[A-Za-z0-9._-]+'
 pattern+='|sk-[A-Za-z0-9_-]{20,}|sk_live_[0-9a-zA-Z]{24,}|AIza[0-9A-Za-z_-]{35}'
 pattern+='|(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}'
 pattern+="|(aws_secret_access_key|AWS_SECRET_ACCESS_KEY)[[:space:]]*[=:][[:space:]]*[\"']?[A-Za-z0-9/+=]{40}"
