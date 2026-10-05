@@ -29,8 +29,16 @@ skill's prose:
 ```bash
 ~/.claude/skills/issue-to-pr/tools/pr-round.sh \
   --repo <repo> --pr <n> --round <N> \
-  --brief <brief-file> --expect-branch <branch-name>
+  --brief <brief-file> --expect-branch <branch-name> \
+  [--dispositions <dispositions-file>]
 ```
+
+From round 2 on, write every Rejected and Accepted line from the prior
+rounds' Dispositions blocks to a file and pass it as `--dispositions`.
+The reviewer reads only its background file, never the PR comments;
+without the lines it re-raises findings already settled with evidence.
+Fixed lines stay out: a fix the reviewer still flags is a fix to
+re-check.
 
 `--expect-branch` binds the round to this loop's branch: a PR whose
 head is any other branch is a hallucinated number, and the script exits

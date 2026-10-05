@@ -559,6 +559,36 @@ assert_json '.runs[0].status == "partial"' "$rd/round.json" "a lost pass is reco
 assert_json '.reviewer_complete == false' "$rd/round.json" "a lost pass is never a complete review"
 assert_eq "$(jq '.runs | length' "$rd/round.json")" 1 "a lost pass is not retried per commit"
 
+echo "pr-round: --dispositions joins the brief and the prior dispositions for the reviewer"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+printf 'make add safe\n' >"$WS/brief.md"
+printf -- '- Rejected: [reviewer] the brief expansion splits paths: field-tested\n' >"$WS/dispositions.md"
+run_prr --repo "$repo" --pr 39 --round 2 --brief "$WS/brief.md" --dispositions "$WS/dispositions.md" >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
+assert_contains "$(cat "$rd/cmd.txt")" "--background-file $rd/background.md" "the reviewer reads the joined background"
+assert_contains "$(cat "$rd/background.md")" "make add safe" "the background carries the brief"
+assert_contains "$(cat "$rd/background.md")" "the brief expansion splits paths" "the background carries the dispositions"
+
+echo "pr-round: without --dispositions the brief passes through unchanged"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+printf 'make add safe\n' >"$WS/brief.md"
+run_prr --repo "$repo" --pr 39 --round 1 --brief "$WS/brief.md" >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
+assert_contains "$(cat "$rd/cmd.txt")" "--background-file $WS/brief.md" "the brief is the background"
+
+echo "pr-round: a relative or missing dispositions file is a usage error"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 2 --dispositions dispositions.md >/dev/null 2>&1
+assert_eq "$?" 2 "relative dispositions path exits 2"
+run_prr --repo "$repo" --pr 39 --round 2 --dispositions "$WS/nope.md" >/dev/null 2>&1
+assert_eq "$?" 2 "missing dispositions file exits 2"
+
 echo "pr-round: a missing range still retries per commit"
 new_sandbox
 make_pr_round_env

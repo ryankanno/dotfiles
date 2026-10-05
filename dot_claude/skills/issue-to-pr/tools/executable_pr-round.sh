@@ -7,11 +7,12 @@
 # tested code rather than in prose an agent might paraphrase.
 #
 # Interface in:  --repo <dir> --pr <n> --round <N> [--brief <file>]
-#                [--expect-branch <branch-name>]
+#                [--dispositions <file>] [--expect-branch <branch-name>]
 # Interface out: the round directory under
 #                $HOME/.cache/pr-loop/<owner/repo>/pr-<n>/round-<N>/ with
 #                each run's outputs plus round.json (range, identity, runs,
-#                reviewer_complete), and the directory path on stdout.
+#                reviewer_complete), background.md when --dispositions was
+#                given, and the directory path on stdout.
 # Exit codes: 0 the round ran; 2 usage; 3 identity mismatch; 4 the PR is
 # missing, not open, or not resolvable; 5 the repository or its refs could
 # not be resolved on the network; 6 the round dir already holds
@@ -20,17 +21,18 @@
 set -euo pipefail
 
 usage() {
-  printf 'usage: pr-round.sh --repo <dir> --pr <n> --round <N> [--brief <file>] [--expect-branch <branch-name>] [--rerun]\n' >&2
+  printf 'usage: pr-round.sh --repo <dir> --pr <n> --round <N> [--brief <file>] [--dispositions <file>] [--expect-branch <branch-name>] [--rerun]\n' >&2
   exit 2
 }
 
-repo="" pr="" round="" brief="" expect="" rerun=""
+repo="" pr="" round="" brief="" dispositions="" expect="" rerun=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --repo) [[ $# -ge 2 ]] || usage; repo="$2"; shift 2 ;;
     --pr) [[ $# -ge 2 ]] || usage; pr="$2"; shift 2 ;;
     --round) [[ $# -ge 2 ]] || usage; round="$2"; shift 2 ;;
     --brief) [[ $# -ge 2 ]] || usage; brief="$2"; shift 2 ;;
+    --dispositions) [[ $# -ge 2 ]] || usage; dispositions="$2"; shift 2 ;;
     --expect-branch) [[ $# -ge 2 ]] || usage; expect="$2"; shift 2 ;;
     --rerun) rerun=1; shift ;;
     *) usage ;;
@@ -43,6 +45,10 @@ case "$repo" in /*) ;; *) printf 'repo must be an absolute path\n' >&2; exit 2 ;
 if [[ -n "$brief" ]]; then
   case "$brief" in /*) ;; *) printf 'brief must be an absolute path\n' >&2; exit 2 ;; esac
   [[ -f "$brief" ]] || { printf 'brief not found: %s\n' "$brief" >&2; exit 2; }
+fi
+if [[ -n "$dispositions" ]]; then
+  case "$dispositions" in /*) ;; *) printf 'dispositions must be an absolute path\n' >&2; exit 2 ;; esac
+  [[ -f "$dispositions" ]] || { printf 'dispositions not found: %s\n' "$dispositions" >&2; exit 2; }
 fi
 command -v gh >/dev/null || { printf 'gh: not found\n' >&2; exit 127; }
 command -v jq >/dev/null || { printf 'jq: not found\n' >&2; exit 127; }
@@ -126,6 +132,20 @@ if [[ ${#leftovers[@]} -gt 0 ]]; then
   keep="$round_dir/superseded-$(date +%Y%m%d-%H%M%S)"
   mkdir -p "$keep"
   mv "${leftovers[@]}" "$keep/"
+fi
+
+# The reviewer sees only its background file, never the PR comments, so
+# without the prior rounds' dispositions it re-raises findings a refine
+# already rejected with evidence (measured on PR 40: the same rejected
+# finding came back twice in the next round).
+if [[ -n "$dispositions" ]]; then
+  {
+    if [[ -n "$brief" ]]; then cat "$brief"; printf '\n'; fi
+    printf '## Findings already dispositioned in earlier rounds\n\n'
+    printf 'Each line was rejected or accepted with recorded evidence. Do not report it again unless the code it cites changed.\n\n'
+    cat "$dispositions"
+  } >"$round_dir/background.md"
+  brief="$round_dir/background.md"
 fi
 
 runs="[]"
