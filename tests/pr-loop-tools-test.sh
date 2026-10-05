@@ -282,9 +282,12 @@ for key in sk-ant-api03-AbCdEfGhIjKlMnOpQrStUv sk-proj-AbCdEfGhIjKlMnOpQrStUv sk
 done
 
 echo "scan: other token formats are caught"
-for tok in ghp_AbCdEfGhIjKlMnOpQrStUvWxYz012345 github_pat_11AbCdEfGhIjKlMnOpQrSt AKIAABCDEFGHIJKLMNOP \
-  xoxb-1234567890-abcdef glpat-AbCdEfGhIjKlMnOpQrSt npm_AbCdEfGhIjKlMnOpQrStUvWx \
-  '-----BEGIN OPENSSH PRIVATE KEY-----' 'Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.abcdef'; do
+# The fakes are assembled at runtime so the source holds no token-shaped
+# literal for the repo's own secret scanner to flag.
+b=AbCdEfGhIjKlMnOpQrStUvWx up=ABCDEFGHIJKLMNOP key="PRIVATE KEY"
+for tok in "ghp_${b}012345" "github_pat_11${b}" "AKIA${up}" \
+  "xoxb-${up}-abcdef" "glpat-${b}" "npm_${b}" \
+  "-----BEGIN OPENSSH ${key}-----" "Authorization: Bearer eyJ${b}.abcdef"; do
   new_sandbox
   scan "x $tok"
   assert_eq "$RC" 1 "blocks ${tok:0:12}"
