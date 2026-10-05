@@ -133,8 +133,7 @@ else
   # Empty or incomplete range result: retry once per commit in the range.
   # The round is complete only when every commit run completed; one
   # success among failures is partial coverage, never a clean review.
-  recovered=1
-  commit_runs=0
+  i=0 recovered=1 commit_runs=0
   while read -r sha; do
     [[ -n "$sha" ]] || continue
     i=$((i + 1))
