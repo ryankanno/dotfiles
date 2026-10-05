@@ -352,6 +352,13 @@ new_sandbox
 scan "commit $(printf 'a%.0s' {1..40}) landed"
 assert_eq "$RC" 0 "a plain sha passes"
 
+echo "scan: the home rewrite has no stray backslash under the system bash"
+new_sandbox
+printf 'see /Users/someone/x\n' >"$WS/body.md"
+HOME=/Users/someone /bin/bash "$SCAN" "$WS/body.md" >/dev/null 2>&1
+assert_eq "$?" 0 "exits 0"
+assert_not_contains "$(cat "$WS/body.md")" '\~' "no literal backslash before the tilde"
+
 echo "scan: no file is a usage error"
 new_sandbox
 OUT="$("$SCAN" "$WS/nope.md" 2>&1)"; RC=$?

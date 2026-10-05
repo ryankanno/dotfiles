@@ -17,8 +17,12 @@ file="${1:-}"
   exit 2
 }
 
+# The tilde rides in a variable: bash 3.2 keeps the escaped form literal in
+# the replacement, and every posted comment from a stock macOS would carry
+# a stray backslash before the redacted path.
+tilde='~'
 body="$(<"$file")"
-printf '%s\n' "${body//"$HOME"/\~}" >"$file"
+printf '%s\n' "${body//"$HOME"/$tilde}" >"$file"
 
 # Token patterns require the variable part (a key body). Home and temp
 # patterns require the first path segment (a username, a scratch name,
