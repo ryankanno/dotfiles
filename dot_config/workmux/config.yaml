@@ -7,12 +7,8 @@ base_branch: auto
 worktree_dir: .worktrees
 
 # The loop dispatches with `-l <name>`, so harness and prompt stack ride together
-# in one layout name. The top-level panes keep the superpowers default, so a
-# manual `workmux add` without `-l` behaves exactly as before.
-panes:
-  - command: 'claude --append-system-prompt "Use the superpowers skills to plan and complete this task."'
-    focus: true
-  - split: horizontal
+# in one layout name. No top-level panes: a manual `workmux add` without `-l`
+# keeps the binary's own default.
 
 layouts:
   claude-sp:
