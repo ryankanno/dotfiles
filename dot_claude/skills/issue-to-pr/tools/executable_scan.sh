@@ -31,7 +31,14 @@ fi
 # touch stays for the patterns to block: fail-closed, never silently
 # half-redacted. The replacement rides quoted so no shell expands it.
 body="$(<"$file")" || { printf 'scan failed (unreadable body)\n' >&2; exit 2; }
-printf '%s\n' "${body//"$HOME/"/"~/"}" >"$file"
+
+# The rewrite lands atomically: staged to a temp file beside the body and
+# moved over it, so an interrupted write cannot destroy the outbound
+# comment, and a symlinked body path swaps the link, never its target.
+dir="${file%/*}"; [[ "$dir" == "$file" ]] && dir=.
+tmp="$(mktemp "$dir/.scan.XXXXXXXX")" || { printf 'scan failed (cannot stage the rewrite)\n' >&2; exit 2; }
+printf '%s\n' "${body//"$HOME/"/"~/"}" >"$tmp"
+mv "$tmp" "$file"
 
 # Token patterns require the variable part (a key body). Home and temp
 # patterns require the first path segment (a username, a scratch name,

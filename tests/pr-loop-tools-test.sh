@@ -335,6 +335,15 @@ scan 'see /Users/someoneelse/x at 4'
 assert_eq "$RC" 1 "a sibling home is the hit the gate defines"
 assert_contains "$BODY" '/Users/someoneelse/x' "the body is not rewritten into nonsense"
 
+echo "scan: the rewrite replaces a symlink, not its target"
+new_sandbox
+printf 'see /Users/someone/x\n' >"$WS/victim.md"
+ln -s "$WS/victim.md" "$WS/body.md"
+HOME=/Users/someone "$SCAN" "$WS/body.md" >/dev/null 2>&1
+assert_eq "$?" 0 "exits 0"
+assert_contains "$(cat "$WS/victim.md")" '/Users/someone/x' "the symlink target is untouched"
+assert_contains "$(cat "$WS/body.md")" '~/x' "the link itself now carries the redacted body"
+
 echo "scan: a bare own home is blocked rather than half-redacted"
 new_sandbox
 scan 'at /Users/someone in prose'
