@@ -38,4 +38,4 @@ awk -v p="$path" -v s="$start" -v e="$end" '
     if (s + 0 <= r[2] + 0 && e + 0 >= r[1] + 0) { hit = 1; exit }
   }
   END { print (hit ? "new" : "reviewed") }
-' "$dir/delta.txt" 2>/dev/null || printf 'reviewed\n'
+' "$dir/delta.txt" 2>/dev/null || printf 'new\n'
