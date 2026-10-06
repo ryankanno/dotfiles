@@ -268,7 +268,7 @@ if [[ -n "$settled" ]]; then
         printf 'the assembled background is %s bytes; the brief with the standing dispositions assembles past the %s reviewer'"'"'s %s-character background limit, and the review would abort before reading a line, once per commit. Condense the brief: its asks, the settled decisions, and the constraints.\n' \
           "$assembled" "$reviewer" "$limit" >&2
       else
-        printf 'the assembled background is %s bytes; the standing dispositions file assembles past the %s reviewer'"'"'s %s-character background limit, and the review would abort before reading a line, once per commit. Condense the dispositions file: fewer entries or trimmed evidence.\n' \
+        printf 'the assembled background is %s bytes; the standing dispositions assemble past the %s reviewer'"'"'s %s-character background limit, and the review would abort before reading a line, once per commit. Condense the standing dispositions: fewer entries or trimmed evidence.\n' \
           "$assembled" "$reviewer" "$limit" >&2
       fi
       exit 2
@@ -355,6 +355,7 @@ if [[ -n "$prior_findings" ]]; then printf '%s\n' "$prior_findings" >"$round_dir
 # before the round dir was touched; committing it here is safe.
 if [[ -n "$settled" ]]; then
   cat "$tmp_bg" >"$round_dir/background.md"
+  rm -f "$tmp_bg"
   tmp_bg=""
   brief="$round_dir/background.md"
 fi

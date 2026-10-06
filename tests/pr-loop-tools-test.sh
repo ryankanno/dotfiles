@@ -781,7 +781,16 @@ head -c $((LIMIT)) </dev/zero | tr '\0' 'x' >"$WS/dispositions.md"
 OUT="$(run_prr --repo "$repo" --pr 39 --round 1 --dispositions "$WS/dispositions.md" 2>&1)"; RC=$?
 assert_eq "$RC" 2 "a prose-only dispositions file over the limit exits 2"
 assert_not_contains "$OUT" "Condense the brief" "the remediation never names an input that was not passed"
-assert_contains "$OUT" "dispositions file" "the remediation names the actual oversized input"
+assert_contains "$OUT" "Condense the standing dispositions" "the remediation names the actual oversized input, whatever its source"
+
+echo "pr-round: a successful round leaves no background temp behind"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+mkdir -p "$WS/tmpdir"
+printf -- '- Rejected: [critic] one standing disposition with its recorded evidence\n' >"$WS/dispositions.md"
+( export TMPDIR="$WS/tmpdir"; run_prr --repo "$repo" --pr 39 --round 1 --dispositions "$WS/dispositions.md" >/dev/null 2>&1 )
+assert_eq "$(find "$WS/tmpdir" -maxdepth 1 -name 'pr-round-bg.*' | wc -l | tr -d ' ')" "0" "the temp is removed on the success path"
 
 echo "pr-round: dispositions fill the background newest first, under the limit"
 new_sandbox
