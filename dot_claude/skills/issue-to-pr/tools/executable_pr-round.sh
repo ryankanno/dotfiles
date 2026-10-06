@@ -16,7 +16,10 @@
 #                prior head otherwise), delta.txt (the
 #                path:start-end hunks changed since the prior round's head,
 #                from round 2 on) with names.txt (the listing the hunks
-#                enumerate over), background.md when there are prior
+#                enumerate over), settled.md (the standing Rejected and
+#                Accepted lines) and prior-findings.md (the newest round
+#                comment's blocking findings) when there are any, which
+#                critic-input.sh reads, background.md when there are prior
 #                dispositions (read from this loop's own round comments
 #                unless --dispositions names a file) or a delta, and the
 #                directory path on stdout.
@@ -139,25 +142,33 @@ base_sha=$(git -C "$repo" merge-base "origin/$base" "$head") || {
 # comments count, the marker on line 1 and our own author, or anyone who
 # can comment on the PR could talk the reviewer out of a real finding.
 # Fixed lines stay out: a fix the reviewer still flags needs re-checking.
+me=$(gh api user --jq .login) || {
+  printf 'cannot resolve the gh user for the prior round comments\n' >&2
+  exit 5
+}
+# The pr view comments field is capped at its first page; the issue
+# comments endpoint paginates, so a long PR cannot silently lose the
+# standing dispositions. One JSON string per line keeps each body whole.
+bodies=$(gh api --paginate "repos/$owner_repo/issues/$pr/comments" \
+    --jq '.[] | select(.user.login == "'"$me"'") | select(.body | startswith("<!-- pr-loop-comment -->")) | .body | @json') || {
+  printf 'cannot read the PR comments\n' >&2
+  exit 5
+}
 if [[ -n "$dispositions" ]]; then
   settled=$(cat "$dispositions")
 else
-  me=$(gh api user --jq .login) || {
-    printf 'cannot resolve the gh user for the prior round comments\n' >&2
-    exit 5
-  }
-  # The pr view comments field is capped at its first page; the issue
-  # comments endpoint paginates, so a long PR cannot silently lose the
-  # standing dispositions.
-  settled=$(gh api --paginate "repos/$owner_repo/issues/$pr/comments" \
-      --jq '.[] | select(.user.login == "'"$me"'") | select(.body | startswith("<!-- pr-loop-comment -->")) | .body' \
+  settled=$(jq -r '.' <<<"$bodies" \
     | awk '/<summary>Dispositions<\/summary>/ { on = 1; next }
            on && /^<\/details>/ { on = 0 }
-           on && /^- (Rejected|Accepted):/') || {
-    printf 'cannot read the PR comments\n' >&2
-    exit 5
-  }
+           on && /^- (Rejected|Accepted):/')
 fi
+# The newest round comment's blocking findings are what this round's
+# delta answers. critic-input.sh hands them to the critic verbatim, so the
+# critic checks the fixes against the claims, not against a paraphrase.
+prior_findings=$(tail -n 1 <<<"$bodies" | jq -r '.' \
+  | awk '/^\*\*Findings:\*\*/ { on = 1; next }
+         on && (/^\*\*/ || /^<details>/) { on = 0 }
+         on && /^[0-9]+\. /')
 
 # Evidence is never silently overwritten or reused: a re-invocation into a
 # round that already holds anything besides superseded runs, including the
@@ -230,6 +241,9 @@ if [[ -n "$prior_head" ]]; then
   done <"$names"
   delta=$(cat "$round_dir/delta.txt")
 fi
+
+if [[ -n "$settled" ]]; then printf '%s\n' "$settled" >"$round_dir/settled.md"; fi
+if [[ -n "$prior_findings" ]]; then printf '%s\n' "$prior_findings" >"$round_dir/prior-findings.md"; fi
 
 if [[ -n "$settled" || -n "$delta" ]]; then
   {

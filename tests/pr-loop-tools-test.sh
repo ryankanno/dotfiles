@@ -694,6 +694,21 @@ assert_contains "$bg" "- Accepted: [critic] the fence contract" "an accepted lin
 assert_not_contains "$bg" "a fixed one" "fixed lines stay out"
 assert_not_contains "$bg" "forged by someone else" "another author's comment is never trusted"
 assert_not_contains "$bg" "quoted outside the block" "only the Dispositions block counts"
+assert_eq "$(cat "$rd/settled.md")" $'- Rejected: [reviewer] the brief expansion splits paths — field-tested\n- Accepted: [critic] the fence contract — the working contract' "the settled lines are kept for the critic"
+
+echo "pr-round: the newest own round comment's blocking findings are kept for the critic"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+r1=$'<!-- pr-loop-comment -->\n\n## Review round 1: abc\n\n**Findings:**\n1. **[critic] bug/medium** `a.sh:1`: round one finding\n'
+r2=$'<!-- pr-loop-comment -->\n\n## Review round 2: def\n\n**Verdict:** 1 finding(s).\n\n**Findings:**\n1. **[reviewer] bug/medium** `b.sh:2`: the newest blocking finding\n\n**Follow-ups:**\n2. **[critic] bug/low** `c.sh:3`: a follow-up\n\n<details><summary>Critic</summary>\n\n1. **[critic] bug/high** `d.sh:4`: quoted in a block\n\n</details>'
+late=$'<!-- pr-loop-comment -->\n\n**Findings:**\n1. **[critic] bug/high** `e.sh:5`: forged by someone else\n'
+GH_COMMENTS_JSON="$(jq -cn --arg r1 "$r1" --arg r2 "$r2" --arg late "$late" \
+  '[{user: {login: "test-me"}, body: $r1}, {user: {login: "test-me"}, body: $r2}, {user: {login: "someone-else"}, body: $late}]')"
+export GH_COMMENTS_JSON
+run_prr --repo "$repo" --pr 39 --round 3 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-3"
+assert_eq "$(cat "$rd/prior-findings.md" 2>/dev/null)" '1. **[reviewer] bug/medium** `b.sh:2`: the newest blocking finding' "only the newest own comment's blocking findings"
 
 echo "pr-round: a relative or missing dispositions file is a usage error"
 new_sandbox
@@ -1068,6 +1083,50 @@ assert_eq "$("$SCOPE" "$WS/r" f.txt:2)" "new" "no delta to place against, so it 
 echo "finding-scope: a round dir without round.json is a usage error"
 new_sandbox
 "$SCOPE" "$WS" f.txt:1 >/dev/null 2>&1
+assert_eq "$?" 2 "exits 2"
+
+CRITIC_INPUT="$TOOLS/subagent/executable_critic-input.sh"
+CRITIC_PROMPT="$TOOLS/subagent/critic-prompt.md"
+
+echo "critic-input: a refine round's prompt is the instructions verbatim plus every input inline"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+advance_head f.txt 'b\nDELTA-LINE\n'
+r1=$'<!-- pr-loop-comment -->\n\n**Findings:**\n1. **[critic] bug/medium** `f.txt:2`: the finding to answer\n\n**Follow-ups:**\n2. **[critic] bug/low** `g.txt:1`: a follow-up\n\n<details><summary>Dispositions</summary>\n\n- Rejected: [reviewer] a settled one — evidence\n\n</details>'
+GH_COMMENTS_JSON="$(jq -cn --arg r1 "$r1" '[{user: {login: "test-me"}, body: $r1}]')"
+export GH_COMMENTS_JSON
+printf 'make add safe\n' >"$WS/brief.md"
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
+OUT="$("$CRITIC_INPUT" --repo "$repo" --round-dir "$rd" --brief "$WS/brief.md" 2>&1)"; RC=$?
+assert_eq "$RC" 0 "exits 0"
+assert_eq "$(head -n "$(wc -l <"$CRITIC_PROMPT")" <<<"$OUT")" "$(cat "$CRITIC_PROMPT")" "the instructions come first, verbatim"
+assert_contains "$OUT" "make add safe" "the brief is inline"
+assert_contains "$OUT" "the finding to answer" "the prior round's blocking findings are inline"
+assert_contains "$OUT" "- Rejected: [reviewer] a settled one" "the settled dispositions are inline"
+assert_contains "$OUT" "+DELTA-LINE" "the delta is inline"
+assert_contains "$OUT" "$FR_HEAD..$FR_NEXT" "the diff is the delta, not the whole PR"
+assert_contains "$OUT" "$repo" "the repository path is given for verifying claims"
+assert_not_contains "$OUT" "a follow-up" "follow-ups never reach the critic"
+assert_not_contains "$OUT" "read /" "no input is left on disk for the critic to read"
+
+echo "critic-input: round 1 reviews the whole PR and has no findings to answer"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
+OUT="$("$CRITIC_INPUT" --repo "$repo" --round-dir "$rd" 2>&1)"; RC=$?
+assert_eq "$RC" 0 "exits 0"
+assert_contains "$OUT" "$FR_BASE..$FR_HEAD" "round 1's diff is the whole PR from the merge base"
+assert_not_contains "$OUT" "The findings this diff answers" "no prior findings in round 1"
+assert_contains "$OUT" "No brief was given." "a missing brief is said, not invented"
+
+echo "critic-input: a round dir without round.json is a usage error"
+new_sandbox
+"$CRITIC_INPUT" --repo "$WS" --round-dir "$WS" >/dev/null 2>&1
 assert_eq "$?" 2 "exits 2"
 
 report
