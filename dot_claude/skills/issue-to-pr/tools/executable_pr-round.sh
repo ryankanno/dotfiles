@@ -174,17 +174,21 @@ if [[ -n "$dispositions" ]]; then
   settled=$(cat "$dispositions")
 else
   settled=$(jq -r '.' <<<"$bodies" \
-    | awk '/<summary>Dispositions<\/summary>/ { on = 1; next }
+     | awk '/<summary>Dispositions<\/summary>/ { on = 1; next }
            on && /^<\/details>/ { on = 0 }
-           on && /^- (Rejected|Accepted):/')
+           on && /^- (Rejected|Accepted):/ { keep = 1; print; next }
+           on && /^- / { keep = 0; next }
+           on && keep && NF')
 fi
 # The newest round comment's blocking findings are what this round's
 # delta answers. critic-input.sh hands them to the critic verbatim, so the
 # critic checks the fixes against the claims, not against a paraphrase.
+# A claim can wrap onto continuation lines; every non-blank line of the
+# section is kept so a wrapped claim arrives whole.
 prior_findings=$(tail -n 1 <<<"$bodies" | jq -r '.' \
   | awk '/^\*\*Findings:\*\*/ { on = 1; next }
          on && (/^\*\*/ || /^<details>/) { on = 0 }
-         on && /^[0-9]+\. /')
+         on && NF')
 
 # Evidence is never silently overwritten or reused: a re-invocation into a
 # round that already holds anything besides superseded runs, including the
