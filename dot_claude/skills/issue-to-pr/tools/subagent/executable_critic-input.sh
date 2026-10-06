@@ -39,6 +39,7 @@ prompt="$(cd "$(dirname "$0")" && pwd)/critic-prompt.md"
 round=$(jq -r '.round' "$dir/round.json")
 head=$(jq -r '.range.head' "$dir/round.json")
 from=$(jq -r '.range.reviewed_from // .range.prior_head // .range.base' "$dir/round.json")
+prior=$(jq -r '.range.prior_head // empty' "$dir/round.json")
 diff=$(git -C "$repo" diff --no-color --no-ext-diff "$from" "$head") || {
   printf 'cannot diff %s..%s\n' "$from" "$head" >&2
   exit 5
@@ -51,7 +52,14 @@ printf '## The brief\n\n'
 if [[ -n "$brief" ]]; then cat "$brief"; else printf 'No brief was given.\n'; fi
 if [[ -s "$dir/prior-findings.md" ]]; then
   printf '\n## The findings this diff answers\n\n'
-  printf 'The prior round named these as blocking; the diff below is the refine'"'"'s answer to them.\n\n'
+  # A refine round's diff is its answer to those findings; on a
+  # convergence round the head is unchanged, the diff is the whole PR,
+  # and no refine stands between it and the findings it re-checks.
+  if [[ "$from" == "$prior" ]]; then
+    printf 'The prior round named these as blocking; the diff below is the refine'"'"'s answer to them.\n\n'
+  else
+    printf 'The prior round named these as blocking; no refine followed, and the diff below is the whole PR, re-reviewed from the merge base.\n\n'
+  fi
   cat "$dir/prior-findings.md"
 fi
 if [[ -s "$dir/settled.md" ]]; then

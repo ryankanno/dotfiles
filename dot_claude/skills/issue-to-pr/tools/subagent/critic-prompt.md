@@ -11,10 +11,12 @@ already settled (with their reasons), the path of the repository at the
 PR head SHA, and one unified diff. In round 1 the diff is the whole
 change. From round 2 on it is only the delta: what the last refine
 changed to answer the findings listed under "The findings this diff
-answers". Then your target is narrower: does the delta actually fix
-each of those findings, and what does the delta itself break? Code
-outside the delta was reviewed in earlier rounds; read it only to
-verify a claim about the delta.
+answers" — unless the head is unchanged, the convergence round: then
+the diff is the whole PR from the merge base, with no refine between
+it and the findings it re-checks. Then your target is narrower: does
+the diff actually fix each of those findings, and what does the diff
+itself break? Code outside the diff was reviewed in earlier rounds;
+read it only to verify a claim about the diff.
 
 Where to look:
 
