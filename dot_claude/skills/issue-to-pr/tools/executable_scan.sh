@@ -43,7 +43,7 @@ body="$(cat "$file")" || { printf 'scan failed (unreadable body)\n' >&2; exit 2;
 dir="${file%/*}"; [[ "$dir" == "$file" ]] && dir=.
 tmp="$(mktemp "$dir/.scan.XXXXXXXX")" || { printf 'scan failed (cannot stage the rewrite)\n' >&2; exit 2; }
 home_prefix="$HOME/"
-redaction='~/'
+redaction=$'~/'
 printf '%s\n' "${body//"$home_prefix"/$redaction}" >"$tmp"
 mv "$tmp" "$file"
 
