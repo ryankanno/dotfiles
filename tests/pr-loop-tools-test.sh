@@ -735,6 +735,16 @@ assert_eq "$RC" 2 "a near-limit brief with dispositions exits 2"
 assert_contains "$OUT" "assembles past" "the message names the assembled background as the ceiling"
 assert_eq "$([[ -e "$rd/cmd.txt" ]] && printf yes || printf no)" "no" "no review ran, so no per-commit retry storm"
 
+echo "pr-round: a near-limit brief without dispositions runs: the background is the brief alone"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+head -c $((LIMIT - 100)) </dev/zero | tr '\0' 'x' >"$WS/brief.md"
+run_prr --repo "$repo" --pr 39 --round 1 --brief "$WS/brief.md" >/dev/null 2>&1; RC=$?
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
+assert_eq "$RC" 0 "a near-limit brief with no standing dispositions runs"
+assert_eq "$([[ -e "$rd/cmd.txt" ]] && printf yes || printf no)" "yes" "the review ran"
+
 echo "pr-round: dispositions fill the background newest first, under the limit"
 new_sandbox
 make_pr_round_env
@@ -770,6 +780,25 @@ assert_not_contains "$bg" "settled finding number 31" "the boundary disposition 
 omitted_n="$(sed -n 's/.*(\([0-9][0-9]*\) older dispositions omitted.*/\1/p' <<<"$bg")"
 kept_e="$(grep -c '^- ' <<<"$bg" || true)"
 assert_eq "$omitted_n" "$(( 40 - kept_e ))" "the omission counts entries, not lines"
+
+echo "pr-round: non-entry prose in a dispositions file is carried, never silently dropped"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+head -c $((LIMIT - 1000)) </dev/zero | tr '\0' 'x' >"$WS/brief.md"
+printf -- '# Standing dispositions from the register\n- Rejected: [critic] settled finding with its recorded evidence\n- Rejected: [critic] another settled finding with its evidence\n' >"$WS/dispositions.md"
+run_prr --repo "$repo" --pr 39 --round 2 --brief "$WS/brief.md" --dispositions "$WS/dispositions.md" >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
+assert_contains "$(cat "$rd/background.md")" "# Standing dispositions from the register" "a heading line ships with its entries"
+
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+head -c $((LIMIT - 1000)) </dev/zero | tr '\0' 'x' >"$WS/brief.md"
+printf -- 'prose the caller wrote with no marker lines at all\n' >"$WS/dispositions.md"
+run_prr --repo "$repo" --pr 39 --round 2 --brief "$WS/brief.md" --dispositions "$WS/dispositions.md" >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
+assert_contains "$(cat "$rd/background.md")" "prose the caller wrote with no marker lines at all" "a prose-only file ships whole"
 
 echo "pr-round: a relative or missing dispositions file is a usage error"
 new_sandbox
@@ -1217,6 +1246,8 @@ OUT="$("$CRITIC_INPUT" --repo "$repo" --round-dir "$rd" 2>&1)"; RC=$?
 assert_eq "$RC" 0 "exits 0"
 assert_contains "$OUT" "no refine followed" "an unchanged head is never a refine's answer"
 assert_not_contains "$OUT" "refine's answer" "the fallback chain no longer decides the preamble"
+assert_contains "$OUT" "$FR_BASE..$FR_HEAD" "the re-review diff is the whole PR from the merge base"
+assert_contains "$OUT" "diff --git" "the re-review diff is not empty"
 
 echo "critic-input: a round dir without round.json is a usage error"
 new_sandbox

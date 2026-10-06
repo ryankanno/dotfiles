@@ -25,8 +25,9 @@
 #                the manifest's reviewer_background_limit), and the
 #                directory path on stdout.
 # Exit codes: 0 the round ran; 2 usage, the environment is unusable
-# (HOME unset), or the brief alone exceeds the reviewer's background
-# limit; 3 identity mismatch; 4 the PR is
+# (HOME unset), or the brief cannot fit the reviewer's background limit,
+# alone or once the standing dispositions assemble into it; 3 identity
+# mismatch; 4 the PR is
 # missing, not open, or not resolvable; 5 the repository, its refs, or
 # the changed-file listing could not be resolved; 6 the round dir already holds
 # evidence and --rerun was not passed; 127 a dependency is missing. A
@@ -90,17 +91,17 @@ done
 # anything, and the per-commit retry then repeats the abort once per
 # commit (measured on sudoku PR 191: an 11083-character brief, 15 runs, no
 # review). Sizes count bytes, never fewer than characters, so a background
-# that fits in bytes fits the reviewer's character limit. The guard and
-# the assembly below share the header text and the 120-byte omission-line
-# reserve, so a brief the guard passes can never overflow the assembly
-# (measured on PR 40: a limit-sized brief assembled to limit+264).
+# that fits in bytes fits the reviewer's character limit. The guard stops
+# a brief that cannot fit alone; the assembly's own check below stops a
+# background that overflows once the standing dispositions join it, so
+# neither window reaches the reviewer (measured on PR 40: a limit-sized
+# brief assembled to limit+264).
 dispositions_header=$'## Findings already dispositioned in earlier rounds\n\nEach line was rejected or accepted with recorded evidence. Do not report it again unless the code it cites changed.\n\n'
-header_bytes=$(printf '%s' "$dispositions_header" | wc -c | tr -d ' ')
 limit=$(jq -r '.reviewer_background_limit // 0' "$manifest")
 if [[ -n "$brief" && "$limit" -gt 0 ]]; then
   brief_size=$(wc -c <"$brief" | tr -d ' ')
-  if [[ $(( brief_size + 1 + header_bytes + 120 )) -gt "$limit" ]]; then
-    printf 'brief is %s bytes; with the standing dispositions it assembles past the %s reviewer'"'"'s %s-character background limit, and the review would abort before reading a line, once per commit. Condense the brief to the task: its asks, the settled decisions, and the constraints.\n' \
+  if [[ "$brief_size" -gt "$limit" ]]; then
+    printf 'brief is %s bytes; the %s reviewer accepts at most %s characters of background. Condense the brief to the task: its asks, the settled decisions, and the constraints.\n' \
       "$brief_size" "$reviewer" "$limit" >&2
     exit 2
   fi
@@ -293,6 +294,12 @@ if [[ -n "$settled" ]]; then
       { l[NR] = $0 }
       /^- / { s[++n] = NR }
       END {
+        # No entries: carry the file whole; the assembled-size check
+        # below bounds it.
+        if (n == 0) { for (i = 1; i <= NR; i++) print l[i]; exit }
+        # Leading prose rides with the oldest entry: it ships when the
+        # oldest entry ships and gives way when it does.
+        s[1] = 1
         # An entry is a marker line plus its continuations; whole entries
         # give way, newest first, so the background never ships an
         # orphaned continuation without its claim.
@@ -319,6 +326,17 @@ if [[ -n "$settled" ]]; then
       printf '\n(%s older dispositions omitted: the reviewer accepts at most %s characters of background.)\n' "$omitted" "$limit"
     fi
   } >>"$round_dir/background.md"
+  # The honest ceiling: the assembled artifact itself, checked before any
+  # review runs, so no reserve arithmetic can reject a background that
+  # fits or pass one that does not.
+  if [[ "$limit" -gt 0 ]]; then
+    assembled=$(wc -c <"$round_dir/background.md" | tr -d ' ')
+    if [[ "$assembled" -gt "$limit" ]]; then
+      printf 'the assembled background is %s bytes; the brief with the standing dispositions assembles past the %s reviewer'"'"'s %s-character background limit, and the review would abort before reading a line, once per commit. Condense the brief: its asks, the settled decisions, and the constraints.\n' \
+        "$assembled" "$reviewer" "$limit" >&2
+      exit 2
+    fi
+  fi
   brief="$round_dir/background.md"
 fi
 
