@@ -29,15 +29,22 @@ fi
 # would also rewrite a sibling path that merely extends it and post it
 # past the gate (measured round 4), and a bare home the anchor cannot
 # touch stays for the patterns to block: fail-closed, never silently
-# half-redacted. The replacement rides quoted so no shell expands it.
-body="$(<"$file")" || { printf 'scan failed (unreadable body)\n' >&2; exit 2; }
+# half-redacted. The replacement rides in a variable because the tools
+# deploy under macOS bash 3.2, where an inline-quoted replacement
+# inserts its quote characters into the body (measured on the CI
+# runner: the rewrite produced `"/"~/"` instead of `~/`). The read uses
+# cat, not the $(< file) special form, whose error status a caller
+# cannot distinguish across bash versions.
+body="$(cat "$file")" || { printf 'scan failed (unreadable body)\n' >&2; exit 2; }
 
 # The rewrite lands atomically: staged to a temp file beside the body and
 # moved over it, so an interrupted write cannot destroy the outbound
 # comment, and a symlinked body path swaps the link, never its target.
 dir="${file%/*}"; [[ "$dir" == "$file" ]] && dir=.
 tmp="$(mktemp "$dir/.scan.XXXXXXXX")" || { printf 'scan failed (cannot stage the rewrite)\n' >&2; exit 2; }
-printf '%s\n' "${body//"$HOME/"/"~/"}" >"$tmp"
+home_prefix="$HOME/"
+redaction='~/'
+printf '%s\n' "${body//"$home_prefix"/$redaction}" >"$tmp"
 mv "$tmp" "$file"
 
 # Token patterns require the variable part (a key body). Home and temp

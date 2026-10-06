@@ -443,6 +443,7 @@ printf 'see x\n' >"$WS/body.md"
 chmod 000 "$WS/body.md"
 OUT="$("$SCAN" "$WS/body.md" 2>&1)"; RC=$?
 assert_eq "$RC" 2 "exits 2 per the documented contract"
+assert_contains "$OUT" "scan failed" "the failure is the scan's own report"
 chmod 644 "$WS/body.md"
 
 echo "scan: no file is a usage error"
