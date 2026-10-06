@@ -105,9 +105,12 @@ leaves out the follow-ups.
   --repo <repo> --round-dir <round-dir> --brief <brief-file>
 ```
 
-Its findings arrive numbered with file, line, the claim, the break, and
-severity. Findings that do not reference that diff are dropped, per the
-binding's contract.
+Its findings arrive numbered with file, line, the claim, the input or
+state that reaches it, the harm, severity, and how it checked. Findings
+that do not reference that diff are dropped, per the binding's
+contract. Its "Unconfirmed candidates" section stays verbatim in the
+collapsed Critic block and never enters the Findings or Follow-ups
+lists: an unconfirmed candidate is not a finding.
 
 ## 4. The caller's own read
 

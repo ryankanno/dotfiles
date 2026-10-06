@@ -43,11 +43,18 @@ The subagent returns numbered findings, each carrying:
 
 - file and line in the diff's terms,
 - the claim: what is broken, incorrect, or missing,
-- the break: how it fails, concretely,
+- the input, state or sequence that reaches it and the observable harm,
 - severity: high, medium, or low,
-- for any claim about what renders or happens at runtime: the file and
-  line of the code that produces it. A behavior claim it cannot cite
-  from the code is reported as unverifiable, not asserted.
+- how it checked, and for any claim about what renders or happens at
+  runtime the file and line of the code that produces it.
+
+Then a final "Unconfirmed candidates" section: suspicions it could not
+ground that way, one line each with what is missing. The caller shows
+that section verbatim in the collapsed critic block and never counts
+it: an unconfirmed candidate is neither a blocking finding nor a
+follow-up. This is roborev's evidence bar (its `review_guidelines`),
+where the refine loop converged; the adversarial "prove otherwise"
+framing it replaces produced at least one medium every round on PR 40.
 
 Findings that do not reference the diff are out of contract and are
 dropped by the caller. An empty findings list is a valid result.
