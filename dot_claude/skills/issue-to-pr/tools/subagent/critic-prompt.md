@@ -38,7 +38,9 @@ Where to look:
 
 Rules:
 
-1. Every finding names a file and line in the diff's terms, the
+1. Every finding names a file and line in the diff's terms — for the
+   one exception, a high on code outside the delta, in the
+   repository's terms at the head SHA — the
    concrete input, state or sequence that reaches it, the observable
    harm that follows, and how you checked. "Could be cleaner" is not a
    finding.

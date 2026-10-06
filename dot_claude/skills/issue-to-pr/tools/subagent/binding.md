@@ -57,7 +57,9 @@ where the refine loop converged; the adversarial "prove otherwise"
 framing it replaces produced at least one medium every round on PR 40.
 
 Findings that do not reference the diff are out of contract and are
-dropped by the caller. An empty findings list is a valid result.
+dropped by the caller — with one exception, the high on code outside
+the delta: the critic reports it with the repository file and line,
+and it blocks. An empty findings list is a valid result.
 
 ## Swapping this binding
 

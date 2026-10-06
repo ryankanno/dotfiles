@@ -44,7 +44,9 @@ From round 2 on, `round.json` carries `range.prior_head` (the previous
 round's head) and the round directory holds `delta.txt`, the
 `path:start-end` hunks changed since that head. The reviewer then
 reviews only the delta, from `range.reviewed_from` (the prior head) to
-the PR head: a finding outside it could only be a follow-up. An empty
+the PR head: a finding outside it can only be a follow-up, except a
+high. High severity blocks anywhere, in the delta or out, and the
+caller counts it under Findings. An empty
 delta (the same head again, as in a convergence round) reviews the
 whole PR from the merge base instead, never an empty range.
 
