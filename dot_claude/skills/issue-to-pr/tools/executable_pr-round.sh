@@ -90,12 +90,17 @@ done
 # anything, and the per-commit retry then repeats the abort once per
 # commit (measured on sudoku PR 191: an 11083-character brief, 15 runs, no
 # review). Sizes count bytes, never fewer than characters, so a background
-# that fits in bytes fits the reviewer's character limit.
+# that fits in bytes fits the reviewer's character limit. The guard and
+# the assembly below share the header text and the 120-byte omission-line
+# reserve, so a brief the guard passes can never overflow the assembly
+# (measured on PR 40: a limit-sized brief assembled to limit+264).
+dispositions_header=$'## Findings already dispositioned in earlier rounds\n\nEach line was rejected or accepted with recorded evidence. Do not report it again unless the code it cites changed.\n\n'
+header_bytes=$(printf '%s' "$dispositions_header" | wc -c | tr -d ' ')
 limit=$(jq -r '.reviewer_background_limit // 0' "$manifest")
 if [[ -n "$brief" && "$limit" -gt 0 ]]; then
   brief_size=$(wc -c <"$brief" | tr -d ' ')
-  if [[ "$brief_size" -gt "$limit" ]]; then
-    printf 'brief is %s bytes; the %s reviewer accepts at most %s characters of background, and later rounds add the standing dispositions to it. Condense the brief to the task: its asks, the settled decisions, and the constraints.\n' \
+  if [[ $(( brief_size + 1 + header_bytes + 120 )) -gt "$limit" ]]; then
+    printf 'brief is %s bytes; with the standing dispositions it assembles past the %s reviewer'"'"'s %s-character background limit, and the review would abort before reading a line, once per commit. Condense the brief to the task: its asks, the settled decisions, and the constraints.\n' \
       "$brief_size" "$reviewer" "$limit" >&2
     exit 2
   fi
@@ -173,12 +178,18 @@ bodies=$(gh api --paginate "repos/$owner_repo/issues/$pr/comments" \
 if [[ -n "$dispositions" ]]; then
   settled=$(cat "$dispositions")
 else
+  # A settled entry is the marker line plus its indented continuations;
+  # a blank line, another marker, or column-0 prose ends it. Structural
+  # lines inside the block ("Round 2's 10 findings, all fixed:") are
+  # column-0 prose and never harvest as settled law.
   settled=$(jq -r '.' <<<"$bodies" \
      | awk '/<summary>Dispositions<\/summary>/ { on = 1; next }
            on && /^<\/details>/ { on = 0 }
            on && /^- (Rejected|Accepted):/ { keep = 1; print; next }
            on && /^- / { keep = 0; next }
-           on && keep && NF')
+           on && NF == 0 { keep = 0; next }
+           on && keep && /^[[:space:]]/ { print; next }
+           on && NF { keep = 0 }')
 fi
 # The newest round comment's blocking findings are what this round's
 # delta answers. critic-input.sh hands them to the critic verbatim, so the
@@ -272,8 +283,7 @@ if [[ -n "$prior_findings" ]]; then printf '%s\n' "$prior_findings" >"$round_dir
 if [[ -n "$settled" ]]; then
   {
     if [[ -n "$brief" ]]; then cat "$brief"; printf '\n'; fi
-    printf '## Findings already dispositioned in earlier rounds\n\n'
-    printf 'Each line was rejected or accepted with recorded evidence. Do not report it again unless the code it cites changed.\n\n'
+    printf '%s' "$dispositions_header"
   } >"$round_dir/background.md"
   kept="$settled" omitted=0
   if [[ "$limit" -gt 0 ]]; then
@@ -281,14 +291,26 @@ if [[ -n "$settled" ]]; then
     budget=$(( limit - $(wc -c <"$round_dir/background.md") - 120 ))
     kept=$(printf '%s\n' "$settled" | LC_ALL=C awk -v b="$budget" '
       { l[NR] = $0 }
+      /^- / { s[++n] = NR }
       END {
-        used = 0; first = NR + 1
-        for (i = NR; i >= 1; i--) { n = length(l[i]) + 1; if (used + n > b) break; used += n; first = i }
-        for (i = first; i <= NR; i++) print l[i]
+        # An entry is a marker line plus its continuations; whole entries
+        # give way, newest first, so the background never ships an
+        # orphaned continuation without its claim.
+        for (i = 1; i <= n; i++) {
+          last = (i < n) ? s[i + 1] - 1 : NR
+          sz[i] = 0
+          for (j = s[i]; j <= last; j++) sz[i] += length(l[j]) + 1
+        }
+        used = 0; first = n + 1
+        for (i = n; i >= 1; i--) { if (used + sz[i] > b) break; used += sz[i]; first = i }
+        for (i = first; i <= n; i++) {
+          last = (i < n) ? s[i + 1] - 1 : NR
+          for (j = s[i]; j <= last; j++) print l[j]
+        }
       }')
-    total=$(printf '%s\n' "$settled" | wc -l)
+    total=$(printf '%s\n' "$settled" | grep -c '^- ' || true)
     kept_n=0
-    if [[ -n "$kept" ]]; then kept_n=$(printf '%s\n' "$kept" | wc -l); fi
+    if [[ -n "$kept" ]]; then kept_n=$(printf '%s\n' "$kept" | grep -c '^- ' || true); fi
     omitted=$(( total - kept_n ))
   fi
   {
