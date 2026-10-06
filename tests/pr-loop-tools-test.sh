@@ -1037,13 +1037,14 @@ make_pr_round_env
 make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
 advance_head f.txt 'changed\n'
-cat >"$stub/git" <<'GITSTUB'
+real_git="$(command -v git)"
+cat >"$stub/git" <<GITSTUB
 #!/usr/bin/env bash
 # Fail only the changed-file listing; everything else is real git.
-for a in "$@"; do
-  if [[ "$a" == "--name-status" ]]; then exit 128; fi
+for a in "\$@"; do
+  if [[ "\$a" == "--name-status" ]]; then exit 128; fi
 done
-exec /usr/bin/git "$@"
+exec "$real_git" "\$@"
 GITSTUB
 chmod +x "$stub/git"
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null 2>&1
