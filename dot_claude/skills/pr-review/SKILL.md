@@ -46,7 +46,8 @@ anything longer before it reviews a line). The dispositions fill the
 room the brief leaves, newest first, and the background says how many
 older ones gave way. A brief over the limit on its own, or one whose
 assembled background overflows once the standing dispositions join it,
-stops the round with exit 2 before anything runs: condense it to the
+stops the round with exit 2 before any review runs, leaving the round
+dir untouched: condense it to the
 task (its asks,
 the settled decisions, the constraints) and rerun, never pass a
 dispatch prompt or loop instructions as the brief.

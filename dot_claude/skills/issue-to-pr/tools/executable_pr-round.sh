@@ -202,6 +202,80 @@ prior_findings=$(tail -n 1 <<<"$bodies" | jq -r '.' \
          on && (/^\*\*/ || /^<details>/) { on = 0 }
          on && NF')
 
+# The background is assembled and measured before the round dir is touched
+# and before any --rerun superseding: a size refusal must leave the dir
+# exactly as it was, so the documented recovery (condense and rerun) hits
+# no leftover guard, and a refusal of a --rerun displaces no record.
+tmp_bg=""
+trap '[[ -n "${tmp_bg:-}" ]] && rm -f "$tmp_bg"' EXIT
+kept="$settled" omitted=0
+if [[ -n "$settled" ]]; then
+  tmp_bg=$(mktemp "${TMPDIR:-/tmp}/pr-round-bg.XXXXXX") || {
+    printf 'cannot create a temp file for the background\n' >&2
+    exit 2
+  }
+  {
+    if [[ -n "$brief" ]]; then cat "$brief"; printf '\n'; fi
+    printf '%s' "$dispositions_header"
+  } >"$tmp_bg"
+  if [[ "$limit" -gt 0 ]]; then
+    # Room for the omission line, whatever its count.
+    budget=$(( limit - $(wc -c <"$tmp_bg" | tr -d ' ') - 120 ))
+    kept=$(printf '%s\n' "$settled" | LC_ALL=C awk -v b="$budget" '
+      { l[NR] = $0 }
+      /^- / { s[++n] = NR }
+      END {
+        # No entries: carry the file whole; the assembled-size check
+        # bounds it.
+        if (n == 0) { for (i = 1; i <= NR; i++) print l[i]; exit }
+        # Leading prose rides with the oldest entry: it ships when the
+        # oldest entry ships and gives way when it does.
+        s[1] = 1
+        # An entry is a marker line plus its continuations; whole entries
+        # give way, newest first, so the background never ships an
+        # orphaned continuation without its claim.
+        for (i = 1; i <= n; i++) {
+          last = (i < n) ? s[i + 1] - 1 : NR
+          sz[i] = 0
+          for (j = s[i]; j <= last; j++) sz[i] += length(l[j]) + 1
+        }
+        used = 0; first = n + 1
+        for (i = n; i >= 1; i--) { if (used + sz[i] > b) break; used += sz[i]; first = i }
+        for (i = first; i <= n; i++) {
+          last = (i < n) ? s[i + 1] - 1 : NR
+          for (j = s[i]; j <= last; j++) print l[j]
+        }
+      }')
+    total=$(printf '%s\n' "$settled" | grep -c '^- ' || true)
+    kept_n=0
+    if [[ -n "$kept" ]]; then kept_n=$(printf '%s\n' "$kept" | grep -c '^- ' || true); fi
+    omitted=$(( total - kept_n ))
+  fi
+  {
+    if [[ -n "$kept" ]]; then printf '%s\n' "$kept"; fi
+    if [[ "$omitted" -gt 0 ]]; then
+      printf '\n(%s older dispositions omitted: the reviewer accepts at most %s characters of background.)\n' "$omitted" "$limit"
+    fi
+  } >>"$tmp_bg"
+  # The honest ceiling: the assembled artifact itself, checked before any
+  # review runs and before the round dir is touched, so no reserve
+  # arithmetic can reject a background that fits or pass one that does
+  # not, and a refusal leaves nothing behind.
+  if [[ "$limit" -gt 0 ]]; then
+    assembled=$(wc -c <"$tmp_bg" | tr -d ' ')
+    if [[ "$assembled" -gt "$limit" ]]; then
+      if [[ -n "$brief" ]]; then
+        printf 'the assembled background is %s bytes; the brief with the standing dispositions assembles past the %s reviewer'"'"'s %s-character background limit, and the review would abort before reading a line, once per commit. Condense the brief: its asks, the settled decisions, and the constraints.\n' \
+          "$assembled" "$reviewer" "$limit" >&2
+      else
+        printf 'the assembled background is %s bytes; the standing dispositions file assembles past the %s reviewer'"'"'s %s-character background limit, and the review would abort before reading a line, once per commit. Condense the dispositions file: fewer entries or trimmed evidence.\n' \
+          "$assembled" "$reviewer" "$limit" >&2
+      fi
+      exit 2
+    fi
+  fi
+fi
+
 # Evidence is never silently overwritten or reused: a re-invocation into a
 # round that already holds anything besides superseded runs, including the
 # leftovers of an interrupted run with no round.json, is refused unless
@@ -277,66 +351,11 @@ fi
 if [[ -n "$settled" ]]; then printf '%s\n' "$settled" >"$round_dir/settled.md"; fi
 if [[ -n "$prior_findings" ]]; then printf '%s\n' "$prior_findings" >"$round_dir/prior-findings.md"; fi
 
-# The standing dispositions grow every round, so they fill whatever room
-# the brief leaves under the reviewer's limit, newest first, and the
-# background says how many older ones gave way. No hunk list: from round
-# 2 on the reviewer reviews only the delta, so the list repeated its input.
+# The background was assembled and size-checked in the temp file above,
+# before the round dir was touched; committing it here is safe.
 if [[ -n "$settled" ]]; then
-  {
-    if [[ -n "$brief" ]]; then cat "$brief"; printf '\n'; fi
-    printf '%s' "$dispositions_header"
-  } >"$round_dir/background.md"
-  kept="$settled" omitted=0
-  if [[ "$limit" -gt 0 ]]; then
-    # Room for the omission line, whatever its count.
-    budget=$(( limit - $(wc -c <"$round_dir/background.md") - 120 ))
-    kept=$(printf '%s\n' "$settled" | LC_ALL=C awk -v b="$budget" '
-      { l[NR] = $0 }
-      /^- / { s[++n] = NR }
-      END {
-        # No entries: carry the file whole; the assembled-size check
-        # below bounds it.
-        if (n == 0) { for (i = 1; i <= NR; i++) print l[i]; exit }
-        # Leading prose rides with the oldest entry: it ships when the
-        # oldest entry ships and gives way when it does.
-        s[1] = 1
-        # An entry is a marker line plus its continuations; whole entries
-        # give way, newest first, so the background never ships an
-        # orphaned continuation without its claim.
-        for (i = 1; i <= n; i++) {
-          last = (i < n) ? s[i + 1] - 1 : NR
-          sz[i] = 0
-          for (j = s[i]; j <= last; j++) sz[i] += length(l[j]) + 1
-        }
-        used = 0; first = n + 1
-        for (i = n; i >= 1; i--) { if (used + sz[i] > b) break; used += sz[i]; first = i }
-        for (i = first; i <= n; i++) {
-          last = (i < n) ? s[i + 1] - 1 : NR
-          for (j = s[i]; j <= last; j++) print l[j]
-        }
-      }')
-    total=$(printf '%s\n' "$settled" | grep -c '^- ' || true)
-    kept_n=0
-    if [[ -n "$kept" ]]; then kept_n=$(printf '%s\n' "$kept" | grep -c '^- ' || true); fi
-    omitted=$(( total - kept_n ))
-  fi
-  {
-    if [[ -n "$kept" ]]; then printf '%s\n' "$kept"; fi
-    if [[ "$omitted" -gt 0 ]]; then
-      printf '\n(%s older dispositions omitted: the reviewer accepts at most %s characters of background.)\n' "$omitted" "$limit"
-    fi
-  } >>"$round_dir/background.md"
-  # The honest ceiling: the assembled artifact itself, checked before any
-  # review runs, so no reserve arithmetic can reject a background that
-  # fits or pass one that does not.
-  if [[ "$limit" -gt 0 ]]; then
-    assembled=$(wc -c <"$round_dir/background.md" | tr -d ' ')
-    if [[ "$assembled" -gt "$limit" ]]; then
-      printf 'the assembled background is %s bytes; the brief with the standing dispositions assembles past the %s reviewer'"'"'s %s-character background limit, and the review would abort before reading a line, once per commit. Condense the brief: its asks, the settled decisions, and the constraints.\n' \
-        "$assembled" "$reviewer" "$limit" >&2
-      exit 2
-    fi
-  fi
+  cat "$tmp_bg" >"$round_dir/background.md"
+  tmp_bg=""
   brief="$round_dir/background.md"
 fi
 

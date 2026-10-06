@@ -745,6 +745,44 @@ rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
 assert_eq "$RC" 0 "a near-limit brief with no standing dispositions runs"
 assert_eq "$([[ -e "$rd/cmd.txt" ]] && printf yes || printf no)" "yes" "the review ran"
 
+echo "pr-round: a size refusal leaves the round dir untouched"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+head -c $((LIMIT - 100)) </dev/zero | tr '\0' 'x' >"$WS/brief.md"
+printf -- '- Rejected: [critic] one standing disposition with its recorded evidence\n' >"$WS/dispositions.md"
+OUT="$(run_prr --repo "$repo" --pr 39 --round 1 --brief "$WS/brief.md" --dispositions "$WS/dispositions.md" 2>&1)"; RC=$?
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
+assert_eq "$RC" 2 "an overflowing assembly exits 2"
+assert_eq "$([[ -e "$rd/background.md" ]] && printf yes || printf no)" "no" "no background.md debris"
+assert_eq "$([[ -e "$rd/settled.md" ]] && printf yes || printf no)" "no" "no settled.md debris"
+head -c $((LIMIT - 4000)) </dev/zero | tr '\0' 'x' >"$WS/brief2.md"
+run_prr --repo "$repo" --pr 39 --round 1 --brief "$WS/brief2.md" --dispositions "$WS/dispositions.md" >/dev/null 2>&1; RC2=$?
+assert_eq "$RC2" 0 "the documented recovery works: condense and rerun, no --rerun needed"
+
+echo "pr-round: a size refusal never displaces a completed round's record"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
+head -c $((LIMIT - 100)) </dev/zero | tr '\0' 'x' >"$WS/brief.md"
+printf -- '- Rejected: [critic] one standing disposition with its recorded evidence\n' >"$WS/dispositions.md"
+run_prr --repo "$repo" --pr 39 --round 1 --brief "$WS/brief.md" --dispositions "$WS/dispositions.md" --rerun >/dev/null 2>&1; RC=$?
+assert_eq "$RC" 2 "the overflowing rerun refuses before superseding"
+assert_eq "$([[ -f "$rd/round.json" ]] && printf yes || printf no)" "yes" "the completed round's record stays in place"
+assert_eq "$(find "$rd" -maxdepth 1 -name 'superseded-*' | wc -l | tr -d ' ')" "0" "a refusal supersedes nothing"
+
+echo "pr-round: an overflow with no brief names the dispositions file, not a brief"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+head -c $((LIMIT)) </dev/zero | tr '\0' 'x' >"$WS/dispositions.md"
+OUT="$(run_prr --repo "$repo" --pr 39 --round 1 --dispositions "$WS/dispositions.md" 2>&1)"; RC=$?
+assert_eq "$RC" 2 "a prose-only dispositions file over the limit exits 2"
+assert_not_contains "$OUT" "Condense the brief" "the remediation never names an input that was not passed"
+assert_contains "$OUT" "dispositions file" "the remediation names the actual oversized input"
+
 echo "pr-round: dispositions fill the background newest first, under the limit"
 new_sandbox
 make_pr_round_env
