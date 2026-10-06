@@ -38,7 +38,13 @@ prompt="$(cd "$(dirname "$0")" && pwd)/critic-prompt.md"
 
 round=$(jq -r '.round' "$dir/round.json")
 head=$(jq -r '.range.head' "$dir/round.json")
-from=$(jq -r '.range.reviewed_from // .range.prior_head // .range.base' "$dir/round.json")
+# The diff source: reviewed_from when the round tool wrote it; a legacy
+# round.json falls to prior_head for a refine (the head moved) and to
+# base when the head did not, so a convergence re-review ships the whole
+# PR its preamble promises, never an empty diff.
+from=$(jq -r 'if .range.reviewed_from then .range.reviewed_from
+             elif (.range.prior_head // "") != "" and .range.prior_head != .range.head then .range.prior_head
+             else (.range.base // "") end' "$dir/round.json")
 prior=$(jq -r '.range.prior_head // empty' "$dir/round.json")
 diff=$(git -C "$repo" diff --no-color --no-ext-diff "$from" "$head") || {
   printf 'cannot diff %s..%s\n' "$from" "$head" >&2
