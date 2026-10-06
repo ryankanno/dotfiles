@@ -41,7 +41,14 @@ One interactive moment. Collect and confirm, then go silent:
      (extract: that element's text)
 2. **The brief.** Write the extracted task to a brief file: title, body,
    acceptance criteria if present, and the source locator. Show it. Wait
-   for confirmation. Extraction errors surface here or never.
+   for confirmation. Extraction errors surface here or never. The
+   reviewer reads this brief as its background, under the manifest's
+   `reviewer_background_limit` (8000 characters for ocr), and later
+   rounds add the standing dispositions to the same budget: keep the
+   brief to about half the limit. A source too long for that (several
+   issues, long bodies) is condensed to its asks, decisions, and
+   constraints, not pasted whole. The brief is the task, never the
+   dispatch prompt: push and loop instructions are not the reviewer's.
 3. **The layout.** Harness plus prompt stack ride together in one workmux
    layout name: `claude-sp`, `claude-mp`, `opencode-sp`, `opencode-mp`
    (sp = superpowers, mp = mattpocock). Confirm which. The opencode

@@ -21,10 +21,12 @@
 #                comment's blocking findings) when there are any, which
 #                critic-input.sh reads, background.md when there are prior
 #                dispositions (read from this loop's own round comments
-#                unless --dispositions names a file) or a delta, and the
+#                unless --dispositions names a file; newest first within
+#                the manifest's reviewer_background_limit), and the
 #                directory path on stdout.
-# Exit codes: 0 the round ran; 2 usage, or the environment is unusable
-# (HOME unset); 3 identity mismatch; 4 the PR is
+# Exit codes: 0 the round ran; 2 usage, the environment is unusable
+# (HOME unset), or the brief alone exceeds the reviewer's background
+# limit; 3 identity mismatch; 4 the PR is
 # missing, not open, or not resolvable; 5 the repository, its refs, or
 # the changed-file listing could not be resolved; 6 the round dir already holds
 # evidence and --rerun was not passed; 127 a dependency is missing. A
@@ -84,6 +86,20 @@ for cand in "$here/$reviewer/review.sh" "$here/$reviewer/executable_review.sh"; 
   if [[ -f "$cand" ]]; then review="$cand"; break; fi
 done
 [[ -n "$review" ]] || { printf 'reviewer binding has no review.sh: %s\n' "$reviewer" >&2; exit 2; }
+# ocr aborts on a background over 8000 characters before reviewing
+# anything, and the per-commit retry then repeats the abort once per
+# commit (measured on sudoku PR 191: an 11083-character brief, 15 runs, no
+# review). Sizes count bytes, never fewer than characters, so a background
+# that fits in bytes fits the reviewer's character limit.
+limit=$(jq -r '.reviewer_background_limit // 0' "$manifest")
+if [[ -n "$brief" && "$limit" -gt 0 ]]; then
+  brief_size=$(wc -c <"$brief" | tr -d ' ')
+  if [[ "$brief_size" -gt "$limit" ]]; then
+    printf 'brief is %s bytes; the %s reviewer accepts at most %s characters of background, and later rounds add the standing dispositions to it. Condense the brief to the task: its asks, the settled decisions, and the constraints.\n' \
+      "$brief_size" "$reviewer" "$limit" >&2
+    exit 2
+  fi
+fi
 
 pr_json=$(cd "$repo" && gh pr view "$pr" --json state,baseRefName,headRefOid,headRefName,isCrossRepository,url) || {
   printf 'cannot view PR %s\n' "$pr" >&2
@@ -245,20 +261,38 @@ fi
 if [[ -n "$settled" ]]; then printf '%s\n' "$settled" >"$round_dir/settled.md"; fi
 if [[ -n "$prior_findings" ]]; then printf '%s\n' "$prior_findings" >"$round_dir/prior-findings.md"; fi
 
-if [[ -n "$settled" || -n "$delta" ]]; then
+# The standing dispositions grow every round, so they fill whatever room
+# the brief leaves under the reviewer's limit, newest first, and the
+# background says how many older ones gave way. No hunk list: from round
+# 2 on the reviewer reviews only the delta, so the list repeated its input.
+if [[ -n "$settled" ]]; then
   {
     if [[ -n "$brief" ]]; then cat "$brief"; printf '\n'; fi
-    if [[ -n "$settled" ]]; then
-      printf '## Findings already dispositioned in earlier rounds\n\n'
-      printf 'Each line was rejected or accepted with recorded evidence. Do not report it again unless the code it cites changed.\n\n'
-      printf '%s\n\n' "$settled"
-    fi
-    if [[ -n "$delta" ]]; then
-      printf '## Changed since the last review round\n\n'
-      printf 'The rest of the diff was reviewed in earlier rounds; these hunks are new.\n\n'
-      printf '%s\n' "$delta"
-    fi
+    printf '## Findings already dispositioned in earlier rounds\n\n'
+    printf 'Each line was rejected or accepted with recorded evidence. Do not report it again unless the code it cites changed.\n\n'
   } >"$round_dir/background.md"
+  kept="$settled" omitted=0
+  if [[ "$limit" -gt 0 ]]; then
+    # Room for the omission line, whatever its count.
+    budget=$(( limit - $(wc -c <"$round_dir/background.md") - 120 ))
+    kept=$(printf '%s\n' "$settled" | LC_ALL=C awk -v b="$budget" '
+      { l[NR] = $0 }
+      END {
+        used = 0; first = NR + 1
+        for (i = NR; i >= 1; i--) { n = length(l[i]) + 1; if (used + n > b) break; used += n; first = i }
+        for (i = first; i <= NR; i++) print l[i]
+      }')
+    total=$(printf '%s\n' "$settled" | wc -l)
+    kept_n=0
+    if [[ -n "$kept" ]]; then kept_n=$(printf '%s\n' "$kept" | wc -l); fi
+    omitted=$(( total - kept_n ))
+  fi
+  {
+    if [[ -n "$kept" ]]; then printf '%s\n' "$kept"; fi
+    if [[ "$omitted" -gt 0 ]]; then
+      printf '\n(%s older dispositions omitted: the reviewer accepts at most %s characters of background.)\n' "$omitted" "$limit"
+    fi
+  } >>"$round_dir/background.md"
   brief="$round_dir/background.md"
 fi
 

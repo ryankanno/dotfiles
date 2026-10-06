@@ -40,6 +40,15 @@ Fixed lines stay out: a fix the reviewer still flags is a fix to
 re-check. `--dispositions <file>` replaces the lines read from the
 comments with the file's content.
 
+The background has a size limit: the manifest's
+`reviewer_background_limit` (8000 characters for ocr, which aborts on
+anything longer before it reviews a line). The dispositions fill the
+room the brief leaves, newest first, and the background says how many
+older ones gave way. A brief over the limit on its own stops the round
+with exit 2 before anything runs: condense it to the task (its asks,
+the settled decisions, the constraints) and rerun, never pass a
+dispatch prompt or loop instructions as the brief.
+
 From round 2 on, `round.json` carries `range.prior_head` (the previous
 round's head) and the round directory holds `delta.txt`, the
 `path:start-end` hunks changed since that head. The reviewer then

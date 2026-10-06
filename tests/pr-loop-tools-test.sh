@@ -710,6 +710,35 @@ run_prr --repo "$repo" --pr 39 --round 3 >/dev/null
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-3"
 assert_eq "$(cat "$rd/prior-findings.md" 2>/dev/null)" '1. **[reviewer] bug/medium** `b.sh:2`: the newest blocking finding' "only the newest own comment's blocking findings"
 
+LIMIT="$(jq -r '.reviewer_background_limit' "$TOOLS/manifest.json")"
+
+echo "pr-round: a brief over the reviewer's background limit stops before any review"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+head -c $((LIMIT + 1)) </dev/zero | tr '\0' 'x' >"$WS/brief.md"
+OUT="$(run_prr --repo "$repo" --pr 39 --round 1 --brief "$WS/brief.md" 2>&1)"; RC=$?
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
+assert_eq "$RC" 2 "an oversized brief exits 2"
+assert_contains "$OUT" "$LIMIT" "the message names the limit"
+assert_eq "$([[ -e "$rd/cmd.txt" ]] && printf yes || printf no)" "no" "no review ran, so no per-commit retry storm"
+
+echo "pr-round: dispositions fill the background newest first, under the limit"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+head -c $((LIMIT - 1000)) </dev/zero | tr '\0' 'x' >"$WS/brief.md"
+for i in $(seq 1 40); do
+  printf -- '- Rejected: [critic] settled finding number %02d with its recorded evidence\n' "$i"
+done >"$WS/dispositions.md"
+run_prr --repo "$repo" --pr 39 --round 2 --brief "$WS/brief.md" --dispositions "$WS/dispositions.md" >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
+bg="$(cat "$rd/background.md")"
+assert_eq "$([[ $(wc -c <"$rd/background.md") -le $LIMIT ]] && printf fits || printf over)" "fits" "the background stays within the limit"
+assert_contains "$bg" "settled finding number 40" "the newest disposition is kept"
+assert_not_contains "$bg" "settled finding number 01" "the oldest disposition gives way first"
+assert_contains "$bg" "older dispositions omitted" "the omission is said, not silent"
+
 echo "pr-round: a relative or missing dispositions file is a usage error"
 new_sandbox
 make_pr_round_env
@@ -935,7 +964,7 @@ run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
 assert_eq "$(jq -r '.range.prior_head' "$rd/round.json")" "$FR_HEAD" "the prior round's head is recorded"
 assert_eq "$(cat "$rd/delta.txt")" $'f.txt:2-3\ng.txt:1-1' "the delta lists each changed hunk at the new head"
-assert_contains "$(cat "$rd/background.md")" "f.txt:2-3" "the reviewer is told what changed since the last round"
+assert_eq "$([[ -e "$rd/background.md" ]] && printf yes || printf no)" "no" "no hunk list in the background: the reviewer already reviews only the delta"
 assert_contains "$(cat "$rd/cmd.txt")" "--from $FR_HEAD --to $FR_NEXT" "a later round reviews only the delta"
 assert_eq "$(jq -r '.range.reviewed_from' "$rd/round.json")" "$FR_HEAD" "the reviewed range starts at the prior head"
 
