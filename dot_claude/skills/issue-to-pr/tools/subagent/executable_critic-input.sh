@@ -52,10 +52,10 @@ printf '## The brief\n\n'
 if [[ -n "$brief" ]]; then cat "$brief"; else printf 'No brief was given.\n'; fi
 if [[ -s "$dir/prior-findings.md" ]]; then
   printf '\n## The findings this diff answers\n\n'
-  # A refine round's diff is its answer to those findings; on a
-  # convergence round the head is unchanged, the diff is the whole PR,
-  # and no refine stands between it and the findings it re-checks.
-  if [[ "$from" == "$prior" ]]; then
+  # A refine happened iff the head moved since the prior round: keyed off
+  # the explicit fields, never the fallback chain, so a legacy round.json
+  # without reviewed_from cannot mislabel a convergence re-review.
+  if [[ -n "$prior" && "$head" != "$prior" ]]; then
     printf 'The prior round named these as blocking; the diff below is the refine'"'"'s answer to them.\n\n'
   else
     printf 'The prior round named these as blocking; no refine followed, and the diff below is the whole PR, re-reviewed from the merge base.\n\n'
