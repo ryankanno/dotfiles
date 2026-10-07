@@ -261,6 +261,10 @@ assert_contains "$(cat "$WS/args.txt")" "--background-file" "passes the brief"
 assert_contains "$(cat "$WS/out/cmd.txt")" 'ocr review' "records the tool invocation"
 assert_contains "$(cat "$WS/out/cmd.txt")" '--from aaa --to bbb' "records the range"
 assert_eq "$(cat "$WS/out/session.txt")" "abc-123" "extracts the session id"
+assert_contains "$(cat "$WS/args.txt")" "--concurrency 1" "one file group at a time: the provider queues the rest until they time out"
+assert_contains "$(cat "$WS/args.txt")" "--max-tools 100" "room for a group to finish its tool rounds"
+assert_contains "$(cat "$WS/args.txt")" "--timeout 80" "room for a group to finish in time"
+assert_contains "$(cat "$WS/args.txt")" "--effort high" "the effort roborev's converging loop runs"
 
 echo "wrapper: commit mode passes the commit"
 new_sandbox
@@ -956,9 +960,10 @@ new_sandbox
 make_pr_round_env
 make_fixture_repo
 export STUB_TOKENS=10
-run_prr --repo "$repo" --pr 39 --round 08 >/dev/null
+ERR="$(run_prr --repo "$repo" --pr 39 --round 08 2>&1 >/dev/null)"
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-08"
 assert_json '.round == 8' "$rd/round.json" "round.json records the decimal round"
+assert_not_contains "$ERR" "value too great for base" "the round compares in base 10, with no octal error on stderr"
 
 echo "pr-round: the recorded base does not move when main advances"
 new_sandbox
@@ -1061,6 +1066,7 @@ assert_json '.range.prior_head == null' "$rd/round.json" "no prior head on round
 assert_eq "$([[ -e "$rd/delta.txt" ]] && printf yes || printf no)" "no" "no delta on round 1"
 assert_contains "$(cat "$rd/cmd.txt")" "--from origin/main --to $FR_HEAD" "round 1 reviews the whole PR"
 assert_eq "$(jq -r '.range.reviewed_from' "$rd/round.json")" "$FR_BASE" "round 1 reviews from the merge base"
+assert_eq "$(jq -r '.range.review_scope' "$rd/round.json")" "full: round 1" "round.json says why the round reviewed the whole PR"
 
 echo "pr-round: a later round records the prior head and the lines changed since it"
 new_sandbox
@@ -1076,6 +1082,56 @@ assert_eq "$(cat "$rd/delta.txt")" $'f.txt:2-3\ng.txt:1-1' "the delta lists each
 assert_eq "$([[ -e "$rd/background.md" ]] && printf yes || printf no)" "no" "no hunk list in the background: the reviewer already reviews only the delta"
 assert_contains "$(cat "$rd/cmd.txt")" "--from $FR_HEAD --to $FR_NEXT" "a later round reviews only the delta"
 assert_eq "$(jq -r '.range.reviewed_from' "$rd/round.json")" "$FR_HEAD" "the reviewed range starts at the prior head"
+assert_eq "$(jq -r '.range.review_scope' "$rd/round.json")" "delta" "round.json says the round reviewed the delta"
+
+rebase_head() { # a new PR head that does not descend from the current one, as a rebase leaves it
+  git -C "$repo" checkout -q -B rebased "$FR_BASE"
+  printf 'rebased\n' >"$repo/r.txt"
+  git -C "$repo" add r.txt
+  git -C "$repo" commit -qm "rebased work"
+  FR_NEXT=$(git -C "$repo" rev-parse HEAD)
+  git -C "$repo" push -q -f origin "HEAD:refs/pull/39/head"
+  GH_PR_JSON="$(jq -c --arg h "$FR_NEXT" '.headRefOid = $h' <<<"$GH_PR_JSON")"
+  export GH_PR_JSON
+}
+
+echo "pr-round: a rebase since the prior round reviews the whole PR, never the old base's range"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+rebase_head
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
+assert_contains "$(cat "$rd/cmd.txt")" "--from origin/main --to $FR_NEXT" "the reviewer reviews from the merge base, not from the orphaned prior head"
+assert_eq "$([[ -e "$rd/delta.txt" ]] && printf yes || printf no)" "no" "no delta across a rebase"
+assert_eq "$(jq -r '.range.reviewed_from' "$rd/round.json")" "$FR_BASE" "the reviewed range starts at the merge base"
+assert_eq "$(jq -r '.range.review_scope' "$rd/round.json")" "full: the branch was rebased since the prior round" "round.json says why"
+assert_eq "$("$TOOLS/executable_finding-scope.sh" "$rd" r.txt:1)" "new" "every finding after a rebase blocks as new"
+
+echo "pr-round: a partial prior round keeps the delta and records the files it left unfinished"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+export STUB_COVERAGE_FAILED='[{"path":"big.ts"},{"path":"f.txt"}]'
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+export STUB_COVERAGE_FAILED=""
+advance_head g.txt 'new\n'
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
+assert_contains "$(cat "$rd/cmd.txt")" "--from $FR_HEAD --to $FR_NEXT" "a re-review of the whole PR would re-fail the same files, so the delta stands"
+assert_eq "$(jq -r '.range.review_scope' "$rd/round.json")" "delta" "the round is still a delta round"
+assert_eq "$(cat "$rd/prior-unfinished.txt" 2>/dev/null)" $'big.ts\nf.txt' "the files the prior round left unfinished are recorded for the critic"
+
+echo "pr-round: a complete prior round leaves nothing unfinished"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+advance_head g.txt 'new\n'
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
+assert_eq "$([[ -e "$rd/prior-unfinished.txt" ]] && printf yes || printf no)" "no" "no unfinished list"
 
 echo "pr-round: a delta round's per-commit retry covers only the delta's commits"
 new_sandbox
@@ -1101,6 +1157,43 @@ assert_eq "$(jq -r '.range.prior_head' "$rd/round.json")" "$FR_HEAD" "the prior 
 assert_eq "$(wc -c <"$rd/delta.txt" | tr -d ' ')" "0" "nothing changed, nothing is new"
 assert_contains "$(cat "$rd/cmd.txt")" "--from origin/main --to $FR_HEAD" "an empty delta falls back to the whole PR, never an empty review"
 assert_eq "$(jq -r '.range.reviewed_from' "$rd/round.json")" "$FR_BASE" "the fallback reviews from the merge base"
+assert_eq "$(jq -r '.range.review_scope' "$rd/round.json")" "full: no change since the prior round" "round.json says why"
+assert_eq "$("$TOOLS/executable_finding-scope.sh" "$rd" f.txt:1)" "reviewed" "on an unchanged head only a high finding blocks: nothing is new"
+
+echo "pr-round: a prior head missing from this clone reviews the whole PR and keeps the head on record"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+rj="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1/round.json"
+jq '.range.head = "0000000000000000000000000000000000000000"' "$rj" >"$rj.tmp" && mv "$rj.tmp" "$rj"
+advance_head g.txt 'new\n'
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
+assert_eq "$(jq -r '.range.review_scope' "$rd/round.json")" "full: the prior head is not in this clone" "round.json says why"
+assert_eq "$(jq -r '.range.prior_head' "$rd/round.json")" "0000000000000000000000000000000000000000" "the unresolvable prior head stays on record"
+assert_eq "$([[ -e "$rd/delta.txt" ]] && printf yes || printf no)" "no" "no delta without the prior head"
+assert_eq "$("$TOOLS/executable_finding-scope.sh" "$rd" g.txt:1)" "new" "every finding blocks as new"
+
+echo "pr-round: a later round with no prior round on record says so, not round 1"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
+assert_eq "$(jq -r '.range.review_scope' "$rd/round.json")" "full: there is no prior round head on record" "round.json gives the true reason"
+
+echo "pr-round: an unreadable prior round.json does not abort the round"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+printf '{"range": tru' >"$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1/round.json"
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null 2>&1
+rc=$?
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
+assert_eq "$rc" 0 "the round runs"
+assert_json '.range.review_scope' "$rd/round.json" "the round record is written"
 
 echo "pr-round: a content line that looks like a diff header does not mislabel the delta"
 new_sandbox
@@ -1262,6 +1355,117 @@ assert_eq "$RC" 0 "exits 0"
 assert_contains "$OUT" "$FR_BASE..$FR_HEAD" "round 1's diff is the whole PR from the merge base"
 assert_not_contains "$OUT" "The findings this diff answers" "no prior findings in round 1"
 assert_contains "$OUT" "No brief was given." "a missing brief is said, not invented"
+
+echo "critic-input: the files the reviewer left unfinished last round reach the critic with their whole-PR diff"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+export STUB_COVERAGE_FAILED='[{"path":"f.txt"}]'
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+export STUB_COVERAGE_FAILED=""
+advance_head g.txt 'new\n'
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
+OUT="$("$CRITIC_INPUT" --repo "$repo" --round-dir "$rd" 2>&1)"; RC=$?
+assert_eq "$RC" 0 "exits 0"
+assert_contains "$OUT" "## Files the reviewer did not finish last round" "the gap has its own section"
+assert_contains "$OUT" "+b" "the unfinished file's whole-PR change is inline"
+assert_contains "$OUT" "$FR_BASE..$FR_NEXT -- f.txt" "the section names the range and the file"
+assert_contains "$OUT" "$FR_HEAD..$FR_NEXT" "the main diff is still the delta"
+
+echo "critic-input: no unfinished files, no gap section"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+advance_head g.txt 'new\n'
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
+OUT="$("$CRITIC_INPUT" --repo "$repo" --round-dir "$rd" 2>&1)"
+assert_not_contains "$OUT" "did not finish" "no gap section"
+
+echo "critic-input: a full round after a partial one has no gap section: the whole PR is already in scope"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+export STUB_COVERAGE_FAILED='[{"path":"f.txt"}]'
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+export STUB_COVERAGE_FAILED=""
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
+OUT="$("$CRITIC_INPUT" --repo "$repo" --round-dir "$rd" 2>&1)"
+assert_not_contains "$OUT" "did not finish" "no high-only gap section on an unchanged-head round"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+export STUB_COVERAGE_FAILED='[{"path":"f.txt"}]'
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+export STUB_COVERAGE_FAILED=""
+rebase_head
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
+OUT="$("$CRITIC_INPUT" --repo "$repo" --round-dir "$rd" 2>&1)"
+assert_not_contains "$OUT" "did not finish" "no high-only gap section after a rebase"
+
+echo "critic-input: an unfinished file the refine also changed keeps the usual rules on its delta lines"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+export STUB_COVERAGE_FAILED='[{"path":"f.txt"}]'
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+export STUB_COVERAGE_FAILED=""
+advance_head f.txt 'b\nc\n'
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
+OUT="$("$CRITIC_INPUT" --repo "$repo" --round-dir "$rd" 2>&1)"
+assert_contains "$OUT" "## Files the reviewer did not finish last round" "the gap section is there"
+assert_contains "$OUT" "lines of these files that the delta below changes are part of the delta" "delta lines are not demoted to high-only"
+assert_not_contains "$OUT" "They sit outside the delta" "no blanket outside-the-delta claim"
+
+echo "critic-input: a rebase round with no prior findings still tells the critic the diff is the whole PR"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+rebase_head
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
+OUT="$("$CRITIC_INPUT" --repo "$repo" --round-dir "$rd" 2>&1)"
+assert_contains "$OUT" "the whole PR, re-reviewed from the merge base because the branch was rebased since the prior round" "the scope reaches the critic without prior findings"
+
+echo "critic-input: a prior head missing from the clone is a refine, not 'no refine followed'"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+rj="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1/round.json"
+jq '.range.head = "0000000000000000000000000000000000000000"' "$rj" >"$rj.tmp" && mv "$rj.tmp" "$rj"
+advance_head g.txt 'new\n'
+r1=$'<!-- pr-loop-comment -->\n\n**Findings:**\n1. **[critic] bug/medium** `f.txt:1`: the finding to answer\n'
+GH_COMMENTS_JSON="$(jq -cn --arg r1 "$r1" '[{user: {login: "test-me"}, body: $r1}]')"
+export GH_COMMENTS_JSON
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
+OUT="$("$CRITIC_INPUT" --repo "$repo" --round-dir "$rd" 2>&1)"
+assert_contains "$OUT" "because the prior head is not in this clone" "the critic is told why"
+assert_not_contains "$OUT" "no refine followed" "the moved head is not called unrefined"
+
+echo "critic-input: after a rebase the critic is told the diff is the whole PR, not the refine's answer"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+rebase_head
+r1=$'<!-- pr-loop-comment -->\n\n**Findings:**\n1. **[critic] bug/medium** `f.txt:1`: the finding to answer\n'
+GH_COMMENTS_JSON="$(jq -cn --arg r1 "$r1" '[{user: {login: "test-me"}, body: $r1}]')"
+export GH_COMMENTS_JSON
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
+OUT="$("$CRITIC_INPUT" --repo "$repo" --round-dir "$rd" 2>&1)"; RC=$?
+assert_eq "$RC" 0 "exits 0"
+assert_contains "$OUT" "$FR_BASE..$FR_NEXT" "the diff is the whole PR from the merge base"
+assert_contains "$OUT" "the branch was rebased since the prior round" "the critic is told why"
+assert_not_contains "$OUT" "the diff below is the refine's answer to them" "the whole PR is not called the refine's answer"
 
 echo "critic-input: a convergence round hands the critic the whole PR and says so"
 new_sandbox

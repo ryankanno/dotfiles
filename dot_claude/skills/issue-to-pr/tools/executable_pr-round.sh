@@ -12,14 +12,21 @@
 #                $HOME/.cache/pr-loop/<owner/repo>/pr-<n>/round-<N>/ with
 #                each run's outputs plus round.json (range, identity, runs,
 #                reviewer_complete, range.prior_head, range.reviewed_from:
-#                the merge base in round 1 or on an empty delta, the
-#                prior head otherwise), delta.txt (the
-#                path:start-end hunks changed since the prior round's head,
-#                from round 2 on) with names.txt (the listing the hunks
+#                the prior head on a delta round, the merge base
+#                otherwise, range.review_scope: "delta" or "full: <why>"),
+#                delta.txt from round 2 on, unless a rebase or an unusable
+#                prior head sends the round to the whole PR (the
+#                path:start-end hunks changed since the prior round's head;
+#                empty when the prior head..head diff adds or modifies no
+#                lines: an empty commit, a revert pair, or a deletion-only,
+#                binary-only or mode-only change, issue #43) with names.txt
+#                (the listing the hunks
 #                enumerate over), settled.md (the standing Rejected and
 #                Accepted lines) and prior-findings.md (the newest round
-#                comment's blocking findings) when there are any, which
-#                critic-input.sh reads, background.md when there are prior
+#                comment's blocking findings) and prior-unfinished.txt (the
+#                files the prior round's reviewer did not finish) when
+#                there are any, which critic-input.sh reads, background.md
+#                when there are prior
 #                dispositions (read from this loop's own round comments
 #                unless --dispositions names a file; newest first within
 #                the manifest's reviewer_background_limit), and the
@@ -301,20 +308,44 @@ fi
 # (measured on PR 40: 24 of 32 findings in rounds 3 to 6). The delta since
 # the prior round's head is what a refine round actually has to answer
 # for; finding-scope.sh classifies each finding against it.
-prior_head=""
+prior_head="" prior_unfinished=""
 for sibling in "$HOME/.cache/pr-loop/$owner_repo/pr-$pr"/round-*/round.json; do
   [[ -f "$sibling" ]] || continue
   n="${sibling%/round.json}"; n="${n##*/round-}"
   [[ "$n" =~ ^[0-9]+$ && $((10#$n)) -eq $((10#$round - 1)) ]] || continue
   prior_head=$(jq -r '.range.head // empty' "$sibling" 2>/dev/null || true)
+  # A partial round's failed files go to the next round's critic, not to
+  # a whole-PR re-review: the same caps re-fail the same files (issue
+  # #41: two files failed in both of a PR's first two rounds).
+  # An unreadable prior round.json contributes nothing, as for prior_head,
+  # never an aborted round.
+  prior_unfinished=$(jq -r '.runs[]?.dir' "$sibling" 2>/dev/null \
+    | while IFS= read -r d; do
+        jq -r '.manifest.coverage.failed[]?.path // empty' "$d/review.json" 2>/dev/null || true
+      done | sort -u || true)
 done
-# A prior head this clone cannot resolve has no delta: every finding
-# counts as new, which blocks more, never less.
-if [[ -n "$prior_head" ]] && ! git -C "$repo" cat-file -e "$prior_head^{commit}" 2>/dev/null; then
-  prior_head=""
+if [[ -n "$prior_unfinished" ]]; then printf '%s\n' "$prior_unfinished" >"$round_dir/prior-unfinished.txt"; fi
+# The delta stands in for the whole PR only when the new head descends
+# from the prior round's head. After a rebase the reviewer's merge-base
+# mode would resolve the orphaned prior head to the old base and review
+# the base branch's own changes as the PR's (issue #41: 66 files reviewed
+# for a 20-file PR), so the round reviews the whole PR from the merge base
+# with no delta, and every finding counts as new, which blocks more,
+# never less.
+scope="delta"
+if [[ $((10#$round)) -eq 1 ]]; then
+  scope="full: round 1"
+elif [[ -z "$prior_head" ]]; then
+  scope="full: there is no prior round head on record"
+elif ! git -C "$repo" cat-file -e "$prior_head^{commit}" 2>/dev/null; then
+  # The head stays on record: the head moved, so the critic is told this
+  # is a refine reviewed whole, not a re-review with no refine.
+  scope="full: the prior head is not in this clone"
+elif ! git -C "$repo" merge-base --is-ancestor "$prior_head" "$head"; then
+  scope="full: the branch was rebased since the prior round"
 fi
 delta=""
-if [[ -n "$prior_head" ]]; then
+if [[ "$scope" == delta ]]; then
   # Hunks enumerate per file because the git header line is inherently
   # ambiguous for paths holding the split sequence itself. Three rules
   # keep the delta exact: the listing's failure is fatal (an unreadable
@@ -386,6 +417,7 @@ status_of() { # dir
 # reviews the whole PR again: an empty range is no review at all.
 review_from="origin/$base" reviewed_from="$base_sha"
 if [[ -n "$delta" ]]; then review_from="$prior_head" reviewed_from="$prior_head"; fi
+if [[ "$scope" == delta && -z "$delta" ]]; then scope="full: no change since the prior round"; fi
 
 set +e
 "$review" --repo "$repo" --out "$round_dir" ${brief:+--brief "$brief"} --base "$review_from" --head "$head"
@@ -458,14 +490,15 @@ for sibling in "$HOME/.cache/pr-loop/$owner_repo/pr-$pr"/round-*/round.json; do
 done
 
 jq -n --arg pr "$pr" --arg url "$url" --arg base "$base" --arg base_sha "$base_sha" --arg head "$head" \
-     --arg hb "$head_branch" --arg expect "$expect" --arg prior "$prior_head" --arg from "$reviewed_from" \
+     --arg hb "$head_branch" --arg expect "$expect" --arg prior "$prior_head" --arg from "$reviewed_from" --arg scope "$scope" \
      --argjson round "$((10#$round))" --argjson runs "$runs" --argjson complete "$complete" \
      --argjson rt "$current_tokens" --argjson ct "$((current_tokens + prior_tokens))" '
   {pr: $pr, url: $url, round: $round,
    identity: {expected_branch: (if $expect == "" then null else $expect end),
               head_branch: $hb},
    range: {base: $base_sha, base_branch: $base, head: $head, exact: "\($base_sha)..\($head)",
-           prior_head: (if $prior == "" then null else $prior end), reviewed_from: $from},
+           prior_head: (if $prior == "" then null else $prior end), reviewed_from: $from,
+           review_scope: $scope},
    runs: $runs, reviewer_complete: $complete,
    round_tokens: $rt, cumulative_tokens: $ct}' > "$round_dir/round.json"
 printf '%s\n' "$round_dir"
