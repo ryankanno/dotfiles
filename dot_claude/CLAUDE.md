@@ -28,7 +28,7 @@
 - Do not start dev servers or long-running watchers. Assume one is already running.
 - When anything fails, the next output is words, not another tool call. State the error, the theory, the proposed action, and the expected outcome. Then wait.
 - Proceed when the next step is low-risk and reversible. Ask first when it is consequential, irreversible, or likely to surprise.
-- Comment on a GitHub issue or PR only when I own the repository. Everywhere else, draft the comment, show it, and wait for a yes. This binds `gh pr review` hardest, since a review carries an approval verdict in my name. Filing issues on my own repos needs no ask.
+- Post to GitHub (issues, comments, PR reviews) only on repositories I own. Everywhere else, never post, even if I say yes: write the draft and hand it to me, and I post it. This binds `gh pr review` hardest, since a review carries an approval verdict in my name. Filing issues on my own repos needs no ask.
 
 ## Tools
 - Python: `uv` + `just`. Node: `pnpm`.
@@ -60,4 +60,4 @@
 ## Text
 - Present tense, active voice.
 - Microsoft style guide for business writing.
-- Use the ASD-STE100 Simplified Technical English mechanics: short sentences (max ~20 words), one instruction per sentence, no compound nouns stacked three deep, and articles wherever the noun is countable.
+- Use ASD-STE100 Simplified Technical English: only approved words in their approved meanings, short sentences (max ~20 words), one instruction per sentence, no compound nouns stacked three deep, and articles wherever the noun is countable.
