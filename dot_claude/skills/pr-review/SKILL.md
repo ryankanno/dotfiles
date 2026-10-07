@@ -123,7 +123,8 @@ spawn it: a fresh, clean-context subagent whose prompt is the output of
 `critic-input.sh`, verbatim. Never write the critic's prompt yourself:
 the script carries the instructions, the brief, the findings this
 round's diff answers, the settled dispositions, and the one diff, and
-leaves out the follow-ups.
+leaves out the follow-ups. It keeps the same prompt as
+`critic-input.md` in the round directory.
 
 ```bash
 ~/.claude/skills/issue-to-pr/tools/subagent/critic-input.sh \

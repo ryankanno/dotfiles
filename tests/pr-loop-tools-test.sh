@@ -1343,6 +1343,7 @@ assert_contains "$OUT" "$FR_HEAD..$FR_NEXT" "the diff is the delta, not the whol
 assert_contains "$OUT" "$repo" "the repository path is given for verifying claims"
 assert_not_contains "$OUT" "a follow-up" "follow-ups never reach the critic"
 assert_not_contains "$OUT" "read /" "no input is left on disk for the critic to read"
+assert_eq "$(cat "$rd/critic-input.md" 2>/dev/null)" "$OUT" "the prompt the critic got is kept in the round dir"
 
 echo "critic-input: round 1 reviews the whole PR and has no findings to answer"
 new_sandbox
