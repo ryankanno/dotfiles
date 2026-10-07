@@ -49,7 +49,16 @@ command -v ocr >/dev/null || { printf 'ocr: not found\n' >&2; exit 127; }
 command -v jq >/dev/null || { printf 'jq: not found\n' >&2; exit 127; }
 mkdir -p "$out"
 
-args=(review --format json --output "$out/review.json")
+# Partial runs failed on ocr's own caps, not on the code: "reached the
+# maximum tool-request rounds" and "file review exceeded its time limit",
+# a 26-line file among them, and a full re-review re-failed the same
+# files. The model provider serves 6 requests at once and queues the
+# rest, so the default 8 parallel groups wait out the 15-minute task
+# timeout. These are roborev's settings (review_guidelines in its
+# config), the loop that converged: one group at a time, room for 100
+# tool rounds and 80 minutes per task.
+args=(review --format json --output "$out/review.json"
+      --concurrency 1 --max-tools 100 --timeout 80 --effort high)
 if [[ -n "$brief" ]]; then
   [[ -f "$brief" ]] || { printf 'brief not found: %s\n' "$brief" >&2; exit 2; }
   args+=(--background-file "$brief")
