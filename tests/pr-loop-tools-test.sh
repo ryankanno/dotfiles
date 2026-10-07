@@ -879,6 +879,13 @@ env -u HOME PATH="$stub:$PATH" "$PRR" --repo "$repo" --pr 39 --round 1 >/dev/nul
 rc=$?
 assert_eq "$rc" 2 "exits 2, not an unbound abort"
 
+echo "pr-round: an owner/name --repo says the flag wants a checkout directory"
+new_sandbox
+make_pr_round_env
+OUT="$(run_prr --repo test-owner/test-repo --pr 39 --round 1 2>&1)"; RC=$?
+assert_eq "$RC" 2 "exits 2"
+assert_contains "$OUT" "--repo must be the local checkout directory, got 'test-owner/test-repo'" "the message names the flag, the wanted form, and the value"
+
 echo "pr-round: an identity mismatch stops before anything runs"
 new_sandbox
 make_pr_round_env
@@ -1505,5 +1512,11 @@ echo "critic-input: a round dir without round.json is a usage error"
 new_sandbox
 "$CRITIC_INPUT" --repo "$WS" --round-dir "$WS" >/dev/null 2>&1
 assert_eq "$?" 2 "exits 2"
+
+echo "critic-input: an owner/name --repo says the flag wants a checkout directory"
+new_sandbox
+OUT="$("$CRITIC_INPUT" --repo test-owner/test-repo --round-dir "$WS" 2>&1)"; RC=$?
+assert_eq "$RC" 2 "exits 2"
+assert_contains "$OUT" "--repo must be the local checkout directory, got 'test-owner/test-repo'" "the message names the flag, the wanted form, and the value"
 
 report

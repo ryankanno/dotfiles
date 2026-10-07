@@ -28,7 +28,10 @@ while [[ $# -gt 0 ]]; do
     *) usage ;;
   esac
 done
-[[ -n "$repo" && -d "$repo" && -n "$dir" && -f "$dir/round.json" ]] || usage
+[[ -n "$repo" && -n "$dir" ]] || usage
+# Callers mistake --repo for the gh owner/name; say so instead of the generic usage line.
+[[ -d "$repo" ]] || { printf "critic-input.sh: --repo must be the local checkout directory, got '%s'\n" "$repo" >&2; exit 2; }
+[[ -f "$dir/round.json" ]] || usage
 [[ -z "$brief" || -f "$brief" ]] || { printf 'brief not found: %s\n' "$brief" >&2; exit 2; }
 command -v jq >/dev/null || { printf 'jq: not found\n' >&2; exit 127; }
 command -v git >/dev/null || { printf 'git: not found\n' >&2; exit 127; }

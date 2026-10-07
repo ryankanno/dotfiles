@@ -17,7 +17,7 @@ added or removed instruction, no input left on disk for it to read.
 
 ```bash
 ~/.claude/skills/issue-to-pr/tools/subagent/critic-input.sh \
-  --repo <repo> --round-dir <round-dir> --brief <brief-file>
+  --repo <checkout-dir> --round-dir <round-dir> --brief <brief-file>
 ```
 
 The script emits `critic-prompt.md` verbatim, then inline: the brief,
