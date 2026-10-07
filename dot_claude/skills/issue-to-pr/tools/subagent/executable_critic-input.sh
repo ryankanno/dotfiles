@@ -55,6 +55,12 @@ diff=$(git -C "$repo" diff --no-color --no-ext-diff "$from" "$head") || {
 cat "$prompt"
 printf '\n---\n\n# Round %s inputs\n\n' "$round"
 printf 'The repository at the PR head %s is checked out at %s. Read files there only to verify a claim about the diff below.\n\n' "$head" "$repo"
+# critic-prompt.md says a round from 2 on reviews the delta. A later round
+# that moved its head and still reviews the whole PR says so here, whether
+# or not the prior round filed findings.
+if [[ "$scope" == full:* && "$scope" != "full: round 1" && "$scope" != "full: no change since the prior round" ]]; then
+  printf 'This round'"'"'s diff is the whole PR, re-reviewed from the merge base because %s, not a delta.\n\n' "${scope#full: }"
+fi
 printf '## The brief\n\n'
 if [[ -n "$brief" ]]; then cat "$brief"; else printf 'No brief was given.\n'; fi
 if [[ -s "$dir/prior-findings.md" ]]; then
@@ -79,8 +85,10 @@ if [[ -s "$dir/settled.md" ]]; then
 fi
 # The reviewer's partial runs leave files it never finished, and a delta
 # round would never show them to anyone again: the critic gets their
-# whole-PR diff. They sit outside the delta, so rule 3 holds there.
-if [[ -s "$dir/prior-unfinished.txt" ]]; then
+# whole-PR diff. Only on a delta round: a full round already shows the
+# whole PR, where every line is in scope. Lines the refine changed are in
+# the delta and keep the usual rules; rule 3 holds for the rest.
+if [[ -s "$dir/prior-unfinished.txt" && "$scope" == delta ]]; then
   base=$(jq -r '.range.base' "$dir/round.json")
   files=()
   while IFS= read -r f; do [[ -n "$f" ]] && files+=("$f"); done <"$dir/prior-unfinished.txt"
@@ -89,7 +97,7 @@ if [[ -s "$dir/prior-unfinished.txt" ]]; then
     exit 5
   }
   printf '\n## Files the reviewer did not finish last round\n\n'
-  printf 'The reviewer stopped before finishing these files in the prior round, and the delta below does not bring them back. They sit outside the delta: rule 3 applies, so report only high findings here. Their diff (%s..%s -- %s) runs to the next line that starts with "## "; no diff line starts that way.\n\n' \
+  printf 'The reviewer stopped before finishing these files in the prior round. Any lines of these files that the delta below changes are part of the delta, and the usual rules hold there; the rest of each file sits outside the delta, so rule 3 applies to it: report only high findings there. Their diff (%s..%s -- %s) runs to the next line that starts with "## "; no diff line starts that way.\n\n' \
     "$base" "$head" "${files[*]}"
   printf '%s\n' "$gap"
 fi

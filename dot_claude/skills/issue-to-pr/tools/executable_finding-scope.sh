@@ -8,7 +8,7 @@
 # Interface in:  <round_dir> <path>[:<start>[-<end>]]
 # Interface out: "new" or "reviewed" on stdout. A round without a prior
 #                head (round 1), a round pr-round.sh wrote no delta for
-#                (a rebase since the prior round), and a finding
+#                (a rebase, a prior head missing from the clone), and a finding
 #                without a line all read as new: what cannot be placed
 #                blocks, never the reverse.
 # Exit codes: 0 classified; 2 usage or no round.json in the round dir.

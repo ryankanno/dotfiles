@@ -83,7 +83,7 @@ flowchart LR
     S --> FS["tools/finding-scope.sh<br/>blocking or follow-up<br/>against the round's delta.txt"]
     M --> R["tools/ocr<br/>review.sh runs the tool<br/>render.sh renders its output"]
     M --> C["tools/subagent<br/>binding.md: how to spawn<br/>critic-prompt.md: what it attacks<br/>critic-input.sh: the verbatim prompt"]
-    P --> O["round dir under<br/>HOME/.cache/pr-loop:<br/>review.json per run,<br/>round.json, delta.txt and names.txt<br/>for the round"]
+    P --> O["round dir under<br/>HOME/.cache/pr-loop:<br/>review.json per run,<br/>round.json for the round,<br/>delta.txt and names.txt<br/>on a delta round only"]
     S --> SC["tools/scan.sh<br/>the leak gate every round<br/>comment passes before posting"]
     S --> BN["tools/branch-name.sh<br/>deterministic loop branch names<br/>for intake and resume"]
 ```

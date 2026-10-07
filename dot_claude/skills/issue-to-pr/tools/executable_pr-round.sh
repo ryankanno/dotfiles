@@ -313,10 +313,12 @@ for sibling in "$HOME/.cache/pr-loop/$owner_repo/pr-$pr"/round-*/round.json; do
   # A partial round's failed files go to the next round's critic, not to
   # a whole-PR re-review: the same caps re-fail the same files (issue
   # #41: two files failed in both of a PR's first two rounds).
+  # An unreadable prior round.json contributes nothing, as for prior_head,
+  # never an aborted round.
   prior_unfinished=$(jq -r '.runs[]?.dir' "$sibling" 2>/dev/null \
     | while IFS= read -r d; do
         jq -r '.manifest.coverage.failed[]?.path // empty' "$d/review.json" 2>/dev/null || true
-      done | sort -u)
+      done | sort -u || true)
 done
 if [[ -n "$prior_unfinished" ]]; then printf '%s\n' "$prior_unfinished" >"$round_dir/prior-unfinished.txt"; fi
 # The delta stands in for the whole PR only when the new head descends
@@ -327,10 +329,14 @@ if [[ -n "$prior_unfinished" ]]; then printf '%s\n' "$prior_unfinished" >"$round
 # with no delta, and every finding counts as new, which blocks more,
 # never less.
 scope="delta"
-if [[ "$round" -eq 1 || -z "$prior_head" ]]; then
+if [[ $((10#$round)) -eq 1 ]]; then
   scope="full: round 1"
+elif [[ -z "$prior_head" ]]; then
+  scope="full: there is no prior round head on record"
 elif ! git -C "$repo" cat-file -e "$prior_head^{commit}" 2>/dev/null; then
-  prior_head="" scope="full: the prior head is not in this clone"
+  # The head stays on record: the head moved, so the critic is told this
+  # is a refine reviewed whole, not a re-review with no refine.
+  scope="full: the prior head is not in this clone"
 elif ! git -C "$repo" merge-base --is-ancestor "$prior_head" "$head"; then
   scope="full: the branch was rebased since the prior round"
 fi
