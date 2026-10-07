@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Print the roborev job reviewing a directory, and the range it reviews.
 
-Usage: roborev-job-range.py <dir>
+Usage: review-range.py <dir>
 Prints "<job id>\t<git_ref>" and exits 0, or explains on stderr and exits 1.
 
 The OCR plugin calls this so ocr_review reviews the change roborev is
@@ -50,7 +50,7 @@ def same_dir(a, b):
 
 def main():
     if len(sys.argv) != 2:
-        sys.exit("usage: roborev-job-range.py <dir>")
+        sys.exit("usage: review-range.py <dir>")
     directory = sys.argv[1]
 
     # The CI poller reviews in ~/.roborev/ci-worktrees/<repo>/roborev-ci-<job>-<n>,

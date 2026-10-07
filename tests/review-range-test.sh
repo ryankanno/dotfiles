@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Black-box tests for roborev-job-range.py. Mocks only the external boundary,
+# Black-box tests for review-range.py. Mocks only the external boundary,
 # the roborev CLI.
 set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SCRIPT="$HERE/../dot_claude/scripts/executable_roborev-job-range.py"
+SCRIPT="$HERE/../dot_claude/scripts/executable_review-range.py"
 PYTHON="$(python3 -c 'import sys; print(sys.executable)')"
 
 PASS=0
