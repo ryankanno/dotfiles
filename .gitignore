@@ -2,3 +2,5 @@
 *.local
 .env*
 *.secret
+/docs/
+.worktrees/

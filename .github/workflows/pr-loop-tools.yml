@@ -1,0 +1,33 @@
+name: pr-loop-tools
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# The job only checks out the repo and runs a shell test suite; the
+# default token scopes are more than it needs, and rapid pushes to the
+# same ref do not need overlapping runs.
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        # The tools deploy to macOS with its bash 3.2; the suite's
+        # system-shell assertions only bite on that runner.
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install jq if missing
+        run: command -v jq >/dev/null || (sudo apt-get update && sudo apt-get install -y jq)
+      - name: Run the pr-loop tool tests
+        run: bash tests/pr-loop-tools-test.sh

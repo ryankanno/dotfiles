@@ -11,6 +11,7 @@ CLAUDE.md
 .config/ntfy-macos
 {{- end }}
 tests/
+docs/
 {{- if eq .chezmoi.os "darwin" }}
 .config/ntfy
 {{- end }}
