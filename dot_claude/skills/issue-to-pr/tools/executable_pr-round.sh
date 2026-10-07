@@ -17,8 +17,10 @@
 #                delta.txt from round 2 on, unless a rebase or an unusable
 #                prior head sends the round to the whole PR (the
 #                path:start-end hunks changed since the prior round's head;
-#                empty when nothing changed since the prior head, which an
-#                empty commit also leaves) with names.txt (the listing the hunks
+#                empty when the prior head..head diff adds or modifies no
+#                lines: an empty commit, a revert pair, or a deletion-only,
+#                binary-only or mode-only change, issue #43) with names.txt
+#                (the listing the hunks
 #                enumerate over), settled.md (the standing Rejected and
 #                Accepted lines) and prior-findings.md (the newest round
 #                comment's blocking findings) and prior-unfinished.txt (the
