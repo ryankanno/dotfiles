@@ -62,6 +62,12 @@ caller counts it under Findings. An empty
 delta (the same head again, as in a convergence round) reviews the
 whole PR from the merge base instead, never an empty range.
 
+The delta stands in for the whole PR only when the new head descends
+from the prior round's head. After a rebase the round reviews the whole
+PR from the merge base and writes no `delta.txt`, so every finding
+blocks as new. `round.json`'s `range.review_scope` says which: `delta`,
+or `full: <why>`.
+
 `--expect-branch` binds the round to this loop's branch: a PR whose
 head is any other branch is a hallucinated number, and the script exits
 3 before anything reviews or posts. Omit it only when the caller

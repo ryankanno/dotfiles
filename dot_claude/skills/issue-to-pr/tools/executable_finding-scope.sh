@@ -7,8 +7,10 @@
 #
 # Interface in:  <round_dir> <path>[:<start>[-<end>]]
 # Interface out: "new" or "reviewed" on stdout. A round without a prior
-#                head (round 1) and a finding without a line both read as
-#                new: what cannot be placed blocks, never the reverse.
+#                head (round 1), a round pr-round.sh wrote no delta for
+#                (a rebase since the prior round), and a finding
+#                without a line all read as new: what cannot be placed
+#                blocks, never the reverse.
 # Exit codes: 0 classified; 2 usage or no round.json in the round dir.
 set -euo pipefail
 
@@ -24,7 +26,7 @@ command -v jq >/dev/null || { printf 'jq: not found\n' >&2; exit 127; }
 prior=$(jq -r '.range.prior_head // empty' "$dir/round.json")
 # The line suffix splits at the last colon, so a path holding a colon stays
 # whole.
-if [[ -z "$prior" || ! "$spec" =~ ^(.+):([0-9]+)(-([0-9]+))?$ ]]; then
+if [[ -z "$prior" || ! -f "$dir/delta.txt" || ! "$spec" =~ ^(.+):([0-9]+)(-([0-9]+))?$ ]]; then
   printf 'new\n'
   exit 0
 fi

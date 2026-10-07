@@ -12,8 +12,9 @@
 #                $HOME/.cache/pr-loop/<owner/repo>/pr-<n>/round-<N>/ with
 #                each run's outputs plus round.json (range, identity, runs,
 #                reviewer_complete, range.prior_head, range.reviewed_from:
-#                the merge base in round 1 or on an empty delta, the
-#                prior head otherwise), delta.txt (the
+#                the prior head on a delta round, the merge base
+#                otherwise, range.review_scope: "delta" or "full: <why>"),
+#                delta.txt on a delta round only (the
 #                path:start-end hunks changed since the prior round's head,
 #                from round 2 on) with names.txt (the listing the hunks
 #                enumerate over), settled.md (the standing Rejected and
@@ -308,13 +309,23 @@ for sibling in "$HOME/.cache/pr-loop/$owner_repo/pr-$pr"/round-*/round.json; do
   [[ "$n" =~ ^[0-9]+$ && $((10#$n)) -eq $((10#$round - 1)) ]] || continue
   prior_head=$(jq -r '.range.head // empty' "$sibling" 2>/dev/null || true)
 done
-# A prior head this clone cannot resolve has no delta: every finding
-# counts as new, which blocks more, never less.
-if [[ -n "$prior_head" ]] && ! git -C "$repo" cat-file -e "$prior_head^{commit}" 2>/dev/null; then
-  prior_head=""
+# The delta stands in for the whole PR only when the new head descends
+# from the prior round's head. After a rebase the reviewer's merge-base
+# mode would resolve the orphaned prior head to the old base and review
+# the base branch's own changes as the PR's (issue #41: 66 files reviewed
+# for a 20-file PR), so the round reviews the whole PR from the merge base
+# with no delta, and every finding counts as new, which blocks more,
+# never less.
+scope="delta"
+if [[ "$round" -eq 1 || -z "$prior_head" ]]; then
+  scope="full: round 1"
+elif ! git -C "$repo" cat-file -e "$prior_head^{commit}" 2>/dev/null; then
+  prior_head="" scope="full: the prior head is not in this clone"
+elif ! git -C "$repo" merge-base --is-ancestor "$prior_head" "$head"; then
+  scope="full: the branch was rebased since the prior round"
 fi
 delta=""
-if [[ -n "$prior_head" ]]; then
+if [[ "$scope" == delta ]]; then
   # Hunks enumerate per file because the git header line is inherently
   # ambiguous for paths holding the split sequence itself. Three rules
   # keep the delta exact: the listing's failure is fatal (an unreadable
@@ -386,6 +397,7 @@ status_of() { # dir
 # reviews the whole PR again: an empty range is no review at all.
 review_from="origin/$base" reviewed_from="$base_sha"
 if [[ -n "$delta" ]]; then review_from="$prior_head" reviewed_from="$prior_head"; fi
+if [[ "$scope" == delta && -z "$delta" ]]; then scope="full: no change since the prior round"; fi
 
 set +e
 "$review" --repo "$repo" --out "$round_dir" ${brief:+--brief "$brief"} --base "$review_from" --head "$head"
@@ -458,14 +470,15 @@ for sibling in "$HOME/.cache/pr-loop/$owner_repo/pr-$pr"/round-*/round.json; do
 done
 
 jq -n --arg pr "$pr" --arg url "$url" --arg base "$base" --arg base_sha "$base_sha" --arg head "$head" \
-     --arg hb "$head_branch" --arg expect "$expect" --arg prior "$prior_head" --arg from "$reviewed_from" \
+     --arg hb "$head_branch" --arg expect "$expect" --arg prior "$prior_head" --arg from "$reviewed_from" --arg scope "$scope" \
      --argjson round "$((10#$round))" --argjson runs "$runs" --argjson complete "$complete" \
      --argjson rt "$current_tokens" --argjson ct "$((current_tokens + prior_tokens))" '
   {pr: $pr, url: $url, round: $round,
    identity: {expected_branch: (if $expect == "" then null else $expect end),
               head_branch: $hb},
    range: {base: $base_sha, base_branch: $base, head: $head, exact: "\($base_sha)..\($head)",
-           prior_head: (if $prior == "" then null else $prior end), reviewed_from: $from},
+           prior_head: (if $prior == "" then null else $prior end), reviewed_from: $from,
+           review_scope: $scope},
    runs: $runs, reviewer_complete: $complete,
    round_tokens: $rt, cumulative_tokens: $ct}' > "$round_dir/round.json"
 printf '%s\n' "$round_dir"

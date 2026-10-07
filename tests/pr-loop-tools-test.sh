@@ -1061,6 +1061,7 @@ assert_json '.range.prior_head == null' "$rd/round.json" "no prior head on round
 assert_eq "$([[ -e "$rd/delta.txt" ]] && printf yes || printf no)" "no" "no delta on round 1"
 assert_contains "$(cat "$rd/cmd.txt")" "--from origin/main --to $FR_HEAD" "round 1 reviews the whole PR"
 assert_eq "$(jq -r '.range.reviewed_from' "$rd/round.json")" "$FR_BASE" "round 1 reviews from the merge base"
+assert_eq "$(jq -r '.range.review_scope' "$rd/round.json")" "full: round 1" "round.json says why the round reviewed the whole PR"
 
 echo "pr-round: a later round records the prior head and the lines changed since it"
 new_sandbox
@@ -1076,6 +1077,32 @@ assert_eq "$(cat "$rd/delta.txt")" $'f.txt:2-3\ng.txt:1-1' "the delta lists each
 assert_eq "$([[ -e "$rd/background.md" ]] && printf yes || printf no)" "no" "no hunk list in the background: the reviewer already reviews only the delta"
 assert_contains "$(cat "$rd/cmd.txt")" "--from $FR_HEAD --to $FR_NEXT" "a later round reviews only the delta"
 assert_eq "$(jq -r '.range.reviewed_from' "$rd/round.json")" "$FR_HEAD" "the reviewed range starts at the prior head"
+assert_eq "$(jq -r '.range.review_scope' "$rd/round.json")" "delta" "round.json says the round reviewed the delta"
+
+rebase_head() { # a new PR head that does not descend from the current one, as a rebase leaves it
+  git -C "$repo" checkout -q -B rebased "$FR_BASE"
+  printf 'rebased\n' >"$repo/r.txt"
+  git -C "$repo" add r.txt
+  git -C "$repo" commit -qm "rebased work"
+  FR_NEXT=$(git -C "$repo" rev-parse HEAD)
+  git -C "$repo" push -q -f origin "HEAD:refs/pull/39/head"
+  GH_PR_JSON="$(jq -c --arg h "$FR_NEXT" '.headRefOid = $h' <<<"$GH_PR_JSON")"
+  export GH_PR_JSON
+}
+
+echo "pr-round: a rebase since the prior round reviews the whole PR, never the old base's range"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+rebase_head
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
+assert_contains "$(cat "$rd/cmd.txt")" "--from origin/main --to $FR_NEXT" "the reviewer reviews from the merge base, not from the orphaned prior head"
+assert_eq "$([[ -e "$rd/delta.txt" ]] && printf yes || printf no)" "no" "no delta across a rebase"
+assert_eq "$(jq -r '.range.reviewed_from' "$rd/round.json")" "$FR_BASE" "the reviewed range starts at the merge base"
+assert_eq "$(jq -r '.range.review_scope' "$rd/round.json")" "full: the branch was rebased since the prior round" "round.json says why"
+assert_eq "$("$TOOLS/executable_finding-scope.sh" "$rd" r.txt:1)" "new" "every finding after a rebase blocks as new"
 
 echo "pr-round: a delta round's per-commit retry covers only the delta's commits"
 new_sandbox
@@ -1262,6 +1289,23 @@ assert_eq "$RC" 0 "exits 0"
 assert_contains "$OUT" "$FR_BASE..$FR_HEAD" "round 1's diff is the whole PR from the merge base"
 assert_not_contains "$OUT" "The findings this diff answers" "no prior findings in round 1"
 assert_contains "$OUT" "No brief was given." "a missing brief is said, not invented"
+
+echo "critic-input: after a rebase the critic is told the diff is the whole PR, not the refine's answer"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+rebase_head
+r1=$'<!-- pr-loop-comment -->\n\n**Findings:**\n1. **[critic] bug/medium** `f.txt:1`: the finding to answer\n'
+GH_COMMENTS_JSON="$(jq -cn --arg r1 "$r1" '[{user: {login: "test-me"}, body: $r1}]')"
+export GH_COMMENTS_JSON
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
+OUT="$("$CRITIC_INPUT" --repo "$repo" --round-dir "$rd" 2>&1)"; RC=$?
+assert_eq "$RC" 0 "exits 0"
+assert_contains "$OUT" "$FR_BASE..$FR_NEXT" "the diff is the whole PR from the merge base"
+assert_contains "$OUT" "the branch was rebased since the prior round" "the critic is told why"
+assert_not_contains "$OUT" "the diff below is the refine's answer to them" "the whole PR is not called the refine's answer"
 
 echo "critic-input: a convergence round hands the critic the whole PR and says so"
 new_sandbox

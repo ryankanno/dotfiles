@@ -46,6 +46,7 @@ from=$(jq -r 'if .range.reviewed_from then .range.reviewed_from
              elif (.range.prior_head // "") != "" and .range.prior_head != .range.head then .range.prior_head
              else (.range.base // "") end' "$dir/round.json")
 prior=$(jq -r '.range.prior_head // empty' "$dir/round.json")
+scope=$(jq -r '.range.review_scope // empty' "$dir/round.json")
 diff=$(git -C "$repo" diff --no-color --no-ext-diff "$from" "$head") || {
   printf 'cannot diff %s..%s\n' "$from" "$head" >&2
   exit 5
@@ -61,7 +62,11 @@ if [[ -s "$dir/prior-findings.md" ]]; then
   # A refine happened iff the head moved since the prior round: keyed off
   # the explicit fields, never the fallback chain, so a legacy round.json
   # without reviewed_from cannot mislabel a convergence re-review.
-  if [[ -n "$prior" && "$head" != "$prior" ]]; then
+  # A refine that ends in a whole-PR review (a rebase) still answered the
+  # findings, but the diff is not the answer alone: say which, and why.
+  if [[ -n "$prior" && "$head" != "$prior" && "$scope" == full:* ]]; then
+    printf 'The prior round named these as blocking; the refine'"'"'s answer is inside the diff below, which is the whole PR, re-reviewed from the merge base because %s.\n\n' "${scope#full: }"
+  elif [[ -n "$prior" && "$head" != "$prior" ]]; then
     printf 'The prior round named these as blocking; the diff below is the refine'"'"'s answer to them.\n\n'
   else
     printf 'The prior round named these as blocking; no refine followed, and the diff below is the whole PR, re-reviewed from the merge base.\n\n'
