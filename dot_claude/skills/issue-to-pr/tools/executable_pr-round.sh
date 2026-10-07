@@ -14,9 +14,10 @@
 #                reviewer_complete, range.prior_head, range.reviewed_from:
 #                the prior head on a delta round, the merge base
 #                otherwise, range.review_scope: "delta" or "full: <why>"),
-#                delta.txt on a delta round only (the
-#                path:start-end hunks changed since the prior round's head,
-#                from round 2 on) with names.txt (the listing the hunks
+#                delta.txt from round 2 on, unless a rebase or an unusable
+#                prior head sends the round to the whole PR (the
+#                path:start-end hunks changed since the prior round's head;
+#                empty on an unchanged head) with names.txt (the listing the hunks
 #                enumerate over), settled.md (the standing Rejected and
 #                Accepted lines) and prior-findings.md (the newest round
 #                comment's blocking findings) and prior-unfinished.txt (the
