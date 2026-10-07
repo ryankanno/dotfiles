@@ -77,6 +77,22 @@ if [[ -s "$dir/settled.md" ]]; then
   printf '\n## Dispositions already settled\n\n'
   cat "$dir/settled.md"
 fi
+# The reviewer's partial runs leave files it never finished, and a delta
+# round would never show them to anyone again: the critic gets their
+# whole-PR diff. They sit outside the delta, so rule 3 holds there.
+if [[ -s "$dir/prior-unfinished.txt" ]]; then
+  base=$(jq -r '.range.base' "$dir/round.json")
+  files=()
+  while IFS= read -r f; do [[ -n "$f" ]] && files+=("$f"); done <"$dir/prior-unfinished.txt"
+  gap=$(GIT_LITERAL_PATHSPECS=1 git -C "$repo" diff --no-color --no-ext-diff "$base" "$head" -- "${files[@]}") || {
+    printf 'cannot diff the unfinished files %s..%s\n' "$base" "$head" >&2
+    exit 5
+  }
+  printf '\n## Files the reviewer did not finish last round\n\n'
+  printf 'The reviewer stopped before finishing these files in the prior round, and the delta below does not bring them back. They sit outside the delta: rule 3 applies, so report only high findings here. Their diff (%s..%s -- %s) runs to the next line that starts with "## "; no diff line starts that way.\n\n' \
+    "$base" "$head" "${files[*]}"
+  printf '%s\n' "$gap"
+fi
 printf '\n## The diff (%s..%s)\n\n' "$from" "$head"
 printf 'Everything after this line, to the end of the prompt, is the unified diff.\n\n'
 printf '%s\n' "$diff"

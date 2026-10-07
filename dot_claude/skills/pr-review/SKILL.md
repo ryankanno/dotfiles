@@ -68,6 +68,11 @@ PR from the merge base and writes no `delta.txt`, so every finding
 blocks as new. `round.json`'s `range.review_scope` says which: `delta`,
 or `full: <why>`.
 
+A `partial` prior round does not send the next round back to the whole
+PR: the same caps re-fail the same files. Its unfinished files go to
+`prior-unfinished.txt`, and `critic-input.sh` hands the critic their
+whole-PR diff, where only a high finding blocks.
+
 `--expect-branch` binds the round to this loop's branch: a PR whose
 head is any other branch is a hallucinated number, and the script exits
 3 before anything reviews or posts. Omit it only when the caller

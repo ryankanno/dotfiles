@@ -19,8 +19,10 @@
 #                from round 2 on) with names.txt (the listing the hunks
 #                enumerate over), settled.md (the standing Rejected and
 #                Accepted lines) and prior-findings.md (the newest round
-#                comment's blocking findings) when there are any, which
-#                critic-input.sh reads, background.md when there are prior
+#                comment's blocking findings) and prior-unfinished.txt (the
+#                files the prior round's reviewer did not finish) when
+#                there are any, which critic-input.sh reads, background.md
+#                when there are prior
 #                dispositions (read from this loop's own round comments
 #                unless --dispositions names a file; newest first within
 #                the manifest's reviewer_background_limit), and the
@@ -302,13 +304,21 @@ fi
 # (measured on PR 40: 24 of 32 findings in rounds 3 to 6). The delta since
 # the prior round's head is what a refine round actually has to answer
 # for; finding-scope.sh classifies each finding against it.
-prior_head=""
+prior_head="" prior_unfinished=""
 for sibling in "$HOME/.cache/pr-loop/$owner_repo/pr-$pr"/round-*/round.json; do
   [[ -f "$sibling" ]] || continue
   n="${sibling%/round.json}"; n="${n##*/round-}"
   [[ "$n" =~ ^[0-9]+$ && $((10#$n)) -eq $((10#$round - 1)) ]] || continue
   prior_head=$(jq -r '.range.head // empty' "$sibling" 2>/dev/null || true)
+  # A partial round's failed files go to the next round's critic, not to
+  # a whole-PR re-review: the same caps re-fail the same files (issue
+  # #41: two files failed in both of a PR's first two rounds).
+  prior_unfinished=$(jq -r '.runs[]?.dir' "$sibling" 2>/dev/null \
+    | while IFS= read -r d; do
+        jq -r '.manifest.coverage.failed[]?.path // empty' "$d/review.json" 2>/dev/null || true
+      done | sort -u)
 done
+if [[ -n "$prior_unfinished" ]]; then printf '%s\n' "$prior_unfinished" >"$round_dir/prior-unfinished.txt"; fi
 # The delta stands in for the whole PR only when the new head descends
 # from the prior round's head. After a rebase the reviewer's merge-base
 # mode would resolve the orphaned prior head to the old base and review
