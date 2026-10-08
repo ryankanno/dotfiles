@@ -333,6 +333,11 @@ for sibling in "$HOME/.cache/pr-loop/$owner_repo/pr-$pr"/round-*/round.json; do
     | while IFS= read -r d; do
         jq -r '.manifest.coverage.failed[]?.path // empty' "$d/review.json" 2>/dev/null || true
       done | sort -u || true)
+  # A base-merge-only round ran no reviewer, so it has no runs to read:
+  # the list it carried passes on, or a base merge would drop it for good.
+  if [[ "$(jq -r '.range.review_scope // empty' "$sibling" 2>/dev/null || true)" == none:* ]]; then
+    prior_unfinished=$(cat "${sibling%/round.json}/prior-unfinished.txt" 2>/dev/null || true)
+  fi
 done
 if [[ -n "$prior_unfinished" ]]; then printf '%s\n' "$prior_unfinished" >"$round_dir/prior-unfinished.txt"; fi
 # The delta stands in for the whole PR only when the new head descends

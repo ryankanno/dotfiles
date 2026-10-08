@@ -1177,6 +1177,20 @@ assert_json '.round_tokens == 0' "$rd/round.json" "nothing billed"
 assert_eq "$(jq -r '.range.head' "$rd/round.json")" "$FR_MERGE" "the next round chains from the merged head"
 assert_contains "$(cat "$rd/prior-findings.md")" "the finding still standing" "the prior round's findings carry forward"
 
+echo "pr-round: a base-merge-only round carries the prior round's unfinished files forward"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+export STUB_COVERAGE_FAILED='[{"path":"f.txt"}]'
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+export STUB_COVERAGE_FAILED=""
+merge_base_into_head
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+advance_head g.txt 'new\n'
+run_prr --repo "$repo" --pr 39 --round 3 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-3"
+assert_eq "$(cat "$rd/prior-unfinished.txt" 2>/dev/null)" "f.txt" "the files round 1 left unfinished still reach round 3's critic"
+
 echo "pr-round: a deletion-only PR change after a base merge is still reviewed"
 new_sandbox
 make_pr_round_env
