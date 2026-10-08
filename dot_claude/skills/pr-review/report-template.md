@@ -51,8 +51,10 @@ reads quickly and loses nothing.
 - **The reviewer's status is visible when it changes what the verdict
   means.** If the binding produced no review text, a line
   `**Reviewer:** unrecovered: <its message, verbatim>` sits above the
-  verdict. If a run ended partial, a line `**Reviewer:** partial: <the
-  failed files or the rendered warning, verbatim>` sits there instead.
+  verdict. If a run ended partial, or a per-commit retry left some
+  commits without review text, a line `**Reviewer:** partial: <the
+  failed files, the commits without review text, or the rendered
+  warning, verbatim>` sits there instead.
   A coverage gap never lives only inside a collapsed block.
 
 ## Layout
@@ -64,9 +66,9 @@ Visible, in this order:
 
 ## Review round <N>: <short-sha>
 
-**Reviewer:** <unrecovered: <its message, verbatim> | partial: <the failed files or the rendered warning, verbatim>>   (this line appears only when the reviewer ended unrecovered or partial; a coverage gap never lives only inside a collapsed block)
+**Reviewer:** <unrecovered: <its message, verbatim> | partial: <the failed files, the commits without review text, or the rendered warning, verbatim>>   (this line appears only when the reviewer ended unrecovered or partial; a coverage gap never lives only inside a collapsed block)
 
-**Verdict:** <No issues found. | N finding(s). | partial (the reviewer's coverage has a gap) | unrecovered (the reviewer produced no review text) | nothing to review (only a base merge since the prior round) | converged (all blocking findings low and dispositioned)>
+**Verdict:** <No issues found. | N finding(s). | partial (the reviewer's coverage has a gap). | unrecovered (the reviewer produced no review text). | nothing to review (only a base merge since the prior round). | converged (all blocking findings low and dispositioned).>
 
 **Gate:** <command> printed <its final result>   (refine and convergence rounds only)
 
@@ -129,10 +131,12 @@ blocks when they contain markup.
 ## Scan before posting
 
 ```bash
-~/.claude/skills/issue-to-pr/tools/scan.sh <file>
+$HOME/.claude/skills/issue-to-pr/tools/scan.sh <file>
 ```
 
 The script replaces home-directory paths with `~` in place. Exit 1
 means a hit remains (another home path, a temp path, a token): do not
 post; record the printed lines and surface them in the loop's final
-report. In an interactive round, show the lines and wait instead.
+report. Exit 2 means a usage error, or the scan itself failed: do not
+post; record its stderr the same way. In an interactive round, show
+the lines and wait instead.

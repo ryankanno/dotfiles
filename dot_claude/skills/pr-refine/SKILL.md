@@ -68,10 +68,10 @@ not this one.
 
 The verdict line is one of
 `No issues found.`, `<n> finding(s).`,
-`partial (the reviewer's coverage has a gap)`,
-`unrecovered (the reviewer produced no review text)`,
-`nothing to review (only a base merge since the prior round)`, or
-`converged (all blocking findings low and dispositioned)`. Partial and
+`partial (the reviewer's coverage has a gap).`,
+`unrecovered (the reviewer produced no review text).`,
+`nothing to review (only a base merge since the prior round).`, or
+`converged (all blocking findings low and dispositioned).` Partial and
 unrecovered mean nothing to fix and no clean claim. Nothing to review
 means no clean claim: its Findings are the prior round's, carried
 verbatim, and you fix them like any round's. A converged verdict
@@ -130,7 +130,7 @@ never force.
 ## 6. Re-run the round — once
 
 Run the full review round exactly as
-`~/.claude/skills/pr-review/SKILL.md` defines it, over the new head
+`$HOME/.claude/skills/pr-review/SKILL.md` defines it, over the new head
 SHA — once, at the end, over the final head, never once per
 intermediate head. Pass the `--effort` and `--timeout` the loop's
 rounds use, when the dispatch prompt or the caller names them. Post the

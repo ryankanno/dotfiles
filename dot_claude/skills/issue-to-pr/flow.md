@@ -95,16 +95,16 @@ flowchart LR
 
 | Thing | Path |
 |---|---|
-| Orchestrator skill | `~/.claude/skills/issue-to-pr/SKILL.md` |
-| Review round skill | `~/.claude/skills/pr-review/SKILL.md` |
-| Refine round skill | `~/.claude/skills/pr-refine/SKILL.md` |
-| Report template | `~/.claude/skills/pr-review/report-template.md` |
-| Implementer prompt | `~/.claude/skills/issue-to-pr/dispatch-prompt-template.md` |
-| Slot manifest and bindings | `~/.claude/skills/issue-to-pr/tools/` |
-| Leak gate | `~/.claude/skills/issue-to-pr/tools/scan.sh` |
-| Branch-name tool | `~/.claude/skills/issue-to-pr/tools/branch-name.sh` |
-| Finding classifier | `~/.claude/skills/issue-to-pr/tools/finding-scope.sh` |
-| Critic prompt builder | `~/.claude/skills/issue-to-pr/tools/subagent/critic-input.sh` |
+| Orchestrator skill | `$HOME/.claude/skills/issue-to-pr/SKILL.md` |
+| Review round skill | `$HOME/.claude/skills/pr-review/SKILL.md` |
+| Refine round skill | `$HOME/.claude/skills/pr-refine/SKILL.md` |
+| Report template | `$HOME/.claude/skills/pr-review/report-template.md` |
+| Implementer prompt | `$HOME/.claude/skills/issue-to-pr/dispatch-prompt-template.md` |
+| Slot manifest and bindings | `$HOME/.claude/skills/issue-to-pr/tools/` |
+| Leak gate | `$HOME/.claude/skills/issue-to-pr/tools/scan.sh` |
+| Branch-name tool | `$HOME/.claude/skills/issue-to-pr/tools/branch-name.sh` |
+| Finding classifier | `$HOME/.claude/skills/issue-to-pr/tools/finding-scope.sh` |
+| Critic prompt builder | `$HOME/.claude/skills/issue-to-pr/tools/subagent/critic-input.sh` |
 | Round artifacts | `$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/round-<N>/` |
 | Final report | `$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/final-report.md` |
 | workmux layouts | `~/.config/workmux/config.yaml` (chezmoi: `dot_config/workmux/config.yaml`) |
