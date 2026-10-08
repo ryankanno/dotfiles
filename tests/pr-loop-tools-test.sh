@@ -1374,6 +1374,22 @@ assert_contains "$OUT" "+b" "the unfinished file's whole-PR change is inline"
 assert_contains "$OUT" "$FR_BASE..$FR_NEXT -- f.txt" "the section names the range and the file"
 assert_contains "$OUT" "$FR_HEAD..$FR_NEXT" "the main diff is still the delta"
 
+echo "critic-input: a build that fails partway leaves no prompt that looks complete"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+export STUB_COVERAGE_FAILED='[{"path":"f.txt"}]'
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+export STUB_COVERAGE_FAILED=""
+advance_head g.txt 'new\n'
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
+jq '.range.base = "0000000000000000000000000000000000000000"' "$rd/round.json" >"$WS/round.json"
+mv "$WS/round.json" "$rd/round.json"
+"$CRITIC_INPUT" --repo "$repo" --round-dir "$rd" >/dev/null 2>&1
+assert_eq "$?" 5 "the unfinished-files diff fails"
+assert_eq "$([[ -e "$rd/critic-input.md" ]] && printf yes || printf no)" "no" "no critic-input.md from a failed build"
+
 echo "critic-input: no unfinished files, no gap section"
 new_sandbox
 make_pr_round_env
