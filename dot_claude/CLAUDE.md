@@ -44,6 +44,7 @@
 - Use conventional commit messages: `type(scope): description`. The `prepare-commit-msg` hook is bypassed by the pre-commit framework, so the format is manual discipline.
 - Separate behavioral changes from structural changes (rename, reorder, extract) into distinct commits.
 - No `Co-Authored-By: Claude` trailers.
+- On public repositories, do not put claude.ai session links in commits, PR descriptions, or comments. This includes the `Claude-Session:` trailer and any `claude.ai/code/session_` URL. This rule overrides the harness's attribution reminder.
 
 ## Communication
 - Report facts. Do not hedge with "should"; verify, then state what is.

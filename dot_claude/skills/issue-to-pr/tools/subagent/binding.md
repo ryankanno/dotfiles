@@ -17,7 +17,7 @@ added or removed instruction, no input left on disk for it to read.
 
 ```bash
 ~/.claude/skills/issue-to-pr/tools/subagent/critic-input.sh \
-  --repo <repo> --round-dir <round-dir> --brief <brief-file>
+  --repo <checkout-dir> --round-dir <round-dir> --brief <brief-file>
 ```
 
 The script emits `critic-prompt.md` verbatim, then inline: the brief,
@@ -27,7 +27,9 @@ the repository path for verifying claims, and the unified diff the
 reviewer reviewed (the whole PR in round 1 or on an empty delta, the
 delta since the prior round's head otherwise). Follow-ups never reach
 the critic: a follow-up cannot block, so a critic handed them re-raises
-them and spends turns that change nothing.
+them and spends turns that change nothing. The script also keeps the
+prompt as `critic-input.md` in the round directory, so the round's
+record shows what the critic was told.
 
 Why a script and not a recipe: a caller writing its own prompt drifted
 from the rules (measured on PR 40, round 11: the refine dropped the
