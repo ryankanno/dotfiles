@@ -29,7 +29,9 @@ new_sandbox() {
   cat >"$WS/bin/roborev" <<'FAKE'
 #!/usr/bin/env bash
 case "$1 $2" in
-  "list "*) echo "$*" >"$WS/list-args"; cat "$WS/list.json";;
+  "list "*) echo "$*" >"$WS/list-args"
+    [[ -f "$WS/list-fails" ]] && { echo "list: daemon not running" >&2; exit 1; }
+    cat "$WS/list.json";;
   "config get") [[ "$3" == server_addr ]] && cat "$WS/addr";;
   *) echo "fake roborev: unexpected call: $*" >&2; exit 64;;
 esac
@@ -50,7 +52,8 @@ start_server() { # serves $WS/http and points the fake's server_addr at it
   done
   echo "test http server did not start" >&2; exit 1
 }
-stop_server() { [[ -n "$SERVER_PID" ]] && kill "$SERVER_PID" 2>/dev/null; SERVER_PID=""; }
+# The wait reaps the server, so bash 3.2 prints no "Terminated" notice for it.
+stop_server() { [[ -n "$SERVER_PID" ]] && { kill "$SERVER_PID"; wait "$SERVER_PID"; } 2>/dev/null; SERVER_PID=""; }
 trap 'stop_server; [[ -n "${WS:-}" ]] && rm -rf "$WS"' EXIT
 
 run() { # dir
@@ -61,7 +64,7 @@ run() { # dir
 
 echo "a CI worktree names its job, which the daemon returns while it runs"
 new_sandbox
-jq -n '{jobs:[{id:14399,status:"running",git_ref:"aaa..bbb"}]}' >"$WS/http/api/jobs"
+jq -n '{jobs:[{id:7,status:"running",git_ref:"zzz..yyy"},{id:14399,status:"running",git_ref:"aaa..bbb"}]}' >"$WS/http/api/jobs"
 start_server
 run "$WS/ci/roborev-ci-14399-2206444493"
 assert_eq "$RC" 0 "exits 0"
@@ -98,6 +101,7 @@ run "$WS/wt"
 assert_eq "$RC" 0 "exits 0"
 assert_eq "$OUT" $'10\taaa..bbb' "ignores finished jobs and other worktrees"
 assert_contains "$(cat "$WS/list-args")" "--all-branches" "lists every branch"
+assert_contains "$(cat "$WS/list-args")" "--json" "asks for JSON"
 assert_contains "$(cat "$WS/list-args")" "--repo $WS/wt" "scopes the list to the directory"
 
 echo "a job without a worktree matches on its repo path"
@@ -137,6 +141,14 @@ new_sandbox
 run "$WS/wt"
 assert_eq "$([[ $RC -ne 0 ]] && echo nonzero)" nonzero "exits non-zero"
 assert_contains "$ERR" "no queued or running roborev job" "says why"
+assert_eq "$OUT" "" "prints no range"
+
+echo "a failing roborev list is an error, not a guess"
+new_sandbox
+touch "$WS/list-fails"
+run "$WS/wt"
+assert_eq "$([[ $RC -ne 0 ]] && echo nonzero)" nonzero "exits non-zero"
+assert_contains "$ERR" "daemon not running" "passes on the CLI's error"
 assert_eq "$OUT" "" "prints no range"
 
 echo "no directory is a usage error"
