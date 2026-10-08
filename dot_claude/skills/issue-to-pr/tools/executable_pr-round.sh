@@ -23,7 +23,7 @@
 #                delta.txt from round 2 on, unless a rebase or an unusable
 #                prior head sends the round to the whole PR (the
 #                path:start-end hunks changed since range.reviewed_from;
-#                empty when the prior head..head diff adds or modifies no
+#                empty when the range.reviewed_from..head diff adds or modifies no
 #                lines: an empty commit, a revert pair, or a deletion-only,
 #                binary-only or mode-only change, issue #43) with names.txt
 #                (the listing the hunks
