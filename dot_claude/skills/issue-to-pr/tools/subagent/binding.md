@@ -54,8 +54,8 @@ Then a final "Unconfirmed candidates" section: suspicions it could not
 ground that way, one line each with what is missing. The caller shows
 that section verbatim in the collapsed critic block and never counts
 it: an unconfirmed candidate is neither a blocking finding nor a
-follow-up. This is roborev's evidence bar (its `review_guidelines`),
-where the refine loop converged; the adversarial "prove otherwise"
+follow-up. This is the evidence bar the earlier roborev refine loop
+converged on; the adversarial "prove otherwise"
 framing it replaces produced at least one medium every round on PR 40.
 
 Findings that do not reference the diff are out of contract and are

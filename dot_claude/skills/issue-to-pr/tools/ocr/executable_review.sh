@@ -54,9 +54,9 @@ mkdir -p "$out"
 # a 26-line file among them, and a full re-review re-failed the same
 # files. The model provider serves 6 requests at once and queues the
 # rest, so the default 8 parallel groups wait out the 15-minute task
-# timeout. These are roborev's settings (review_guidelines in its
-# config), the loop that converged: one group at a time, room for 100
-# tool rounds and 80 minutes per task.
+# timeout. These are the settings under which the earlier roborev loop
+# converged: one group at a time, room for 100 tool rounds and 80
+# minutes per task.
 args=(review --format json --output "$out/review.json"
       --concurrency 1 --max-tools 100 --timeout 80 --effort high)
 if [[ -n "$brief" ]]; then
