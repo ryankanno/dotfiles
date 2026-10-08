@@ -6,10 +6,6 @@ default-host: {{ $host }}
 # rather than everything inheriting whichever label a shared topic set.
 # The -high variants carry priority 4+ and raise urgency to critical.
 subscribe:
-  - topic: linux-roborev
-    command: 'notify-send -a roborev -i dialog-information "$title" "[$(date -d @${time:-$(date +%s)} +%F\ %T)] $message"'
-  - topic: linux-roborev-high
-    command: 'notify-send -a roborev -i dialog-warning -u critical "$title" "[$(date -d @${time:-$(date +%s)} +%F\ %T)] $message"'
   - topic: linux-cc
     command: 'notify-send -a claude-code -i utilities-terminal "$title" "[$(date -d @${time:-$(date +%s)} +%F\ %T)] $message"'
   - topic: linux-cc-high

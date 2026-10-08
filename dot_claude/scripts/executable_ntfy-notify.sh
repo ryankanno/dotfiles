@@ -8,8 +8,8 @@
 #   ntfy-notify.sh stop                    # task-completion for current repo
 #   ntfy-notify.sh subagent-stop           # subagent-completion
 #
-# Topics are <os>-<source> (cc for Claude Code hooks, roborev for roborev);
-# priority 4+ events route to <os>-<source>-high. NTFY_TOPIC overrides <source>.
+# Topics are <os>-cc; priority 4+ events route to <os>-cc-high.
+# NTFY_TOPIC overrides cc.
 # Silently exits 0 if NTFY_SERVER_URL is unset.
 
 set -euo pipefail
@@ -36,15 +36,7 @@ detect_os() {
     esac
 }
 
-# Each source gets its own topic so a subscriber can label, icon, and mute
-# them separately. Sharing one topic meant every message rendered under
-# whichever app name that topic's command happened to hardcode.
-case "${mode}" in
-    roborev) source_topic="roborev" ;;
-    *) source_topic="cc" ;;
-esac
-
-topic_base="$(detect_os)-${NTFY_TOPIC:-${source_topic}}"
+topic_base="$(detect_os)-${NTFY_TOPIC:-cc}"
 base_url="${NTFY_SERVER_URL%/}"
 
 post() {
@@ -137,46 +129,8 @@ case "${mode}" in
     subagent-stop)
         post "🤖 Subagent done: $(repo_label)" "Subagent finished"$'\n'"$(pwd_line)" 4 "robot,checkered_flag" "$(tmux_click_url)"
         ;;
-    roborev)
-        # args: repo_name repo_path sha verdict detail
-        # verdict P=pass, F=findings, anything else=job error
-        shift
-        rr_repo="${1:-unknown}"
-        rr_path="${2:-}"
-        rr_sha="${3:-}"
-        rr_verdict="${4:-}"
-        rr_detail="${5:-}"
-
-        # Best-effort GitHub link: the PR containing the head commit, else the
-        # commit page. A slow or failed lookup must never delay the notification.
-        rr_click=""
-        rr_head="${rr_sha##*..}"
-        if [ -d "${rr_path}" ] && [ -n "${rr_head}" ]; then
-            rr_slug=$(git -C "${rr_path}" remote get-url origin 2>/dev/null \
-                | sed 's|.*[/:]\([^/]*/[^/]*\)$|\1|; s|\.git$||') || rr_slug=""
-            if [ -n "${rr_slug}" ]; then
-                rr_click=$(timeout 5 gh api "repos/${rr_slug}/commits/${rr_head}/pulls" \
-                    --jq '.[0].html_url // empty' 2>/dev/null) || rr_click=""
-                if [ -z "${rr_click}" ]; then
-                    rr_click="https://github.com/${rr_slug}/commit/${rr_head}"
-                fi
-            fi
-        fi
-
-        case "${rr_verdict}" in
-            P)
-                post "✅ roborev pass: ${rr_repo}" "${rr_head}" 3 "white_check_mark" "${rr_click}"
-                ;;
-            F)
-                post "❌ roborev findings: ${rr_repo}" "${rr_head}"$'\n'"${rr_detail}" 4 "x,mag" "${rr_click}"
-                ;;
-            *)
-                post "💥 roborev error: ${rr_repo}" "${rr_head}"$'\n'"${rr_detail}" 4 "boom,rotating_light" "${rr_click}"
-                ;;
-        esac
-        ;;
     *)
-        echo "usage: $0 {notification|notification-idle|notification-permission|stop|subagent-stop|roborev}" >&2
+        echo "usage: $0 {notification|notification-idle|notification-permission|stop|subagent-stop}" >&2
         exit 2
         ;;
 esac
