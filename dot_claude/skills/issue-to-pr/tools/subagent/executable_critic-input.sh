@@ -8,7 +8,8 @@
 # stale), and every input left on disk cost the critic a turn to read.
 #
 # Interface in:  --repo <dir> --round-dir <dir> [--brief <file>]
-# Interface out: the prompt on stdout. The diff is the range the reviewer
+# Interface out: the prompt on stdout, and the same prompt kept as
+#                critic-input.md in the round dir. The diff is the range the reviewer
 #                reviewed (range.reviewed_from..range.head): the whole PR
 #                in round 1 or on an empty delta, the delta otherwise.
 # Exit codes: 0 built; 2 usage, no round.json, or no critic-prompt.md;
@@ -55,6 +56,11 @@ diff=$(git -C "$repo" diff --no-color --no-ext-diff "$from" "$head") || {
   exit 5
 }
 
+# The round dir keeps the prompt the critic got, so a round's record shows
+# what the critic was told, not only what it found. It lands under its
+# final name only once whole: a failed build never leaves a prompt that
+# looks complete.
+{
 cat "$prompt"
 printf '\n---\n\n# Round %s inputs\n\n' "$round"
 printf 'The repository at the PR head %s is checked out at %s. Read files there only to verify a claim about the diff below.\n\n' "$head" "$repo"
@@ -107,3 +113,6 @@ fi
 printf '\n## The diff (%s..%s)\n\n' "$from" "$head"
 printf 'Everything after this line, to the end of the prompt, is the unified diff.\n\n'
 printf '%s\n' "$diff"
+} >"$dir/critic-input.md.partial"
+mv "$dir/critic-input.md.partial" "$dir/critic-input.md"
+cat "$dir/critic-input.md"
