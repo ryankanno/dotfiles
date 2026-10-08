@@ -57,8 +57,12 @@ mkdir -p "$out"
 # timeout. These are the settings under which the earlier roborev loop
 # converged: one group at a time, room for 100 tool rounds and 80
 # minutes per task.
+# Effort sets only the review rounds per group (high 3, medium 2); a
+# round after the first runs only when the one before added a finding,
+# and its turns reason longest (issue #52: round 2 of a 7-file group ran
+# 28 requests, many at 12k to 32k reasoning tokens each).
 args=(review --format json --output "$out/review.json"
-      --concurrency 1 --max-tools 100 --timeout 80 --effort high)
+      --concurrency 1 --max-tools 100 --timeout 80 --effort medium)
 if [[ -n "$brief" ]]; then
   [[ -f "$brief" ]] || { printf 'brief not found: %s\n' "$brief" >&2; exit 2; }
   args+=(--background-file "$brief")
