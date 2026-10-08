@@ -10,16 +10,22 @@
 #                [--dispositions <file>] [--expect-branch <branch-name>]
 #                [--effort low|medium|high] [--timeout <minutes>] (passed
 #                to every review run; the binding owns the defaults)
+#                [--rerun] [--convergence: a base merge with no PR change
+#                reviews the whole PR instead of nothing]
 # Interface out: the round directory under
 #                $HOME/.cache/pr-loop/<owner/repo>/pr-<n>/round-<N>/ with
 #                each run's outputs plus round.json (range, identity, runs,
 #                reviewer_complete, range.prior_head, range.reviewed_from:
-#                the prior head on a delta round, the merge base
-#                otherwise, range.review_scope: "delta" or "full: <why>"),
+#                the prior head on a delta round, or after a base merge
+#                a baseline commit (the prior head merged onto the new
+#                merge base), the merge base otherwise,
+#                range.review_scope: "delta", "full: <why>", or
+#                "none: <why>" when a base merge alone moved the head and
+#                no reviewer runs),
 #                delta.txt from round 2 on, unless a rebase or an unusable
 #                prior head sends the round to the whole PR (the
-#                path:start-end hunks changed since the prior round's head;
-#                empty when the prior head..head diff adds or modifies no
+#                path:start-end hunks changed since range.reviewed_from;
+#                empty when the range.reviewed_from..head diff adds or modifies no
 #                lines: an empty commit, a revert pair, or a deletion-only,
 #                binary-only or mode-only change, issue #43) with names.txt
 #                (the listing the hunks
@@ -44,11 +50,11 @@
 set -euo pipefail
 
 usage() {
-  printf 'usage: pr-round.sh --repo <dir> --pr <n> --round <N> [--brief <file>] [--dispositions <file>] [--expect-branch <branch-name>] [--effort low|medium|high] [--timeout <minutes>] [--rerun]\n' >&2
+  printf 'usage: pr-round.sh --repo <dir> --pr <n> --round <N> [--brief <file>] [--dispositions <file>] [--expect-branch <branch-name>] [--effort low|medium|high] [--timeout <minutes>] [--rerun] [--convergence]\n' >&2
   exit 2
 }
 
-repo="" pr="" round="" brief="" dispositions="" expect="" rerun="" effort="" timeout=""
+repo="" pr="" round="" brief="" dispositions="" expect="" rerun="" effort="" timeout="" convergence=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --repo) [[ $# -ge 2 ]] || usage; repo="$2"; shift 2 ;;
@@ -60,6 +66,7 @@ while [[ $# -gt 0 ]]; do
     --effort) [[ $# -ge 2 ]] || usage; effort="$2"; shift 2 ;;
     --timeout) [[ $# -ge 2 ]] || usage; timeout="$2"; shift 2 ;;
     --rerun) rerun=1; shift ;;
+    --convergence) convergence=1; shift ;;
     *) usage ;;
   esac
 done
@@ -318,12 +325,13 @@ fi
 # (measured on PR 40: 24 of 32 findings in rounds 3 to 6). The delta since
 # the prior round's head is what a refine round actually has to answer
 # for; finding-scope.sh classifies each finding against it.
-prior_head="" prior_unfinished=""
+prior_head="" prior_base="" prior_unfinished=""
 for sibling in "$HOME/.cache/pr-loop/$owner_repo/pr-$pr"/round-*/round.json; do
   [[ -f "$sibling" ]] || continue
   n="${sibling%/round.json}"; n="${n##*/round-}"
   [[ "$n" =~ ^[0-9]+$ && $((10#$n)) -eq $((10#$round - 1)) ]] || continue
   prior_head=$(jq -r '.range.head // empty' "$sibling" 2>/dev/null || true)
+  prior_base=$(jq -r '.range.base // empty' "$sibling" 2>/dev/null || true)
   # A partial round's failed files go to the next round's critic, not to
   # a whole-PR re-review: the same caps re-fail the same files (issue
   # #41: two files failed in both of a PR's first two rounds).
@@ -333,6 +341,11 @@ for sibling in "$HOME/.cache/pr-loop/$owner_repo/pr-$pr"/round-*/round.json; do
     | while IFS= read -r d; do
         jq -r '.manifest.coverage.failed[]?.path // empty' "$d/review.json" 2>/dev/null || true
       done | sort -u || true)
+  # A base-merge-only round ran no reviewer, so it has no runs to read:
+  # the list it carried passes on, or a base merge would drop it for good.
+  if [[ "$(jq -r '.range.review_scope // empty' "$sibling" 2>/dev/null || true)" == none:* ]]; then
+    prior_unfinished=$(cat "${sibling%/round.json}/prior-unfinished.txt" 2>/dev/null || true)
+  fi
 done
 if [[ -n "$prior_unfinished" ]]; then printf '%s\n' "$prior_unfinished" >"$round_dir/prior-unfinished.txt"; fi
 # The delta stands in for the whole PR only when the new head descends
@@ -354,6 +367,40 @@ elif ! git -C "$repo" cat-file -e "$prior_head^{commit}" 2>/dev/null; then
 elif ! git -C "$repo" merge-base --is-ancestor "$prior_head" "$head"; then
   scope="full: the branch was rebased since the prior round"
 fi
+# A merge of the base into the PR keeps the prior head an ancestor, but
+# prior_head..head then carries every base change the merge brought in
+# (issue #49: 16 of 21 delta hunks on PR 45 were main's). When the merge
+# base moved, the delta starts from a baseline commit instead: the prior
+# head merged onto the new merge base, so only the PR's own changes since
+# the prior round remain, conflict resolutions among them. The reviewer
+# diffs in merge-base mode, and the baseline and the head share two
+# merge bases, so the reviewer gets a commit with the head's tree whose
+# only parent is the baseline. Neither commit is on any ref.
+delta_from="$prior_head" delta_to="$head"
+if [[ "$scope" == delta && -n "$prior_base" && "$prior_base" != "$base_sha" ]]; then
+  # merge-tree exits 1 on a conflict and still writes the merged tree,
+  # with the conflict markers in it, on its first line.
+  set +e
+  merged=$(git -C "$repo" merge-tree --write-tree "$prior_head" "$base_sha")
+  mrc=$?
+  set -e
+  if [[ $mrc -gt 1 ]]; then
+    printf "cannot merge the prior head %s onto the merge base %s (git's error is above; merge-tree --write-tree needs git 2.38 or later)\n" "$prior_head" "$base_sha" >&2
+    exit 5
+  fi
+  # A fixed identity: the user's checkout may have none, or sign commits.
+  synth() {
+    GIT_AUTHOR_NAME=pr-loop GIT_AUTHOR_EMAIL=pr-loop@localhost \
+    GIT_COMMITTER_NAME=pr-loop GIT_COMMITTER_EMAIL=pr-loop@localhost \
+      git -C "$repo" commit-tree --no-gpg-sign "$@"
+  }
+  delta_from=$(synth "${merged%%$'\n'*}" -p "$prior_head" -p "$base_sha" \
+      -m "pr-loop baseline: $prior_head on merge base $base_sha") \
+    && delta_to=$(synth "$head^{tree}" -p "$delta_from" -m "pr-loop head: $head") || {
+    printf 'cannot write the baseline commits for the delta\n' >&2
+    exit 5
+  }
+fi
 delta=""
 if [[ "$scope" == delta ]]; then
   # Hunks enumerate per file because the git header line is inherently
@@ -365,7 +412,7 @@ if [[ "$scope" == delta ]]; then
   # reports as edited ranges, never a whole-file add.
   names="$round_dir/names.txt"
   git -C "$repo" -c core.quotePath=false diff --name-status -M --no-color \
-      "$prior_head" "$head" >"$names" || {
+      "$delta_from" "$head" >"$names" || {
     printf 'cannot list the changed files\n' >&2
     exit 5
   }
@@ -379,7 +426,7 @@ if [[ "$scope" == delta ]]; then
     if [[ "$status" == R* ]]; then p="$new"; paths+=("$new"); fi
     GIT_LITERAL_PATHSPECS=1 \
       git -C "$repo" -c core.quotePath=false diff -U0 -M --no-color --no-ext-diff \
-          "$prior_head" "$head" -- "${paths[@]}" \
+          "$delta_from" "$head" -- "${paths[@]}" \
       | p="$p" awk '/^@@ / {
           n = split(substr($3, 2), a, ",")
           cnt = (n > 1) ? a[2] : 1
@@ -425,17 +472,49 @@ status_of() { # dir
 # tokens a round on PR 40 to yield one or two blocking findings. An empty
 # delta (the same head as the prior round, as in a convergence round)
 # reviews the whole PR again: an empty range is no review at all.
-review_from="origin/$base" reviewed_from="$base_sha"
-if [[ -n "$delta" ]]; then review_from="$prior_head" reviewed_from="$prior_head"; fi
+review_from="origin/$base" reviewed_from="$base_sha" review_to="$head"
+if [[ -n "$delta" ]]; then review_from="$delta_from" reviewed_from="$delta_from" review_to="$delta_to"; fi
+# A base merge alone leaves the PR's own code as the prior round reviewed
+# it, so the round records that and bills nothing. Nothing reviewed is
+# never clean. The trees decide, not the hunks: a deletion-only change
+# also leaves the delta empty (issue #43) and is still a change. The
+# convergence round still reviews the whole PR: the loop's clean verdict
+# must rest on a review of the merged head.
+same_tree=1
+if [[ "$scope" == delta && "$delta_from" != "$prior_head" ]]; then
+  # diff exits 1 when the trees differ; above 1 it failed, and a failure
+  # read as "differ" would bill a whole-PR review in silence.
+  set +e
+  git -C "$repo" diff --quiet --no-ext-diff "$delta_from" "$head"
+  same_tree=$?
+  set -e
+  if [[ $same_tree -gt 1 ]]; then
+    printf 'cannot compare the baseline %s with the head %s\n' "$delta_from" "$head" >&2
+    exit 5
+  fi
+fi
+if [[ $same_tree -eq 0 ]]; then
+  if [[ -z "$convergence" ]]; then
+    scope="none: the PR's own code did not change since the prior round (a base merge only)"
+    review_from="$delta_from" reviewed_from="$delta_from"
+  else
+    scope="full: only a base merge since the prior round"
+  fi
+fi
 if [[ "$scope" == delta && -z "$delta" ]]; then scope="full: no change since the prior round"; fi
 
-set +e
-"$review" --repo "$repo" --out "$round_dir" ${brief:+--brief "$brief"} ${effort:+--effort "$effort"} ${timeout:+--timeout "$timeout"} --base "$review_from" --head "$head"
-rc=$?
-set -e
-range_status=$(status_of "$round_dir")
-record range "$round_dir" "$range_status" "$(cat "$round_dir/session.txt" 2>/dev/null || true)" "$rc"
-if [[ "$range_status" == complete ]]; then
+range_status=none
+if [[ "$scope" != none:* ]]; then
+  set +e
+  "$review" --repo "$repo" --out "$round_dir" ${brief:+--brief "$brief"} ${effort:+--effort "$effort"} ${timeout:+--timeout "$timeout"} --base "$review_from" --head "$review_to"
+  rc=$?
+  set -e
+  range_status=$(status_of "$round_dir")
+  record range "$round_dir" "$range_status" "$(cat "$round_dir/session.txt" 2>/dev/null || true)" "$rc"
+fi
+if [[ "$range_status" == none ]]; then
+  complete=false
+elif [[ "$range_status" == complete ]]; then
   complete=true
 elif [[ "$range_status" == missing || "$range_status" == skipped ]]; then
   complete=false
@@ -459,7 +538,7 @@ elif [[ "$range_status" == missing || "$range_status" == skipped ]]; then
     record "commit:$sha" "$commit_dir" "$cstatus" "$(cat "$commit_dir/session.txt" 2>/dev/null || true)" "$crc"
     commit_runs=$((commit_runs + 1))
     [[ "$cstatus" == complete ]] || recovered=0
-  done < <(git -C "$repo" log --format=%H "$review_from..$head")
+  done < <(git -C "$repo" log --format=%H "$review_from..$review_to")
   if [[ $commit_runs -gt 0 && $recovered -eq 1 ]]; then complete=true; fi
 else
   # partial or any other non-complete status: review text exists, some

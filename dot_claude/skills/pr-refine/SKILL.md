@@ -69,9 +69,12 @@ not this one.
 The verdict line is one of
 `No issues found.`, `<n> finding(s).`,
 `partial (the reviewer's coverage has a gap)`,
-`unrecovered (the reviewer produced no review text)`, or
+`unrecovered (the reviewer produced no review text)`,
+`nothing to review (only a base merge since the prior round)`, or
 `converged (all blocking findings low and dispositioned)`. Partial and
-unrecovered mean nothing to fix and no clean claim. A converged verdict
+unrecovered mean nothing to fix and no clean claim. Nothing to review
+means no clean claim: its Findings are the prior round's, carried
+verbatim, and you fix them like any round's. A converged verdict
 means the orchestrator closed the loop: nothing to fix, no new round.
 
 ## 2. Validate every finding
