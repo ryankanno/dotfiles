@@ -56,8 +56,8 @@ validate every finding against the diff before touching code, fix under
 TDD, run the gate, commit, push, re-run the review round, post the
 round's comment.
 <only when intake set the reviewer's effort or timeout; omit this line
-otherwise:> Every review round passes `--effort <level> --timeout
-<minutes>` to `pr-round.sh`.
+otherwise, and keep only the flags intake set:> Every review round
+passes `--effort <level> --timeout <minutes>` to `pr-round.sh`.
 
 ## When you are done
 
