@@ -1177,6 +1177,19 @@ assert_json '.round_tokens == 0' "$rd/round.json" "nothing billed"
 assert_eq "$(jq -r '.range.head' "$rd/round.json")" "$FR_MERGE" "the next round chains from the merged head"
 assert_contains "$(cat "$rd/prior-findings.md")" "the finding still standing" "the prior round's findings carry forward"
 
+echo "pr-round: a deletion-only PR change after a base merge is still reviewed"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+advance_head f.txt 'b\nbug\n'
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+merge_base_into_head
+advance_head f.txt 'b\n'
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
+assert_not_contains "$(jq -r '.range.review_scope' "$rd/round.json")" "none:" "a deleted line is a PR change, not nothing to review"
+assert_contains "$(cat "$rd/cmd.txt" 2>/dev/null)" "--from origin/main --to $FR_NEXT" "the reviewer reviews the whole PR, as for any change with no added lines"
+
 echo "pr-round: --convergence reviews the whole PR after a base merge with no PR change"
 new_sandbox
 make_pr_round_env
@@ -1186,7 +1199,7 @@ merge_base_into_head
 run_prr --repo "$repo" --pr 39 --round 2 --convergence >/dev/null
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
 assert_contains "$(cat "$rd/cmd.txt")" "--from origin/main --to $FR_MERGE" "the convergence round reviews the whole merged PR"
-assert_eq "$(jq -r '.range.review_scope' "$rd/round.json")" "full: no change since the prior round" "round.json says why"
+assert_eq "$(jq -r '.range.review_scope' "$rd/round.json")" "full: only a base merge since the prior round" "round.json says why: the head moved"
 
 echo "pr-round: a conflicted base merge keeps its resolution in the delta"
 new_sandbox

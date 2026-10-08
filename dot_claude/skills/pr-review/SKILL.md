@@ -79,12 +79,14 @@ reviewer's range, and the critic's diff then hold only the PR's own
 changes since the prior round, conflict resolutions included, and none
 of the base's. A finding on the base's lines reads `reviewed`.
 
-When the base merge is the only change since the prior round, the
-PR-only delta is empty and the round reviews nothing: `range.review_scope`
-starts with `none:`, `runs` is empty, `reviewer_complete` is `false`,
-and nothing is billed. The orchestrator's convergence round passes
-`--convergence`, and the round then reviews the whole PR from the merge
-base, as an unchanged head does.
+When the base merge is the only change since the prior round (the
+head's tree equals the baseline's), the round reviews nothing:
+`range.review_scope` starts with `none:`, `runs` is empty,
+`reviewer_complete` is `false`, and nothing is billed. A PR change
+with no added lines (a deletion) is still a change and reviews the
+whole PR. The orchestrator's convergence round passes `--convergence`,
+and the round then reviews the whole PR from the merge base, with the
+scope `full: only a base merge since the prior round`.
 
 A `partial` prior round does not send the next round back to the whole
 PR: the same caps re-fail the same files. Its unfinished files go to

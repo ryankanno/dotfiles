@@ -463,11 +463,18 @@ review_from="origin/$base" reviewed_from="$base_sha" review_to="$head"
 if [[ -n "$delta" ]]; then review_from="$delta_from" reviewed_from="$delta_from" review_to="$delta_to"; fi
 # A base merge alone leaves the PR's own code as the prior round reviewed
 # it, so the round records that and bills nothing. Nothing reviewed is
-# never clean. The convergence round still reviews the whole PR: the
-# loop's clean verdict must rest on a review of the merged head.
-if [[ "$scope" == delta && -z "$delta" && "$delta_from" != "$prior_head" && -z "$convergence" ]]; then
-  scope="none: the PR's own code did not change since the prior round (a base merge only)"
-  review_from="$delta_from" reviewed_from="$delta_from"
+# never clean. The trees decide, not the hunks: a deletion-only change
+# also leaves the delta empty (issue #43) and is still a change. The
+# convergence round still reviews the whole PR: the loop's clean verdict
+# must rest on a review of the merged head.
+if [[ "$scope" == delta && "$delta_from" != "$prior_head" ]] \
+    && git -C "$repo" diff --quiet "$delta_from" "$head" 2>/dev/null; then
+  if [[ -z "$convergence" ]]; then
+    scope="none: the PR's own code did not change since the prior round (a base merge only)"
+    review_from="$delta_from" reviewed_from="$delta_from"
+  else
+    scope="full: only a base merge since the prior round"
+  fi
 fi
 if [[ "$scope" == delta && -z "$delta" ]]; then scope="full: no change since the prior round"; fi
 
