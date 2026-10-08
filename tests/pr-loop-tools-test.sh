@@ -1228,7 +1228,7 @@ rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
 assert_eq "$rc" 0 "a conflicted merge still runs the round"
 assert_eq "$(cat "$rd/delta.txt")" "f.txt:1-1" "the resolution is the PR's own change; the base's m.txt is not"
 
-echo "pr-round: a baseline merge-tree cannot build exits 5 and names the git minimum"
+echo "pr-round: a baseline merge-tree cannot build exits 5 and points at git's own error"
 new_sandbox
 make_pr_round_env
 make_fixture_repo
@@ -1249,7 +1249,31 @@ export GH_PR_JSON
 err=$(run_prr --repo "$repo" --pr 39 --round 2 2>&1 >/dev/null)
 rc=$?
 assert_eq "$rc" 5 "a baseline that cannot be built exits 5"
-assert_contains "$err" "git 2.38 or later" "the error names the git minimum merge-tree needs"
+assert_contains "$err" "refusing to merge unrelated histories" "git's own cause reaches the caller"
+assert_contains "$err" "git's error is above" "the message defers to git's cause instead of guessing one"
+
+echo "pr-round: a failed baseline comparison exits 5, never a silent whole-PR review"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+merge_base_into_head
+# A git that fails only the tree comparison: the failure the round must
+# surface, not fold into "the trees differ".
+real_git=$(command -v git)
+cat >"$stub/git" <<GITSTUB
+#!/usr/bin/env bash
+for a in "\$@"; do [[ "\$a" == --quiet ]] && { echo "fatal: simulated diff failure" >&2; exit 128; }; done
+exec "$real_git" "\$@"
+GITSTUB
+chmod +x "$stub/git"
+err=$(run_prr --repo "$repo" --pr 39 --round 2 2>&1 >/dev/null)
+rc=$?
+rm -f "$stub/git"
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
+assert_eq "$rc" 5 "a failed comparison exits 5"
+assert_contains "$err" "simulated diff failure" "git's diagnostic is not discarded"
+assert_eq "$([[ -e "$rd/cmd.txt" ]] && printf yes || printf no)" "no" "the reviewer was not invoked"
 
 echo "pr-round: a prior round.json without range.base keeps the delta from the prior head"
 new_sandbox

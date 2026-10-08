@@ -372,7 +372,7 @@ if [[ "$scope" == delta && -n "$prior_base" && "$prior_base" != "$base_sha" ]]; 
   mrc=$?
   set -e
   if [[ $mrc -gt 1 ]]; then
-    printf 'cannot merge the prior head %s onto the merge base %s (git merge-tree --write-tree needs git 2.38 or later)\n' "$prior_head" "$base_sha" >&2
+    printf "cannot merge the prior head %s onto the merge base %s (git's error is above; merge-tree --write-tree needs git 2.38 or later)\n" "$prior_head" "$base_sha" >&2
     exit 5
   fi
   # A fixed identity: the user's checkout may have none, or sign commits.
@@ -467,8 +467,20 @@ if [[ -n "$delta" ]]; then review_from="$delta_from" reviewed_from="$delta_from"
 # also leaves the delta empty (issue #43) and is still a change. The
 # convergence round still reviews the whole PR: the loop's clean verdict
 # must rest on a review of the merged head.
-if [[ "$scope" == delta && "$delta_from" != "$prior_head" ]] \
-    && git -C "$repo" diff --quiet "$delta_from" "$head" 2>/dev/null; then
+same_tree=1
+if [[ "$scope" == delta && "$delta_from" != "$prior_head" ]]; then
+  # diff exits 1 when the trees differ; above 1 it failed, and a failure
+  # read as "differ" would bill a whole-PR review in silence.
+  set +e
+  git -C "$repo" diff --quiet --no-ext-diff "$delta_from" "$head"
+  same_tree=$?
+  set -e
+  if [[ $same_tree -gt 1 ]]; then
+    printf 'cannot compare the baseline %s with the head %s\n' "$delta_from" "$head" >&2
+    exit 5
+  fi
+fi
+if [[ $same_tree -eq 0 ]]; then
   if [[ -z "$convergence" ]]; then
     scope="none: the PR's own code did not change since the prior round (a base merge only)"
     review_from="$delta_from" reviewed_from="$delta_from"
