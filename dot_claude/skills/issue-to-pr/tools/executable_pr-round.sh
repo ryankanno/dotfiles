@@ -67,7 +67,7 @@ done
 # Checked here, not left to the binding: a value it rejects would fail
 # every run of the round and leave a round dir that only --rerun clears.
 case "$effort" in ""|low|medium|high) ;; *) usage ;; esac
-[[ -z "$timeout" || "$timeout" =~ ^[0-9]+$ ]] || usage
+[[ -z "$timeout" || "$timeout" =~ ^[1-9][0-9]*$ ]] || usage
 # Callers mistake --repo for the gh owner/name; say so instead of the generic usage line.
 [[ -d "$repo" ]] || { printf "pr-round.sh: --repo must be the local checkout directory, got '%s'\n" "$repo" >&2; exit 2; }
 case "$repo" in /*) ;; *) printf 'repo must be an absolute path\n' >&2; exit 2 ;; esac

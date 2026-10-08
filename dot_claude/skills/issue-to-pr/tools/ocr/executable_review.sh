@@ -35,7 +35,8 @@ while [[ $# -gt 0 ]]; do
 done
 [[ -n "$repo" && -n "$out" && -d "$repo" ]] || usage
 case "$effort" in low|medium|high) ;; *) usage ;; esac
-[[ "$timeout" =~ ^[0-9]+$ ]] || usage
+# ocr reads 0 as no deadline and a leading zero as octal (080 fails).
+[[ "$timeout" =~ ^[1-9][0-9]*$ ]] || usage
 # The wrapper cds into the repo before invoking the tool, so relative
 # output and brief paths would resolve against the wrong directory.
 case "$out" in /*) ;; *) printf 'out must be an absolute path\n' >&2; exit 2 ;; esac

@@ -284,8 +284,14 @@ PATH="$WS/stub:$PATH" "$REVIEW" --repo "$WS/repo" --out "$WS/out" --effort max -
 rc1=$?
 PATH="$WS/stub:$PATH" "$REVIEW" --repo "$WS/repo" --out "$WS/out" --timeout 1h --commit x >/dev/null 2>&1
 rc2=$?
+PATH="$WS/stub:$PATH" "$REVIEW" --repo "$WS/repo" --out "$WS/out" --timeout 0 --commit x >/dev/null 2>&1
+rc3=$?
+PATH="$WS/stub:$PATH" "$REVIEW" --repo "$WS/repo" --out "$WS/out" --timeout 080 --commit x >/dev/null 2>&1
+rc4=$?
 assert_eq "$rc1" 2 "an unknown effort exits 2"
 assert_eq "$rc2" 2 "a non-numeric timeout exits 2"
+assert_eq "$rc3" 2 "a zero timeout (ocr: no deadline) exits 2"
+assert_eq "$rc4" 2 "a leading-zero timeout (ocr parses it as octal) exits 2"
 assert_not_contains "$(cat "$WS/args.txt")" "review" "never invoked the tool"
 
 echo "wrapper: commit mode passes the commit"
@@ -705,8 +711,14 @@ run_prr --repo "$repo" --pr 39 --round 1 --effort max >/dev/null 2>&1
 rc1=$?
 run_prr --repo "$repo" --pr 39 --round 1 --timeout 1h >/dev/null 2>&1
 rc2=$?
+run_prr --repo "$repo" --pr 39 --round 1 --timeout 0 >/dev/null 2>&1
+rc3=$?
+run_prr --repo "$repo" --pr 39 --round 1 --timeout 080 >/dev/null 2>&1
+rc4=$?
 assert_eq "$rc1" 2 "an unknown effort exits 2"
 assert_eq "$rc2" 2 "a non-numeric timeout exits 2"
+assert_eq "$rc3" 2 "a zero timeout exits 2"
+assert_eq "$rc4" 2 "a leading-zero timeout exits 2"
 assert_eq "$([[ -e "$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1" ]] && printf exists || printf absent)" "absent" "no round dir to --rerun past"
 
 echo "pr-round: --dispositions joins the brief and the prior dispositions for the reviewer"
