@@ -1116,6 +1116,72 @@ assert_eq "$(jq -r '.range.reviewed_from' "$rd/round.json")" "$FR_BASE" "the rev
 assert_eq "$(jq -r '.range.review_scope' "$rd/round.json")" "full: the branch was rebased since the prior round" "round.json says why"
 assert_eq "$("$TOOLS/executable_finding-scope.sh" "$rd" r.txt:1)" "new" "every finding after a rebase blocks as new"
 
+merge_base_into_head() { # the base gains m.txt and the PR head merges it in, as GitHub's "Update branch" does
+  local pr_branch
+  pr_branch=$(git -C "$repo" rev-parse --abbrev-ref HEAD)
+  git -C "$repo" checkout -q -B mainline "$FR_BASE"
+  printf 'main\n' >"$repo/m.txt"
+  git -C "$repo" add m.txt
+  git -C "$repo" commit -qm "base work"
+  git -C "$repo" push -q origin "HEAD:refs/heads/main"
+  git -C "$repo" checkout -q "$pr_branch"
+  git -C "$repo" merge -q --no-ff --no-edit mainline
+  FR_MERGE=$(git -C "$repo" rev-parse HEAD)
+  git -C "$repo" push -q -f origin "HEAD:refs/pull/39/head"
+  GH_PR_JSON="$(jq -c --arg h "$FR_MERGE" '.headRefOid = $h' <<<"$GH_PR_JSON")"
+  export GH_PR_JSON
+}
+
+echo "pr-round: a base merge since the prior round stays out of the delta"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+merge_base_into_head
+advance_head g.txt 'new\n'
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
+from=$(jq -r '.range.reviewed_from' "$rd/round.json")
+assert_eq "$(cat "$rd/delta.txt")" "g.txt:1-1" "the delta holds only the PR's own change"
+assert_eq "$(jq -r '.range.review_scope' "$rd/round.json")" "delta" "the round still reviews a delta"
+assert_eq "$(jq -r '.range.head' "$rd/round.json")" "$FR_NEXT" "range.head stays the PR head"
+assert_eq "$(git -C "$repo" diff --name-only "$from" "$FR_NEXT")" "g.txt" "the reviewed range holds only the PR's own change"
+assert_contains "$(cat "$rd/cmd.txt")" "--from $from " "the reviewer gets the reviewed range"
+# The reviewer diffs in merge-base mode, so its range is from...to.
+read -r rf rt < <(sed -E 's/.*--from ([^ ]+) --to ([^ ]+).*/\1 \2/' "$rd/cmd.txt")
+assert_eq "$(git -C "$repo" diff --name-only "$rf...$rt")" "g.txt" "the reviewer's merge-base range holds only the PR's own change"
+assert_eq "$(git -C "$repo" rev-parse "$rt^{tree}")" "$(git -C "$repo" rev-parse "$FR_NEXT^{tree}")" "the reviewer reads the PR head's files"
+assert_eq "$("$TOOLS/executable_finding-scope.sh" "$rd" m.txt:1)" "reviewed" "a finding on the base's lines does not block as new"
+OUT="$("$TOOLS/subagent/executable_critic-input.sh" --repo "$repo" --round-dir "$rd" 2>&1)"
+assert_not_contains "$OUT" "m.txt" "the critic's diff leaves out the base merge"
+
+echo "pr-round: a conflicted base merge keeps its resolution in the delta"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+pr_branch=$(git -C "$repo" rev-parse --abbrev-ref HEAD)
+git -C "$repo" checkout -q -B mainline "$FR_BASE"
+printf 'main\n' >"$repo/f.txt"
+printf 'main\n' >"$repo/m.txt"
+git -C "$repo" add f.txt m.txt
+git -C "$repo" commit -qm "base work"
+git -C "$repo" push -q origin "HEAD:refs/heads/main"
+git -C "$repo" checkout -q "$pr_branch"
+git -C "$repo" merge -q --no-edit mainline >/dev/null 2>&1
+printf 'resolved\n' >"$repo/f.txt"
+git -C "$repo" add f.txt
+git -C "$repo" commit -qm "merge main, resolved" >/dev/null 2>&1
+FR_NEXT=$(git -C "$repo" rev-parse HEAD)
+git -C "$repo" push -q -f origin "HEAD:refs/pull/39/head"
+GH_PR_JSON="$(jq -c --arg h "$FR_NEXT" '.headRefOid = $h' <<<"$GH_PR_JSON")"
+export GH_PR_JSON
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+rc=$?
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
+assert_eq "$rc" 0 "a conflicted merge still runs the round"
+assert_eq "$(cat "$rd/delta.txt")" "f.txt:1-1" "the resolution is the PR's own change; the base's m.txt is not"
+
 echo "pr-round: a partial prior round keeps the delta and records the files it left unfinished"
 new_sandbox
 make_pr_round_env

@@ -71,6 +71,14 @@ PR from the merge base and writes no `delta.txt`, so every finding
 blocks as new. `round.json`'s `range.review_scope` says which: `delta`,
 or `full: <why>`.
 
+A merge of the base branch into the PR keeps the delta to the PR's own
+code. When the merge base moved since the prior round,
+`range.reviewed_from` is a baseline commit instead of the prior head:
+the prior head merged onto the new merge base. `delta.txt`, the
+reviewer's range, and the critic's diff then hold only the PR's own
+changes since the prior round, conflict resolutions included, and none
+of the base's. A finding on the base's lines reads `reviewed`.
+
 A `partial` prior round does not send the next round back to the whole
 PR: the same caps re-fail the same files. Its unfinished files go to
 `prior-unfinished.txt`, and `critic-input.sh` hands the critic their
