@@ -30,6 +30,12 @@ reads quickly and loses nothing.
     the reviewer binding ended unrecovered and no other source produced
     a finding. Neither clean nor failed; /pr-refine has nothing to fix,
     and the loop cannot declare the branch clean off this round.
+  - `**Verdict:** nothing to review (only a base merge since the prior round).` —
+    `round.json`'s `range.review_scope` starts with `none:`: the head
+    moved by a base merge alone, and no source ran. The prior round's
+    `**Findings:**` section follows verbatim, so its blocking findings
+    stand for /pr-refine. The loop cannot declare the branch clean off
+    this round.
   - `**Verdict:** converged (all blocking findings low and dispositioned).` —
     only the orchestrator's convergence round writes this: blocking
     findings exist, every one is low, and every one is fixed, rejected,
@@ -60,7 +66,7 @@ Visible, in this order:
 
 **Reviewer:** <unrecovered: <its message, verbatim> | partial: <the failed files or the rendered warning, verbatim>>   (this line appears only when the reviewer ended unrecovered or partial; a coverage gap never lives only inside a collapsed block)
 
-**Verdict:** <No issues found. | N finding(s). | partial (the reviewer's coverage has a gap) | unrecovered (the reviewer produced no review text) | converged (all blocking findings low and dispositioned)>
+**Verdict:** <No issues found. | N finding(s). | partial (the reviewer's coverage has a gap) | unrecovered (the reviewer produced no review text) | nothing to review (only a base merge since the prior round) | converged (all blocking findings low and dispositioned)>
 
 **Gate:** <command> printed <its final result>   (refine and convergence rounds only)
 

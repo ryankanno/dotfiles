@@ -79,6 +79,13 @@ reviewer's range, and the critic's diff then hold only the PR's own
 changes since the prior round, conflict resolutions included, and none
 of the base's. A finding on the base's lines reads `reviewed`.
 
+When the base merge is the only change since the prior round, the
+PR-only delta is empty and the round reviews nothing: `range.review_scope`
+starts with `none:`, `runs` is empty, `reviewer_complete` is `false`,
+and nothing is billed. The orchestrator's convergence round passes
+`--convergence`, and the round then reviews the whole PR from the merge
+base, as an unchanged head does.
+
 A `partial` prior round does not send the next round back to the whole
 PR: the same caps re-fail the same files. Its unfinished files go to
 `prior-unfinished.txt`, and `critic-input.sh` hands the critic their
@@ -97,6 +104,14 @@ whose `round.json` carries the range, the identity, every run (mode,
 directory, status, session id, exit code), and `reviewer_complete`.
 
 ## 2. Read round.json
+
+**`range.review_scope` starting with `none:`** is a base merge with no
+PR change. Skip steps 3 to 5: no source runs. Post a comment per
+report-template.md with the verdict `nothing to review (only a base
+merge since the prior round)` and the round dir's `prior-findings.md`,
+verbatim, as its `**Findings:**` section when the file exists. The
+prior round's blocking findings then stand for /pr-refine and for the
+next round.
 
 **`reviewer_complete: true`** with zero findings is a clean review:
 report it as clean. **`reviewer_complete: false`** takes one of two
@@ -198,9 +213,11 @@ The verdict line is machine-read by /pr-refine; keep the protocol exact,
 one of: `**Verdict:** No issues found.` when every source ran and
 produced no blocking finding, `**Verdict:** <n> finding(s).` when <n>
 blocking findings exist, `**Verdict:** partial (the reviewer's coverage has a gap).` when
-the binding ended partial with nothing else to report, or
+the binding ended partial with nothing else to report,
 `**Verdict:** unrecovered (the reviewer produced no review text).` when
-the binding ended unrecovered with nothing else to report.
+the binding ended unrecovered with nothing else to report, or
+`**Verdict:** nothing to review (only a base merge since the prior round).`
+when `range.review_scope` starts with `none:`.
 
 ## 7. Scan before posting
 

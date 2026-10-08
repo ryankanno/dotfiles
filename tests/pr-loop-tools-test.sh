@@ -1155,6 +1155,39 @@ assert_eq "$("$TOOLS/executable_finding-scope.sh" "$rd" m.txt:1)" "reviewed" "a 
 OUT="$("$TOOLS/subagent/executable_critic-input.sh" --repo "$repo" --round-dir "$rd" 2>&1)"
 assert_not_contains "$OUT" "m.txt" "the critic's diff leaves out the base merge"
 
+echo "pr-round: a base merge with no PR change records the round and reviews nothing"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+merge_base_into_head
+r1=$'<!-- pr-loop-comment -->\n\n**Findings:**\n1. **[critic] bug/medium** `f.txt:1`: the finding still standing\n'
+GH_COMMENTS_JSON="$(jq -cn --arg r1 "$r1" '[{user: {login: "test-me"}, body: $r1}]')"
+export GH_COMMENTS_JSON
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+rc=$?
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
+assert_eq "$rc" 0 "the round exits 0"
+assert_eq "$(jq -r '.range.review_scope' "$rd/round.json")" "none: the PR's own code did not change since the prior round (a base merge only)" "round.json says why nothing was reviewed"
+assert_eq "$(jq '.runs | length' "$rd/round.json")" 0 "no reviewer run"
+assert_eq "$([[ -e "$rd/cmd.txt" ]] && printf yes || printf no)" "no" "the reviewer was not invoked"
+assert_eq "$([[ -f "$rd/delta.txt" && ! -s "$rd/delta.txt" ]] && printf yes || printf no)" "yes" "the delta is empty"
+assert_json '.reviewer_complete == false' "$rd/round.json" "nothing reviewed is never clean"
+assert_json '.round_tokens == 0' "$rd/round.json" "nothing billed"
+assert_eq "$(jq -r '.range.head' "$rd/round.json")" "$FR_MERGE" "the next round chains from the merged head"
+assert_contains "$(cat "$rd/prior-findings.md")" "the finding still standing" "the prior round's findings carry forward"
+
+echo "pr-round: --convergence reviews the whole PR after a base merge with no PR change"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+merge_base_into_head
+run_prr --repo "$repo" --pr 39 --round 2 --convergence >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
+assert_contains "$(cat "$rd/cmd.txt")" "--from origin/main --to $FR_MERGE" "the convergence round reviews the whole merged PR"
+assert_eq "$(jq -r '.range.review_scope' "$rd/round.json")" "full: no change since the prior round" "round.json says why"
+
 echo "pr-round: a conflicted base merge keeps its resolution in the delta"
 new_sandbox
 make_pr_round_env

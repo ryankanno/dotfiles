@@ -174,7 +174,10 @@ convergence. The asymptote ends where the dispositions do.
 Only this skill declares the branch clean or converged, and only on its
 own evidence. When the implementer reports clean, a converged
 candidate, or the cap hits, run the full review
-round yourself on the final SHA, and run the gate yourself. Gate the
+round yourself on the final SHA, and run the gate yourself. Pass
+`--convergence` to `pr-round.sh`: a base merge with no PR change then
+reviews the whole merged PR instead of nothing, so the loop's verdict
+rests on a review of the head it declares. Gate the
 PR's code, not your checkout: run the gate in the implementer's
 worktree (`workmux path <handle>` prints it), after verifying the
 worktree's HEAD equals the PR's headRefOid

@@ -18,6 +18,9 @@ gets fixed.
   loop cannot declare the branch clean off that round.
 - `unrecovered (the reviewer produced no review text)` — neither clean
   nor failing; the loop cannot declare the branch clean off that round.
+- `nothing to review (only a base merge since the prior round)` — no
+  source ran; the prior round's blocking findings carry forward
+  verbatim; the loop cannot declare the branch clean off that round.
 - `converged (all blocking findings low and dispositioned)` — the
   orchestrator's convergence round only: blocking findings existed,
   every one low and fixed,
@@ -48,7 +51,7 @@ flowchart TD
     E -- "yes" --> R["Review round<br/>pr-round.sh: range resolved from the PR,<br/>identity check, reviewer binding,<br/>per-commit empty-retry"]
     R --> F["Adversarial critic: fresh clean-context subagent<br/>plus the caller's own read"]
     F --> FS["finding-scope.sh per finding:<br/>high or on the delta blocks,<br/>the rest are follow-ups"]
-    FS --> G["Assemble the comment per report-template<br/>marker first line, five-state verdict"]
+    FS --> G["Assemble the comment per report-template<br/>marker first line, six-state verdict"]
     G --> S{"Scan before posting"}
     S -- "hit: do not leak" --> Y["Abort the post, record it,<br/>the final report surfaces it"]
     S -- "clean" --> H["Post the round comment<br/>append per round"]

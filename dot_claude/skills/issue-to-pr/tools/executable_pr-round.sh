@@ -8,6 +8,8 @@
 #
 # Interface in:  --repo <dir> --pr <n> --round <N> [--brief <file>]
 #                [--dispositions <file>] [--expect-branch <branch-name>]
+#                [--rerun] [--convergence: a base merge with no PR change
+#                reviews the whole PR instead of nothing]
 # Interface out: the round directory under
 #                $HOME/.cache/pr-loop/<owner/repo>/pr-<n>/round-<N>/ with
 #                each run's outputs plus round.json (range, identity, runs,
@@ -15,7 +17,9 @@
 #                the prior head on a delta round, or after a base merge
 #                a baseline commit (the prior head merged onto the new
 #                merge base), the merge base otherwise,
-#                range.review_scope: "delta" or "full: <why>"),
+#                range.review_scope: "delta", "full: <why>", or
+#                "none: <why>" when a base merge alone moved the head and
+#                no reviewer runs),
 #                delta.txt from round 2 on, unless a rebase or an unusable
 #                prior head sends the round to the whole PR (the
 #                path:start-end hunks changed since range.reviewed_from;
@@ -44,11 +48,11 @@
 set -euo pipefail
 
 usage() {
-  printf 'usage: pr-round.sh --repo <dir> --pr <n> --round <N> [--brief <file>] [--dispositions <file>] [--expect-branch <branch-name>] [--rerun]\n' >&2
+  printf 'usage: pr-round.sh --repo <dir> --pr <n> --round <N> [--brief <file>] [--dispositions <file>] [--expect-branch <branch-name>] [--rerun] [--convergence]\n' >&2
   exit 2
 }
 
-repo="" pr="" round="" brief="" dispositions="" expect="" rerun=""
+repo="" pr="" round="" brief="" dispositions="" expect="" rerun="" convergence=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --repo) [[ $# -ge 2 ]] || usage; repo="$2"; shift 2 ;;
@@ -58,6 +62,7 @@ while [[ $# -gt 0 ]]; do
     --dispositions) [[ $# -ge 2 ]] || usage; dispositions="$2"; shift 2 ;;
     --expect-branch) [[ $# -ge 2 ]] || usage; expect="$2"; shift 2 ;;
     --rerun) rerun=1; shift ;;
+    --convergence) convergence=1; shift ;;
     *) usage ;;
   esac
 done
@@ -456,15 +461,28 @@ status_of() { # dir
 # reviews the whole PR again: an empty range is no review at all.
 review_from="origin/$base" reviewed_from="$base_sha" review_to="$head"
 if [[ -n "$delta" ]]; then review_from="$delta_from" reviewed_from="$delta_from" review_to="$delta_to"; fi
+# A base merge alone leaves the PR's own code as the prior round reviewed
+# it, so the round records that and bills nothing. Nothing reviewed is
+# never clean. The convergence round still reviews the whole PR: the
+# loop's clean verdict must rest on a review of the merged head.
+if [[ "$scope" == delta && -z "$delta" && "$delta_from" != "$prior_head" && -z "$convergence" ]]; then
+  scope="none: the PR's own code did not change since the prior round (a base merge only)"
+  review_from="$delta_from" reviewed_from="$delta_from"
+fi
 if [[ "$scope" == delta && -z "$delta" ]]; then scope="full: no change since the prior round"; fi
 
-set +e
-"$review" --repo "$repo" --out "$round_dir" ${brief:+--brief "$brief"} --base "$review_from" --head "$review_to"
-rc=$?
-set -e
-range_status=$(status_of "$round_dir")
-record range "$round_dir" "$range_status" "$(cat "$round_dir/session.txt" 2>/dev/null || true)" "$rc"
-if [[ "$range_status" == complete ]]; then
+range_status=none
+if [[ "$scope" != none:* ]]; then
+  set +e
+  "$review" --repo "$repo" --out "$round_dir" ${brief:+--brief "$brief"} --base "$review_from" --head "$review_to"
+  rc=$?
+  set -e
+  range_status=$(status_of "$round_dir")
+  record range "$round_dir" "$range_status" "$(cat "$round_dir/session.txt" 2>/dev/null || true)" "$rc"
+fi
+if [[ "$range_status" == none ]]; then
+  complete=false
+elif [[ "$range_status" == complete ]]; then
   complete=true
 elif [[ "$range_status" == missing || "$range_status" == skipped ]]; then
   complete=false
