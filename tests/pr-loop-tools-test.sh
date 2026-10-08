@@ -264,7 +264,7 @@ assert_eq "$(cat "$WS/out/session.txt")" "abc-123" "extracts the session id"
 assert_contains "$(cat "$WS/args.txt")" "--concurrency 1" "one file group at a time: the provider queues the rest until they time out"
 assert_contains "$(cat "$WS/args.txt")" "--max-tools 100" "room for a group to finish its tool rounds"
 assert_contains "$(cat "$WS/args.txt")" "--timeout 80" "room for a group to finish in time"
-assert_contains "$(cat "$WS/args.txt")" "--effort high" "the effort roborev's converging loop runs"
+assert_contains "$(cat "$WS/args.txt")" "--effort high" "the effort the converging loop ran at"
 
 echo "wrapper: commit mode passes the commit"
 new_sandbox
