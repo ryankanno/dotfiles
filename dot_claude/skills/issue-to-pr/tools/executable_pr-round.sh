@@ -8,6 +8,8 @@
 #
 # Interface in:  --repo <dir> --pr <n> --round <N> [--brief <file>]
 #                [--dispositions <file>] [--expect-branch <branch-name>]
+#                [--effort low|medium|high] [--timeout <minutes>] (passed
+#                to every review run; the binding owns the defaults)
 #                [--rerun] [--convergence: a base merge with no PR change
 #                reviews the whole PR instead of nothing]
 # Interface out: the round directory under
@@ -48,11 +50,11 @@
 set -euo pipefail
 
 usage() {
-  printf 'usage: pr-round.sh --repo <dir> --pr <n> --round <N> [--brief <file>] [--dispositions <file>] [--expect-branch <branch-name>] [--rerun] [--convergence]\n' >&2
+  printf 'usage: pr-round.sh --repo <dir> --pr <n> --round <N> [--brief <file>] [--dispositions <file>] [--expect-branch <branch-name>] [--effort low|medium|high] [--timeout <minutes>] [--rerun] [--convergence]\n' >&2
   exit 2
 }
 
-repo="" pr="" round="" brief="" dispositions="" expect="" rerun="" convergence=""
+repo="" pr="" round="" brief="" dispositions="" expect="" rerun="" effort="" timeout="" convergence=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --repo) [[ $# -ge 2 ]] || usage; repo="$2"; shift 2 ;;
@@ -61,12 +63,18 @@ while [[ $# -gt 0 ]]; do
     --brief) [[ $# -ge 2 ]] || usage; brief="$2"; shift 2 ;;
     --dispositions) [[ $# -ge 2 ]] || usage; dispositions="$2"; shift 2 ;;
     --expect-branch) [[ $# -ge 2 ]] || usage; expect="$2"; shift 2 ;;
+    --effort) [[ $# -ge 2 ]] || usage; effort="$2"; shift 2 ;;
+    --timeout) [[ $# -ge 2 ]] || usage; timeout="$2"; shift 2 ;;
     --rerun) rerun=1; shift ;;
     --convergence) convergence=1; shift ;;
     *) usage ;;
   esac
 done
 [[ -n "$repo" && -n "$pr" && -n "$round" ]] || usage
+# Checked here, not left to the binding: a value it rejects would fail
+# every run of the round and leave a round dir that only --rerun clears.
+case "$effort" in ""|low|medium|high) ;; *) usage ;; esac
+[[ -z "$timeout" || "$timeout" =~ ^[1-9][0-9]*$ ]] || usage
 # Callers mistake --repo for the gh owner/name; say so instead of the generic usage line.
 [[ -d "$repo" ]] || { printf "pr-round.sh: --repo must be the local checkout directory, got '%s'\n" "$repo" >&2; exit 2; }
 case "$repo" in /*) ;; *) printf 'repo must be an absolute path\n' >&2; exit 2 ;; esac
@@ -498,7 +506,7 @@ if [[ "$scope" == delta && -z "$delta" ]]; then scope="full: no change since the
 range_status=none
 if [[ "$scope" != none:* ]]; then
   set +e
-  "$review" --repo "$repo" --out "$round_dir" ${brief:+--brief "$brief"} --base "$review_from" --head "$review_to"
+  "$review" --repo "$repo" --out "$round_dir" ${brief:+--brief "$brief"} ${effort:+--effort "$effort"} ${timeout:+--timeout "$timeout"} --base "$review_from" --head "$review_to"
   rc=$?
   set -e
   range_status=$(status_of "$round_dir")
@@ -523,7 +531,7 @@ elif [[ "$range_status" == missing || "$range_status" == skipped ]]; then
     i=$((i + 1))
     commit_dir="$round_dir/commit-$i"
     set +e
-    "$review" --repo "$repo" --out "$commit_dir" ${brief:+--brief "$brief"} --commit "$sha"
+    "$review" --repo "$repo" --out "$commit_dir" ${brief:+--brief "$brief"} ${effort:+--effort "$effort"} ${timeout:+--timeout "$timeout"} --commit "$sha"
     crc=$?
     set -e
     cstatus=$(status_of "$commit_dir")

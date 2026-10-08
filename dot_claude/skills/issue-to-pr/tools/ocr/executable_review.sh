@@ -3,19 +3,21 @@
 # directly, so the reviewer stays a swappable slot: a different tool is a
 # new directory with the same interface, plus one manifest line.
 #
-# Interface in: --repo, --out, optional --brief, and either --base/--head
-# (range mode) or --commit (per-commit mode, the empty-result retry).
+# Interface in: --repo, --out, optional --brief, optional --effort
+# (low|medium|high, default medium) and --timeout (minutes, default 80),
+# and either --base/--head (range mode) or --commit (per-commit mode, the
+# empty-result retry).
 # Interface out: <out>/review.json (the tool's own output), stdout.txt,
 # stderr.txt, cmd.txt (the exact invocation, for the report), session.txt
 # (session id, for resume and round-over-round compare), exit.txt on failure.
 set -euo pipefail
 
 usage() {
-  printf 'usage: review.sh --repo <dir> --out <dir> [--brief <file>] (--base <ref> --head <ref> | --commit <sha>)\n' >&2
+  printf 'usage: review.sh --repo <dir> --out <dir> [--brief <file>] [--effort low|medium|high] [--timeout <minutes>] (--base <ref> --head <ref> | --commit <sha>)\n' >&2
   exit 2
 }
 
-repo="" out="" brief="" base="" head="" commit=""
+repo="" out="" brief="" base="" head="" commit="" effort="medium" timeout="80"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     # The value guards keep a missing option value a usage error (exit 2)
@@ -26,10 +28,15 @@ while [[ $# -gt 0 ]]; do
     --base) [[ $# -ge 2 ]] || usage; base="$2"; shift 2 ;;
     --head) [[ $# -ge 2 ]] || usage; head="$2"; shift 2 ;;
     --commit) [[ $# -ge 2 ]] || usage; commit="$2"; shift 2 ;;
+    --effort) [[ $# -ge 2 ]] || usage; effort="$2"; shift 2 ;;
+    --timeout) [[ $# -ge 2 ]] || usage; timeout="$2"; shift 2 ;;
     *) usage ;;
   esac
 done
 [[ -n "$repo" && -n "$out" && -d "$repo" ]] || usage
+case "$effort" in low|medium|high) ;; *) usage ;; esac
+# ocr reads 0 as no deadline and a leading zero as octal (080 fails).
+[[ "$timeout" =~ ^[1-9][0-9]*$ ]] || usage
 # The wrapper cds into the repo before invoking the tool, so relative
 # output and brief paths would resolve against the wrong directory.
 case "$out" in /*) ;; *) printf 'out must be an absolute path\n' >&2; exit 2 ;; esac
@@ -54,11 +61,16 @@ mkdir -p "$out"
 # a 26-line file among them, and a full re-review re-failed the same
 # files. The model provider serves 6 requests at once and queues the
 # rest, so the default 8 parallel groups wait out the 15-minute task
-# timeout. These are roborev's settings (review_guidelines in its
-# config), the loop that converged: one group at a time, room for 100
-# tool rounds and 80 minutes per task.
+# timeout. These are the settings under which the earlier roborev loop
+# converged: one group at a time, room for 100 tool rounds, and a task
+# deadline of --timeout times the review rounds (ocr multiplies them),
+# so the default 80 gives each group 160 minutes at the default medium.
+# Effort sets only the review rounds per group (high 3, medium 2); a
+# round after the first runs only when the one before added a finding,
+# and its turns reason longest (issue #52: round 2 of a 7-file group ran
+# 28 requests, many at 12k to 32k reasoning tokens each).
 args=(review --format json --output "$out/review.json"
-      --concurrency 1 --max-tools 100 --timeout 80 --effort high)
+      --concurrency 1 --max-tools 100 --timeout "$timeout" --effort "$effort")
 if [[ -n "$brief" ]]; then
   [[ -f "$brief" ]] || { printf 'brief not found: %s\n' "$brief" >&2; exit 2; }
   args+=(--background-file "$brief")

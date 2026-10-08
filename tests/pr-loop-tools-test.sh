@@ -264,7 +264,35 @@ assert_eq "$(cat "$WS/out/session.txt")" "abc-123" "extracts the session id"
 assert_contains "$(cat "$WS/args.txt")" "--concurrency 1" "one file group at a time: the provider queues the rest until they time out"
 assert_contains "$(cat "$WS/args.txt")" "--max-tools 100" "room for a group to finish its tool rounds"
 assert_contains "$(cat "$WS/args.txt")" "--timeout 80" "room for a group to finish in time"
-assert_contains "$(cat "$WS/args.txt")" "--effort high" "the effort roborev's converging loop runs"
+assert_contains "$(cat "$WS/args.txt")" "--effort medium" "two review rounds per group, not three"
+
+echo "wrapper: --effort and --timeout replace the defaults"
+new_sandbox
+make_stub
+mkdir -p "$WS/repo" "$WS/out"
+PATH="$WS/stub:$PATH" "$REVIEW" --repo "$WS/repo" --out "$WS/out" --effort high --timeout 40 --base aaa --head bbb
+assert_eq "$?" 0 "exits 0"
+assert_contains "$(cat "$WS/args.txt")" "--timeout 40 --effort high" "the given effort and timeout reach ocr"
+assert_not_contains "$(cat "$WS/args.txt")" "--effort medium" "the default effort is gone"
+assert_not_contains "$(cat "$WS/args.txt")" "--timeout 80" "the default timeout is gone"
+
+echo "wrapper: an unknown effort or a non-numeric timeout is a usage error"
+new_sandbox
+make_stub
+mkdir -p "$WS/repo" "$WS/out"
+PATH="$WS/stub:$PATH" "$REVIEW" --repo "$WS/repo" --out "$WS/out" --effort max --commit x >/dev/null 2>&1
+rc1=$?
+PATH="$WS/stub:$PATH" "$REVIEW" --repo "$WS/repo" --out "$WS/out" --timeout 1h --commit x >/dev/null 2>&1
+rc2=$?
+PATH="$WS/stub:$PATH" "$REVIEW" --repo "$WS/repo" --out "$WS/out" --timeout 0 --commit x >/dev/null 2>&1
+rc3=$?
+PATH="$WS/stub:$PATH" "$REVIEW" --repo "$WS/repo" --out "$WS/out" --timeout 080 --commit x >/dev/null 2>&1
+rc4=$?
+assert_eq "$rc1" 2 "an unknown effort exits 2"
+assert_eq "$rc2" 2 "a non-numeric timeout exits 2"
+assert_eq "$rc3" 2 "a zero timeout (ocr: no deadline) exits 2"
+assert_eq "$rc4" 2 "a leading-zero timeout (ocr parses it as octal) exits 2"
+assert_not_contains "$(cat "$WS/args.txt")" "review" "never invoked the tool"
 
 echo "wrapper: commit mode passes the commit"
 new_sandbox
@@ -656,6 +684,42 @@ rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
 assert_json '.runs[0].status == "partial"' "$rd/round.json" "a lost pass is recorded as partial"
 assert_json '.reviewer_complete == false' "$rd/round.json" "a lost pass is never a complete review"
 assert_eq "$(jq '.runs | length' "$rd/round.json")" 1 "a lost pass is not retried per commit"
+
+echo "pr-round: --effort and --timeout reach every review run"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+export STUB_RANGE_STATUS=skipped STUB_COMMIT_STATUS=complete
+run_prr --repo "$repo" --pr 39 --round 1 --effort high --timeout 40 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
+assert_contains "$(cat "$rd/cmd.txt")" "--timeout 40 --effort high" "the range run gets them"
+assert_contains "$(cat "$rd/commit-1/cmd.txt")" "--timeout 40 --effort high" "the per-commit retry gets them"
+
+echo "pr-round: without --effort and --timeout the binding's defaults apply"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
+assert_contains "$(cat "$rd/cmd.txt")" "--timeout 80 --effort medium" "medium effort, 80 minutes"
+
+echo "pr-round: a bad --effort or --timeout stops before the round dir exists"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 --effort max >/dev/null 2>&1
+rc1=$?
+run_prr --repo "$repo" --pr 39 --round 1 --timeout 1h >/dev/null 2>&1
+rc2=$?
+run_prr --repo "$repo" --pr 39 --round 1 --timeout 0 >/dev/null 2>&1
+rc3=$?
+run_prr --repo "$repo" --pr 39 --round 1 --timeout 080 >/dev/null 2>&1
+rc4=$?
+assert_eq "$rc1" 2 "an unknown effort exits 2"
+assert_eq "$rc2" 2 "a non-numeric timeout exits 2"
+assert_eq "$rc3" 2 "a zero timeout exits 2"
+assert_eq "$rc4" 2 "a leading-zero timeout exits 2"
+assert_eq "$([[ -e "$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1" ]] && printf exists || printf absent)" "absent" "no round dir to --rerun past"
 
 echo "pr-round: --dispositions joins the brief and the prior dispositions for the reviewer"
 new_sandbox

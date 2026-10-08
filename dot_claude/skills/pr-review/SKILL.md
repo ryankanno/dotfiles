@@ -29,11 +29,19 @@ skill's prose:
 ```bash
 ~/.claude/skills/issue-to-pr/tools/pr-round.sh \
   --repo <checkout-dir> --pr <n> --round <N> \
-  --brief <brief-file> --expect-branch <branch-name>
+  --brief <brief-file> --expect-branch <branch-name> \
+  [--effort low|medium|high] [--timeout <minutes>]
 ```
 
 `<checkout-dir>` is the absolute path of the local clone or worktree
 that holds the PR branch. It is not the `owner/name` slug.
+
+`--effort` and `--timeout` go to every review run of the round. Pass
+them only when the caller gives them; without them the binding's
+defaults apply (ocr: `medium`, `80`). For ocr, effort sets the review
+passes per file group (low 1, medium 2, high 3), and a pass after the
+first runs only when the one before added a finding. ocr multiplies the
+timeout by those passes, so the default gives each group 160 minutes.
 
 The reviewer reads only its background file, never the PR comments, so
 the script joins the brief with every Rejected and Accepted line from
