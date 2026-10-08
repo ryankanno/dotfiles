@@ -13,15 +13,15 @@ gets fixed.
   sources that ran. A finding blocks when it is high or sits on a line
   changed since the prior round's head; the rest are follow-ups for the
   human, never refine work.
-- `partial (the reviewer's coverage has a gap)` — review text exists but
+- `partial (the reviewer's coverage has a gap).` — review text exists but
   part of the range went unreviewed; neither clean nor failing; the
   loop cannot declare the branch clean off that round.
-- `unrecovered (the reviewer produced no review text)` — neither clean
+- `unrecovered (the reviewer produced no review text).` — neither clean
   nor failing; the loop cannot declare the branch clean off that round.
-- `nothing to review (only a base merge since the prior round)` — no
+- `nothing to review (only a base merge since the prior round).` — no
   source ran; the prior round's blocking findings carry forward
   verbatim; the loop cannot declare the branch clean off that round.
-- `converged (all blocking findings low and dispositioned)` — the
+- `converged (all blocking findings low and dispositioned).` — the
   orchestrator's convergence round only: blocking findings existed,
   every one low and fixed,
   rejected, or accepted with a recorded reason. The loop ends unless a
