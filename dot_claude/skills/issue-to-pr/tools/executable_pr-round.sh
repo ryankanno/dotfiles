@@ -59,7 +59,9 @@ while [[ $# -gt 0 ]]; do
     *) usage ;;
   esac
 done
-[[ -n "$repo" && -n "$pr" && -n "$round" && -d "$repo" ]] || usage
+[[ -n "$repo" && -n "$pr" && -n "$round" ]] || usage
+# Callers mistake --repo for the gh owner/name; say so instead of the generic usage line.
+[[ -d "$repo" ]] || { printf "pr-round.sh: --repo must be the local checkout directory, got '%s'\n" "$repo" >&2; exit 2; }
 case "$repo" in /*) ;; *) printf 'repo must be an absolute path\n' >&2; exit 2 ;; esac
 [[ "$pr" =~ ^[0-9]+$ ]] || usage
 [[ "$round" =~ ^[0-9]+$ ]] || usage

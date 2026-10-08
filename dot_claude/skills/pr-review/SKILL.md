@@ -28,9 +28,12 @@ skill's prose:
 
 ```bash
 ~/.claude/skills/issue-to-pr/tools/pr-round.sh \
-  --repo <repo> --pr <n> --round <N> \
+  --repo <checkout-dir> --pr <n> --round <N> \
   --brief <brief-file> --expect-branch <branch-name>
 ```
+
+`<checkout-dir>` is the absolute path of the local clone or worktree
+that holds the PR branch. It is not the `owner/name` slug.
 
 The reviewer reads only its background file, never the PR comments, so
 the script joins the brief with every Rejected and Accepted line from
@@ -128,7 +131,7 @@ leaves out the follow-ups. It keeps the same prompt as
 
 ```bash
 ~/.claude/skills/issue-to-pr/tools/subagent/critic-input.sh \
-  --repo <repo> --round-dir <round-dir> --brief <brief-file>
+  --repo <checkout-dir> --round-dir <round-dir> --brief <brief-file>
 ```
 
 Its findings arrive numbered with file, line, the claim, the input or
