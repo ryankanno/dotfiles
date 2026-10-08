@@ -372,7 +372,7 @@ if [[ "$scope" == delta && -n "$prior_base" && "$prior_base" != "$base_sha" ]]; 
   mrc=$?
   set -e
   if [[ $mrc -gt 1 ]]; then
-    printf 'cannot merge the prior head %s onto the merge base %s\n' "$prior_head" "$base_sha" >&2
+    printf 'cannot merge the prior head %s onto the merge base %s (git merge-tree --write-tree needs git 2.38 or later)\n' "$prior_head" "$base_sha" >&2
     exit 5
   fi
   # A fixed identity: the user's checkout may have none, or sign commits.

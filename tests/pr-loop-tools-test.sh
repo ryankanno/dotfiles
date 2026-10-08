@@ -1228,6 +1228,44 @@ rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
 assert_eq "$rc" 0 "a conflicted merge still runs the round"
 assert_eq "$(cat "$rd/delta.txt")" "f.txt:1-1" "the resolution is the PR's own change; the base's m.txt is not"
 
+echo "pr-round: a baseline merge-tree cannot build exits 5 and names the git minimum"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+pr_branch=$(git -C "$repo" rev-parse --abbrev-ref HEAD)
+git -C "$repo" checkout -q --orphan unrelated
+git -C "$repo" rm -rqf .
+printf 'u\n' >"$repo/u.txt"
+git -C "$repo" add u.txt
+git -C "$repo" commit -qm "unrelated base"
+git -C "$repo" push -q -f origin "HEAD:refs/heads/main"
+git -C "$repo" checkout -q "$pr_branch"
+git -C "$repo" merge -q --no-edit --allow-unrelated-histories unrelated
+FR_NEXT=$(git -C "$repo" rev-parse HEAD)
+git -C "$repo" push -q -f origin "HEAD:refs/pull/39/head"
+GH_PR_JSON="$(jq -c --arg h "$FR_NEXT" '.headRefOid = $h' <<<"$GH_PR_JSON")"
+export GH_PR_JSON
+err=$(run_prr --repo "$repo" --pr 39 --round 2 2>&1 >/dev/null)
+rc=$?
+assert_eq "$rc" 5 "a baseline that cannot be built exits 5"
+assert_contains "$err" "git 2.38 or later" "the error names the git minimum merge-tree needs"
+
+echo "pr-round: a prior round.json without range.base keeps the delta from the prior head"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+rj="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1/round.json"
+jq 'del(.range.base)' "$rj" >"$rj.tmp"
+mv "$rj.tmp" "$rj"
+merge_base_into_head
+advance_head g.txt 'new\n'
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
+assert_eq "$(cat "$rd/delta.txt")" $'g.txt:1-1\nm.txt:1-1' "a legacy round.json keeps the old delta"
+assert_eq "$(jq -r '.range.reviewed_from' "$rd/round.json")" "$FR_HEAD" "the reviewed range starts at the prior head"
+
 echo "pr-round: a partial prior round keeps the delta and records the files it left unfinished"
 new_sandbox
 make_pr_round_env
