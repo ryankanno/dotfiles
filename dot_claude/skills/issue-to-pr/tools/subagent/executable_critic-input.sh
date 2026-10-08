@@ -65,7 +65,13 @@ diff=$(git -C "$repo" diff --no-color --no-ext-diff "$from" "$head") || {
 {
 cat "$prompt"
 printf '\n---\n\n# Round %s inputs\n\n' "$round"
-printf 'The repository at the PR head %s is checked out at %s. Read files there only to verify a claim about the diff below.\n\n' "$head" "$repo"
+# The orchestrator's checkout is often on main (issue #57): its files are
+# not the head's, but pr-round.sh fetched the head into it.
+if [[ "$(git -C "$repo" rev-parse HEAD 2>/dev/null)" == "$head" ]]; then
+  printf 'The repository at the PR head %s is checked out at %s. Read files there only to verify a claim about the diff below.\n\n' "$head" "$repo"
+else
+  printf 'The checkout at %s is not at the PR head %s; its files are not the head'"'"'s. Read a file at the head with `git -C %s show %s:<path>`, only to verify a claim about the diff below.\n\n' "$repo" "$head" "$repo" "$head"
+fi
 # critic-prompt.md says a round from 2 on reviews the delta. A later round
 # that moved its head and still reviews the whole PR says so here, whether
 # or not the prior round filed findings.

@@ -1616,6 +1616,26 @@ assert_contains "$OUT" "$FR_BASE..$FR_HEAD" "round 1's diff is the whole PR from
 assert_not_contains "$OUT" "The findings this diff answers" "no prior findings in round 1"
 assert_contains "$OUT" "No brief was given." "a missing brief is said, not invented"
 
+echo "critic-input: a checkout at the PR head is offered for reading files"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
+OUT="$("$CRITIC_INPUT" --repo "$repo" --round-dir "$rd" 2>&1)"
+assert_contains "$OUT" "The repository at the PR head $FR_HEAD is checked out at $repo." "the checkout is at the head"
+
+echo "critic-input: a checkout off the PR head is never claimed to be at it"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+git -C "$repo" checkout -q --detach "$FR_BASE"
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
+OUT="$("$CRITIC_INPUT" --repo "$repo" --round-dir "$rd" 2>&1)"
+assert_not_contains "$OUT" "is checked out at" "the wrong tree is not offered as the head"
+assert_contains "$OUT" "git -C $repo show $FR_HEAD:<path>" "the critic reads the head's files from git"
+
 echo "critic-input: the files the reviewer left unfinished last round reach the critic with their whole-PR diff"
 new_sandbox
 make_pr_round_env
