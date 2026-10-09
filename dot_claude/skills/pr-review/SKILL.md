@@ -71,7 +71,10 @@ the PR head: a finding outside it can only be a follow-up, except a
 high. High severity blocks anywhere, in the delta or out, and the
 caller counts it under Findings. An empty
 delta (the same head again, as in a convergence round) reviews the
-whole PR from the merge base instead, never an empty range.
+whole PR from the merge base instead, never an empty range. A change
+that adds or modifies no lines (a deletion) also reviews the whole PR,
+with the scope `full: the change since the prior round adds no lines`
+and no `delta.txt`, so every finding blocks as new.
 
 The delta stands in for the whole PR only when the new head descends
 from the prior round's head. After a rebase the round reviews the whole

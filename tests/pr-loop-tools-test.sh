@@ -1435,6 +1435,23 @@ assert_eq "$(jq -r '.range.reviewed_from' "$rd/round.json")" "$FR_BASE" "the fal
 assert_eq "$(jq -r '.range.review_scope' "$rd/round.json")" "full: no change since the prior round" "round.json says why"
 assert_eq "$("$TOOLS/executable_finding-scope.sh" "$rd" f.txt:1)" "reviewed" "on an unchanged head only a high finding blocks: nothing is new"
 
+echo "pr-round: a deletion-only refine reviews the whole PR and every finding is new"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+advance_head f.txt 'b\nbug\n'
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+advance_head f.txt 'b\n'
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
+assert_eq "$(jq -r '.range.review_scope' "$rd/round.json")" "full: the change since the prior round adds no lines" "round.json says the head moved"
+assert_contains "$(cat "$rd/cmd.txt")" "--from origin/main --to $FR_NEXT" "the reviewer reviews the whole PR"
+assert_eq "$("$TOOLS/executable_finding-scope.sh" "$rd" f.txt:1)" "new" "a finding on the whole-PR review blocks as new"
+assert_eq "$([[ -e "$rd/names.txt" ]] && printf yes || printf no)" "no" "no listing without a delta"
+OUT="$("$TOOLS/subagent/executable_critic-input.sh" --repo "$repo" --round-dir "$rd" 2>&1)"
+assert_contains "$OUT" "the whole PR, re-reviewed from the merge base because the change since the prior round adds no lines, not a delta" "the critic is told the diff is the whole PR"
+assert_not_contains "$OUT" "because no change since the prior round" "the critic is not told the head did not move"
+
 echo "pr-round: a prior head missing from this clone reviews the whole PR and keeps the head on record"
 new_sandbox
 make_pr_round_env

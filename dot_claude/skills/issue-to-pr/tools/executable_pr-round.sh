@@ -22,12 +22,13 @@
 #                range.review_scope: "delta", "full: <why>", or
 #                "none: <why>" when a base merge alone moved the head and
 #                no reviewer runs),
-#                delta.txt from round 2 on, unless a rebase or an unusable
-#                prior head sends the round to the whole PR (the
+#                delta.txt from round 2 on, unless a rebase, an unusable
+#                prior head, or a change that adds or modifies no lines (a
+#                deletion-only, binary-only or mode-only change, issue #56)
+#                sends the round to the whole PR (the
 #                path:start-end hunks changed since range.reviewed_from;
-#                empty when the range.reviewed_from..head diff adds or modifies no
-#                lines: an empty commit, a revert pair, or a deletion-only,
-#                binary-only or mode-only change, issue #43) with names.txt
+#                empty when the tree did not change: the same head, an
+#                empty commit or a revert pair, issue #43) with names.txt
 #                (the listing the hunks
 #                enumerate over), settled.md (the standing Rejected and
 #                Accepted lines) and prior-findings.md (the newest earlier-round
@@ -505,7 +506,24 @@ if [[ $same_tree -eq 0 ]]; then
     scope="full: only a base merge since the prior round"
   fi
 fi
-if [[ "$scope" == delta && -z "$delta" ]]; then scope="full: no change since the prior round"; fi
+if [[ "$scope" == delta && -z "$delta" ]]; then
+  # A moved tree with no added line (a deletion, a binary or mode change)
+  # is a change (issue #56): with no delta.txt every finding blocks as new.
+  set +e
+  git -C "$repo" diff --quiet --no-ext-diff "$delta_from" "$head"
+  moved=$?
+  set -e
+  if [[ $moved -gt 1 ]]; then
+    printf 'cannot compare the prior head %s with the head %s\n' "$delta_from" "$head" >&2
+    exit 5
+  fi
+  if [[ $moved -eq 1 ]]; then
+    scope="full: the change since the prior round adds no lines"
+    rm -f "$round_dir/delta.txt" "$round_dir/names.txt"
+  else
+    scope="full: no change since the prior round"
+  fi
+fi
 
 range_status=none
 if [[ "$scope" != none:* ]]; then
