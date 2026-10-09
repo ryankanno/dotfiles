@@ -30,7 +30,8 @@ skill's prose:
 $HOME/.claude/skills/issue-to-pr/tools/pr-round.sh \
   --repo <checkout-dir> --pr <n> --round <N> \
   --brief <brief-file> --expect-branch <branch-name> \
-  [--effort low|medium|high] [--timeout <minutes>]
+  [--effort low|medium|high] [--timeout <minutes>] \
+  [--max-tools <n>] [--max-tokens-budget <n>]
 ```
 
 `<checkout-dir>` is the absolute path of the local clone or worktree
@@ -42,6 +43,14 @@ defaults apply (ocr: `medium`, `80`). For ocr, effort sets the review
 passes per file group (low 1, medium 2, high 3), and a pass after the
 first runs only when the one before added a finding. ocr multiplies the
 timeout by those passes, so the default gives each group 160 minutes.
+
+`--max-tools` and `--max-tokens-budget` also go to every review run.
+Without them the binding's defaults apply (ocr: `200`, `25000000`).
+For ocr, `--max-tools` is the tool rounds per file group, 50 or more.
+`--max-tokens-budget` caps the tokens of one ocr run, not of one group.
+A group over the budget gets one final round and fails as `budget`,
+and ocr starts no more groups. The binding also makes ocr review test
+files, which ocr skips by default.
 
 The reviewer reads only its background file, never the PR comments, so
 the script joins the brief with every Rejected and Accepted line from

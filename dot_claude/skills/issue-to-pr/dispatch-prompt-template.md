@@ -59,9 +59,10 @@ TDD, run the gate, commit, push, re-run the review round, post the
 round's comment.
 Every review round passes `--brief <the brief file above>` to
 `pr-round.sh` and `critic-input.sh`.
-<only when intake set the reviewer's effort or timeout; omit this line
-otherwise, and keep only the flags intake set:> Every review round
-passes `--effort <level> --timeout <minutes>` to `pr-round.sh`.
+<only when intake set the reviewer's effort, timeout, tool cap or token
+budget; omit this line otherwise, and keep only the flags intake set:>
+Every review round passes `--effort <level> --timeout <minutes>
+--max-tools <n> --max-tokens-budget <n>` to `pr-round.sh`.
 
 ## When you are done
 

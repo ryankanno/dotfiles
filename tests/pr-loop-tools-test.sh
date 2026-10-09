@@ -262,9 +262,46 @@ assert_contains "$(cat "$WS/out/cmd.txt")" 'ocr review' "records the tool invoca
 assert_contains "$(cat "$WS/out/cmd.txt")" '--from aaa --to bbb' "records the range"
 assert_eq "$(cat "$WS/out/session.txt")" "abc-123" "extracts the session id"
 assert_contains "$(cat "$WS/args.txt")" "--concurrency 1" "one file group at a time: the provider queues the rest until they time out"
-assert_contains "$(cat "$WS/args.txt")" "--max-tools 100" "room for a group to finish its tool rounds"
+assert_contains "$(cat "$WS/args.txt")" "--max-tools 200" "room for a group to finish its tool rounds"
+assert_contains "$(cat "$WS/args.txt")" "--max-tokens-budget 25000000" "a ceiling on a runaway review's tokens"
 assert_contains "$(cat "$WS/args.txt")" "--timeout 80" "room for a group to finish in time"
 assert_contains "$(cat "$WS/args.txt")" "--effort medium" "two review rounds per group, not three"
+
+echo "wrapper: the binding's rule file makes ocr select test files"
+rule="$(sed -n 's/.*--rule \([^ ]*\).*/\1/p' "$WS/args.txt")"
+assert_contains "$(cat "$WS/args.txt")" "--rule /" "passes an absolute rule path, since the wrapper cds into the repo"
+assert_json '.include | index("**/*_test.go")' "$rule" "the rule includes go test files"
+assert_json '.include | index("**/test_*.py")' "$rule" "the rule includes python test files"
+assert_json '.include | index("**/package-lock.json") | not' "$rule" "lockfiles stay excluded"
+
+echo "wrapper: --max-tools and --max-tokens-budget replace the defaults"
+new_sandbox
+make_stub
+mkdir -p "$WS/repo" "$WS/out"
+PATH="$WS/stub:$PATH" "$REVIEW" --repo "$WS/repo" --out "$WS/out" --max-tools 150 --max-tokens-budget 9000000 --commit x
+assert_eq "$?" 0 "exits 0"
+assert_contains "$(cat "$WS/args.txt")" "--max-tools 150 --max-tokens-budget 9000000" "the given limits reach ocr"
+assert_not_contains "$(cat "$WS/args.txt")" "--max-tools 200" "the default tool cap is gone"
+assert_not_contains "$(cat "$WS/args.txt")" "--max-tokens-budget 25000000" "the default budget is gone"
+assert_contains "$(cat "$WS/args.txt")" "--rule /" "commit mode passes the rule too"
+
+echo "wrapper: a tool cap under 50 or a non-numeric budget is a usage error"
+new_sandbox
+make_stub
+mkdir -p "$WS/repo" "$WS/out"
+PATH="$WS/stub:$PATH" "$REVIEW" --repo "$WS/repo" --out "$WS/out" --max-tools 49 --commit x >/dev/null 2>&1
+rc1=$?
+PATH="$WS/stub:$PATH" "$REVIEW" --repo "$WS/repo" --out "$WS/out" --max-tools 0200 --commit x >/dev/null 2>&1
+rc2=$?
+PATH="$WS/stub:$PATH" "$REVIEW" --repo "$WS/repo" --out "$WS/out" --max-tokens-budget 25M --commit x >/dev/null 2>&1
+rc3=$?
+PATH="$WS/stub:$PATH" "$REVIEW" --repo "$WS/repo" --out "$WS/out" --max-tokens-budget 0 --commit x >/dev/null 2>&1
+rc4=$?
+assert_eq "$rc1" 2 "a tool cap under ocr's minimum of 50 exits 2"
+assert_eq "$rc2" 2 "a leading-zero tool cap exits 2"
+assert_eq "$rc3" 2 "a non-numeric budget exits 2"
+assert_eq "$rc4" 2 "a zero budget (ocr: unlimited) exits 2"
+assert_not_contains "$(cat "$WS/args.txt")" "review" "never invoked the tool"
 
 echo "wrapper: --effort and --timeout replace the defaults"
 new_sandbox
@@ -702,6 +739,32 @@ make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
 assert_contains "$(cat "$rd/cmd.txt")" "--timeout 80 --effort medium" "medium effort, 80 minutes"
+assert_contains "$(cat "$rd/cmd.txt")" "--max-tools 200 --max-tokens-budget 25000000" "200 tool rounds, 25M tokens"
+
+echo "pr-round: --max-tools and --max-tokens-budget reach every review run"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+export STUB_RANGE_STATUS=skipped STUB_COMMIT_STATUS=complete
+run_prr --repo "$repo" --pr 39 --round 1 --max-tools 150 --max-tokens-budget 9000000 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
+assert_contains "$(cat "$rd/cmd.txt")" "--max-tools 150 --max-tokens-budget 9000000" "the range run gets them"
+assert_contains "$(cat "$rd/commit-1/cmd.txt")" "--max-tools 150 --max-tokens-budget 9000000" "the per-commit retry gets them"
+
+echo "pr-round: a bad --max-tools or --max-tokens-budget stops before the round dir exists"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 --max-tools 49 >/dev/null 2>&1
+rc1=$?
+run_prr --repo "$repo" --pr 39 --round 1 --max-tokens-budget 0 >/dev/null 2>&1
+rc2=$?
+run_prr --repo "$repo" --pr 39 --round 1 --max-tokens-budget 25M >/dev/null 2>&1
+rc3=$?
+assert_eq "$rc1" 2 "a tool cap under 50 exits 2"
+assert_eq "$rc2" 2 "a zero budget exits 2"
+assert_eq "$rc3" 2 "a non-numeric budget exits 2"
+assert_eq "$([[ -e "$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1" ]] && printf exists || printf absent)" "absent" "no round dir to --rerun past"
 
 echo "pr-round: a bad --effort or --timeout stops before the round dir exists"
 new_sandbox
