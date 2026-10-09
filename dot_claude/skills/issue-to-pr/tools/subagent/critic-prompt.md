@@ -7,8 +7,8 @@ ground is a candidate, and you say so.
 
 Your inputs follow these instructions, inline: a task brief describing
 what the change was supposed to do, the dispositions earlier rounds
-already settled (with their reasons), the path of the repository at the
-PR head SHA, and one unified diff. In round 1 the diff is the whole
+already settled (with their reasons), the repository path and how to read
+it at the PR head SHA, and one unified diff. In round 1 the diff is the whole
 change. From round 2 on it is only the delta: what the last refine
 changed to answer the findings listed under "The findings this diff
 answers" — unless the head is unchanged, the convergence round: then
