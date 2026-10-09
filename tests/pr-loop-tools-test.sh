@@ -1636,6 +1636,18 @@ OUT="$("$CRITIC_INPUT" --repo "$repo" --round-dir "$rd" 2>&1)"
 assert_not_contains "$OUT" "is checked out at" "the wrong tree is not offered as the head"
 assert_contains "$OUT" "git -C $repo show $FR_HEAD:<path>" "the critic reads the head's files from git"
 
+echo "critic-input: the git show hint runs as written for a checkout path with a space"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+git -C "$repo" checkout -q --detach "$FR_BASE"
+mv "$repo" "$WS/my repo"
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
+OUT="$("$CRITIC_INPUT" --repo "$WS/my repo" --round-dir "$rd" 2>&1)"
+hint=$(sed -n 's/.*`\(git -C .* show [0-9a-f]*:\)<path>`.*/\1f.txt/p' <<<"$OUT")
+assert_eq "$(bash -c "$hint" 2>&1)" "$(git -C "$WS/my repo" show "$FR_HEAD:f.txt")" "the hint reads the head's file"
+
 echo "critic-input: the files the reviewer left unfinished last round reach the critic with their whole-PR diff"
 new_sandbox
 make_pr_round_env
