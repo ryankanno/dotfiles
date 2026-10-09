@@ -515,7 +515,7 @@ if [[ "$scope" == delta && -z "$delta" ]]; then
   fi
   if [[ $moved -eq 1 ]]; then
     scope="full: the change since the prior round adds no lines"
-    rm -f "$round_dir/delta.txt"
+    rm -f "$round_dir/delta.txt" "$round_dir/names.txt"
   else
     scope="full: no change since the prior round"
   fi
