@@ -6,6 +6,8 @@
 
 Source: <source locator>
 
+Brief file: `<absolute path of the brief file>`
+
 <Only when the grill is on; omit this section entirely when it is off:>
 ## Before any code: plan, then grill it here
 
@@ -55,6 +57,8 @@ pr-refine skill against that PR: read the newest matching comment,
 validate every finding against the diff before touching code, fix under
 TDD, run the gate, commit, push, re-run the review round, post the
 round's comment.
+Every review round passes `--brief <the brief file above>` to
+`pr-round.sh` and `critic-input.sh`.
 <only when intake set the reviewer's effort or timeout; omit this line
 otherwise, and keep only the flags intake set:> Every review round
 passes `--effort <level> --timeout <minutes>` to `pr-round.sh`.

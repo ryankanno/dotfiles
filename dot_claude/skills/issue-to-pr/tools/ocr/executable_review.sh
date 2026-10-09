@@ -61,7 +61,7 @@ mkdir -p "$out"
 # a 26-line file among them, and a full re-review re-failed the same
 # files. The model provider serves 6 requests at once and queues the
 # rest, so the default 8 parallel groups wait out the 15-minute task
-# timeout. These are the settings under which the earlier roborev loop
+# timeout. These are the settings under which the earlier refine loop
 # converged: one group at a time, room for 100 tool rounds, and a task
 # deadline of --timeout times the review rounds (ocr multiplies them),
 # so the default 80 gives each group 160 minutes at the default medium.

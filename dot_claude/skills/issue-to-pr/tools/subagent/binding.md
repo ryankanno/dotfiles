@@ -16,7 +16,7 @@ The subagent's prompt is the output of this directory's
 added or removed instruction, no input left on disk for it to read.
 
 ```bash
-~/.claude/skills/issue-to-pr/tools/subagent/critic-input.sh \
+$HOME/.claude/skills/issue-to-pr/tools/subagent/critic-input.sh \
   --repo <checkout-dir> --round-dir <round-dir> --brief <brief-file>
 ```
 
@@ -54,7 +54,7 @@ Then a final "Unconfirmed candidates" section: suspicions it could not
 ground that way, one line each with what is missing. The caller shows
 that section verbatim in the collapsed critic block and never counts
 it: an unconfirmed candidate is neither a blocking finding nor a
-follow-up. This is the evidence bar the earlier roborev refine loop
+follow-up. This is the evidence bar the earlier refine loop
 converged on; the adversarial "prove otherwise"
 framing it replaces produced at least one medium every round on PR 40.
 

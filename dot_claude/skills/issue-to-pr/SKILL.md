@@ -24,7 +24,7 @@ this skill once per task and reads that message. Keep it self-contained.
 The whole loop as one picture: [`flow.md`](flow.md).
 
 Fixed process, swappable tools: the reviewer and the critic are named
-slots resolved through `~/.claude/skills/issue-to-pr/tools/manifest.json`
+slots resolved through `$HOME/.claude/skills/issue-to-pr/tools/manifest.json`
 and the bindings under `tools/`. Never hardcode a tool binary from a
 manifest slot into a command; read the manifest, then use the binding.
 
@@ -88,7 +88,7 @@ hand. `<source-type>` is `gh`, `md`, or `html`; the item text is the
 extracted task from the brief.
 
 ```bash
-~/.claude/skills/issue-to-pr/tools/branch-name.sh \
+$HOME/.claude/skills/issue-to-pr/tools/branch-name.sh \
   --type <source-type> --locator <source locator> --title <title> \
   < <item-text-file>
 gh pr list --state open --head <branch-name>
@@ -146,7 +146,7 @@ round script re-checks with `--expect-branch` before any review runs.
 
 ## 5. The review round
 
-Run the review round exactly as `~/.claude/skills/pr-review/SKILL.md`
+Run the review round exactly as `$HOME/.claude/skills/pr-review/SKILL.md`
 defines it, over the PR's ref range. Reviews never touch the checkout's
 `HEAD`.
 
@@ -161,7 +161,7 @@ workmux send <handle> "Refine round <N> on PR <n>: run the pr-refine skill."
 
 The implementer fixes under TDD, runs the gate, pushes, re-runs the
 review round, and posts the round's comment itself, per
-`~/.claude/skills/pr-refine/SKILL.md`. Watch it with `workmux status` /
+`$HOME/.claude/skills/pr-refine/SKILL.md`. Watch it with `workmux status` /
 `capture`, and verify each round's push with `gh pr view` before the next
 step.
 
@@ -196,7 +196,7 @@ finding blocks.
 - both clean: the loop ends clean.
 - blocking findings all low and every one dispositioned: your
   convergence comment's verdict is `converged (all blocking findings
-  low and dispositioned)` and the loop ends converged, with the
+  low and dispositioned).` and the loop ends converged, with the
   accepted judgment calls listed in the final report.
 - blocking findings otherwise: one more refine round while rounds
   remain under the cap; when the cap is spent, the loop ends
@@ -212,7 +212,8 @@ The last message of the run, verbatim to the future runner:
   round found every one low and dispositioned; the accepted judgment
   calls are listed), `capped-unrecovered` (blocking findings remain
   after 3 rounds), or
-  `blocked` (pane death after redispatch, no gate found, scan hit, or
+  `blocked` (pane death after redispatch, no gate found, scan hit, a
+  `pr-round.sh` exit 4, 5, 6, or 127, or
   a partial or unrecovered reviewer with nothing from any source)
 - per-round one-liners: round number, short SHA, verdict, who ran it
 - the follow-ups from the final round's comment, verbatim: findings on
@@ -244,6 +245,9 @@ report; the file is its durable copy, the exact text, no summary layer.
 - **Empty reviewer result:** handled inside the review round (retry once
   per-commit). Two empties: the round is unrecovered, never clean and
   never failing.
+- **`pr-round.sh` exit 4, 5, 6, or 127:** the round reports blocked,
+  with the script's stderr line in the final report. Never pass
+  `--rerun` on your own.
 - **PR creation failed:** capture the pane's error, report blocked. Do
   not redispatch the whole task.
 - **Degraded critic harness:** if your own critic subagent cannot run,

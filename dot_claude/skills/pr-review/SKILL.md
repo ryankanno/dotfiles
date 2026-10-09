@@ -27,7 +27,7 @@ The range mechanics live in the slot's tested script, not in this
 skill's prose:
 
 ```bash
-~/.claude/skills/issue-to-pr/tools/pr-round.sh \
+$HOME/.claude/skills/issue-to-pr/tools/pr-round.sh \
   --repo <checkout-dir> --pr <n> --round <N> \
   --brief <brief-file> --expect-branch <branch-name> \
   [--effort low|medium|high] [--timeout <minutes>]
@@ -106,19 +106,30 @@ head is any other branch is a hallucinated number, and the script exits
 3 before anything reviews or posts. Omit it only when the caller
 cannot know the branch (a human's standalone review). The script
 resolves the range from the PR (never the checkout's `HEAD`), fetches
-the refs, runs the active reviewer binding over
-`<range.reviewed_from>..<headRefOid>`, applies the per-commit
+the refs, runs the active reviewer binding over the round's range,
+applies the per-commit
 empty-retry policy once per commit in that range, and prints the round
 directory
 whose `round.json` carries the range, the identity, every run (mode,
 directory, status, session id, exit code), and `reviewer_complete`.
+The reviewer's range is `origin/<base>..<headRefOid>` in merge-base
+mode on a full-scope round, and `<range.reviewed_from>..<headRefOid>`
+on a delta round. After a base merge it runs from the baseline to a
+commit that has the head's tree and only the baseline as parent.
+
+The script exits 4 when the PR is missing, not open, or not
+resolvable, 5 when the repository, its refs, or the changed-file
+listing cannot be resolved, and 127 when `gh`, `jq`, or `git` is
+missing. It exits 6 when the round directory already holds evidence:
+`--rerun` moves that evidence into a `superseded-*/` subdirectory, then
+runs the round.
 
 ## 2. Read round.json
 
 **`range.review_scope` starting with `none:`** is a base merge with no
 PR change. Skip steps 3 to 5: no source runs. Post a comment per
 report-template.md with the verdict `nothing to review (only a base
-merge since the prior round)` and the round dir's `prior-findings.md`,
+merge since the prior round).` and the round dir's `prior-findings.md`,
 verbatim, as its `**Findings:**` section when the file exists. The
 prior round's blocking findings then stand for /pr-refine and for the
 next round.
@@ -127,15 +138,17 @@ next round.
 report it as clean. **`reviewer_complete: false`** takes one of two
 shapes, read from `runs[].status`:
 
-- **Partial** (a run is `partial`): the reviewer produced review text,
-  but part of the range went unreviewed (failed files, or a group that
-  lost a review pass). Its findings count like any other source's.
+- **Partial** (a run is `partial`, or a `commit:` run is `complete`):
+  the reviewer produced review text,
+  but part of the range went unreviewed (failed files, a group that
+  lost a review pass, or commits whose retry produced no review text).
+  Its findings count like any other source's.
   With nothing from any source, the verdict is `partial (the
-  reviewer's coverage has a gap)`.
-- **Unrecovered** (no run is `partial`): the reviewer produced no
+  reviewer's coverage has a gap).`
+- **Unrecovered** (neither): the reviewer produced no
   review text, whatever runs it attempted. With nothing from any
   source, the verdict is `unrecovered (the reviewer produced no review
-  text)`.
+  text).`
 
 Either way, findings from any source make the verdict count them, and
 the visible `**Reviewer:**` line names the gap per report-template.md.
@@ -154,7 +167,7 @@ reports none, the line says so; a guessed number is never written.
 ## 3. The adversarial critic
 
 Resolve the critic from the manifest and follow its binding file
-(`~/.claude/skills/issue-to-pr/tools/<critic>/binding.md`) for how to
+(`$HOME/.claude/skills/issue-to-pr/tools/<critic>/binding.md`) for how to
 spawn it: a fresh, clean-context subagent whose prompt is the output of
 `critic-input.sh`, verbatim. Never write the critic's prompt yourself:
 the script carries the instructions, the brief, the findings this
@@ -163,7 +176,7 @@ leaves out the follow-ups. It keeps the same prompt as
 `critic-input.md` in the round directory.
 
 ```bash
-~/.claude/skills/issue-to-pr/tools/subagent/critic-input.sh \
+$HOME/.claude/skills/issue-to-pr/tools/subagent/critic-input.sh \
   --repo <checkout-dir> --round-dir <round-dir> --brief <brief-file>
 ```
 
@@ -196,7 +209,7 @@ Read the diff against the brief yourself:
 Classify every finding from every source against the round's delta:
 
 ```bash
-~/.claude/skills/issue-to-pr/tools/finding-scope.sh <round-dir> <path>:<start>[-<end>]
+$HOME/.claude/skills/issue-to-pr/tools/finding-scope.sh <round-dir> <path>:<start>[-<end>]
 ```
 
 - **Blocking:** high severity anywhere, or `new`: on a line changed
@@ -225,9 +238,11 @@ produced no blocking finding, `**Verdict:** <n> finding(s).` when <n>
 blocking findings exist, `**Verdict:** partial (the reviewer's coverage has a gap).` when
 the binding ended partial with nothing else to report,
 `**Verdict:** unrecovered (the reviewer produced no review text).` when
-the binding ended unrecovered with nothing else to report, or
+the binding ended unrecovered with nothing else to report,
 `**Verdict:** nothing to review (only a base merge since the prior round).`
-when `range.review_scope` starts with `none:`.
+when `range.review_scope` starts with `none:`, or
+`**Verdict:** converged (all blocking findings low and dispositioned).`,
+which only the orchestrator's convergence round writes.
 
 ## 7. Scan before posting
 
@@ -235,12 +250,14 @@ Write the body to a file, never inline. Scan it before it leaves the
 machine:
 
 ```bash
-~/.claude/skills/issue-to-pr/tools/scan.sh <file>
+$HOME/.claude/skills/issue-to-pr/tools/scan.sh <file>
 ```
 
 The script rewrites home paths to `~` in place. Exit 0: post the file.
 Exit 1: it printed each remaining hit (another home path, a temp path,
-or a token); **do not post**. Record the lines. Unattended does not mean
+or a token); **do not post**. Record the lines. Exit 2: a usage
+error, or the scan itself failed; **do not post**. Record its stderr.
+Unattended does not mean
 leaked; the blocked post surfaces in the loop's final report.
 
 ## 8. Post
