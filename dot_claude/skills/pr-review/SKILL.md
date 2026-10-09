@@ -129,7 +129,7 @@ runs the round.
 **`range.review_scope` starting with `none:`** is a base merge with no
 PR change. Skip steps 3 to 5: no source runs. Post a comment per
 report-template.md with the verdict `nothing to review (only a base
-merge since the prior round)` and the round dir's `prior-findings.md`,
+merge since the prior round).` and the round dir's `prior-findings.md`,
 verbatim, as its `**Findings:**` section when the file exists. The
 prior round's blocking findings then stand for /pr-refine and for the
 next round.
@@ -144,11 +144,11 @@ shapes, read from `runs[].status`:
   lost a review pass, or commits whose retry produced no review text).
   Its findings count like any other source's.
   With nothing from any source, the verdict is `partial (the
-  reviewer's coverage has a gap)`.
+  reviewer's coverage has a gap).`
 - **Unrecovered** (neither): the reviewer produced no
   review text, whatever runs it attempted. With nothing from any
   source, the verdict is `unrecovered (the reviewer produced no review
-  text)`.
+  text).`
 
 Either way, findings from any source make the verdict count them, and
 the visible `**Reviewer:**` line names the gap per report-template.md.

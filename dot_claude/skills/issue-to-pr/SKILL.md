@@ -196,7 +196,7 @@ finding blocks.
 - both clean: the loop ends clean.
 - blocking findings all low and every one dispositioned: your
   convergence comment's verdict is `converged (all blocking findings
-  low and dispositioned)` and the loop ends converged, with the
+  low and dispositioned).` and the loop ends converged, with the
   accepted judgment calls listed in the final report.
 - blocking findings otherwise: one more refine round while rounds
   remain under the cap; when the cap is spent, the loop ends
