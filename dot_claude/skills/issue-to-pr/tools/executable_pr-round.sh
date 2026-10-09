@@ -30,7 +30,7 @@
 #                binary-only or mode-only change, issue #43) with names.txt
 #                (the listing the hunks
 #                enumerate over), settled.md (the standing Rejected and
-#                Accepted lines) and prior-findings.md (the newest round
+#                Accepted lines) and prior-findings.md (the newest earlier-round
 #                comment's blocking findings) and prior-unfinished.txt (the
 #                files the prior round's reviewer did not finish) when
 #                there are any, which critic-input.sh reads, background.md
@@ -200,6 +200,10 @@ bodies=$(gh api --paginate "repos/$owner_repo/issues/$pr/comments" \
   printf 'cannot read the PR comments\n' >&2
   exit 5
 }
+# A rerun of round N must not read round N's or a later round's comment
+# (issue #58). A comment without the round heading stays.
+bodies=$(jq -c --argjson r "$((10#$round))" \
+  'select(((capture("(?m)^## Review round (?<n>[0-9]+):") | .n | tonumber) // 0) < $r)' <<<"$bodies")
 if [[ -n "$dispositions" ]]; then
   settled=$(cat "$dispositions")
 else
@@ -216,7 +220,7 @@ else
            on && keep && /^[[:space:]]/ { print; next }
            on && NF { keep = 0 }')
 fi
-# The newest round comment's blocking findings are what this round's
+# The newest earlier-round comment's blocking findings are what this round's
 # delta answers. critic-input.sh hands them to the critic verbatim, so the
 # critic checks the fixes against the claims, not against a paraphrase.
 # A claim can wrap onto continuation lines; every non-blank line of the

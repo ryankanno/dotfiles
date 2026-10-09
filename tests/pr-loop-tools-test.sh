@@ -779,6 +779,22 @@ run_prr --repo "$repo" --pr 39 --round 3 >/dev/null
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-3"
 assert_eq "$(cat "$rd/prior-findings.md" 2>/dev/null)" $'1. **[reviewer] bug/medium** `b.sh:2`: the newest blocking finding\n   whose claim wraps onto a second line' "the newest own comment's blocking findings, continuations included"
 
+echo "pr-round: a rerun of an earlier round reads that round's prior comment, not a later one"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+r1=$'<!-- pr-loop-comment -->\n\n## Review round 1: abc\n\n**Findings:**\n1. **[critic] bug/medium** `a.sh:1`: round one finding\n\n<details><summary>Dispositions</summary>\n\n- Rejected: [critic] round one rejection\n\n</details>'
+r2=$'<!-- pr-loop-comment -->\n\n## Review round 2: def\n\n**Findings:**\n1. **[reviewer] bug/medium** `b.sh:2`: round two finding\n\n<details><summary>Dispositions</summary>\n\n- Rejected: [reviewer] round two rejection\n\n</details>'
+GH_COMMENTS_JSON="$(jq -cn --arg r1 "$r1" --arg r2 "$r2" \
+  '[{user: {login: "test-me"}, body: $r1}, {user: {login: "test-me"}, body: $r2}]')"
+export GH_COMMENTS_JSON
+run_prr --repo "$repo" --pr 39 --round 2 --rerun >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
+assert_eq "$(cat "$rd/prior-findings.md" 2>/dev/null)" '1. **[critic] bug/medium** `a.sh:1`: round one finding' "the rerun answers round 1's findings"
+assert_eq "$(cat "$rd/settled.md" 2>/dev/null)" '- Rejected: [critic] round one rejection' "the rerun settles nothing a later round decided"
+
 LIMIT="$(jq -r '.reviewer_background_limit' "$TOOLS/manifest.json")"
 
 echo "pr-round: a brief over the reviewer's background limit stops before any review"
