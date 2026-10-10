@@ -59,9 +59,11 @@ One interactive moment. Collect and confirm, then go silent:
    by manifest. Still nothing: later rounds report blocked rather than
    inventing one.
 5. **The reviewer.** Default from the manifest. Override only if asked.
-   The same holds for its effort and timeout: the binding's defaults
-   (ocr: `medium`, `80` minutes) unless the human sets them. A set value
-   goes to `pr-round.sh` as `--effort` / `--timeout` in every round of
+   The same holds for its effort, timeout, tool cap and token budget:
+   the binding's defaults (ocr: `medium`, `80` minutes, `200` tool
+   rounds, `25000000` tokens) unless the human sets them. A set value
+   goes to `pr-round.sh` as `--effort` / `--timeout` / `--max-tools` /
+   `--max-tokens-budget` in every round of
    the loop: your review and convergence rounds, and the implementer's
    refine rounds through the dispatch prompt.
 6. **The grill.** On or off. On when the task leaves decisions to the

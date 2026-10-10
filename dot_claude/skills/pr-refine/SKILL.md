@@ -132,8 +132,9 @@ never force.
 Run the full review round exactly as
 `$HOME/.claude/skills/pr-review/SKILL.md` defines it, over the new head
 SHA — once, at the end, over the final head, never once per
-intermediate head. Pass the `--effort` and `--timeout` the loop's
-rounds use, when the dispatch prompt or the caller names them. Post the
+intermediate head. Pass the `--effort`, `--timeout`, `--max-tools` and
+`--max-tokens-budget` the loop's rounds use, when the dispatch prompt or
+the caller names them. Post the
 round's comment per `report-template.md`
 with the round number incremented, the Dispositions block, and the
 cumulative cost line from round.json.
