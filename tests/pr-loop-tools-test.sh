@@ -799,6 +799,8 @@ assert_eq "$rc2" 2 "a zero budget exits 2"
 assert_eq "$rc3" 2 "a non-numeric budget exits 2"
 run_prr --repo "$repo" --pr 39 --round 1 --max-tools 99999999999999999999 >/dev/null 2>&1
 assert_eq "$?" 2 "a tool cap past bash's integer range exits 2"
+run_prr --repo "$repo" --pr 39 --round 1 --max-tokens-budget 99999999999999999999 >/dev/null 2>&1
+assert_eq "$?" 2 "a budget past ocr's integer range exits 2"
 assert_eq "$([[ -e "$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1" ]] && printf exists || printf absent)" "absent" "no round dir to --rerun past"
 
 echo "pr-round: a bad --effort or --timeout stops before the round dir exists"
