@@ -6,7 +6,7 @@
     "**/*Test.fs",
     "**/*.test.{js,jsx,ts,tsx}",
     "**/*.spec.{js,jsx,ts,tsx}",
-    "**/__tests__/**",
+    "**/__tests__/**/*.{js,jsx,ts,tsx,mjs,cjs}",
     "**/test/**/*_test.py",
     "**/tests/**/*_test.py",
     "**/*_test.py",
@@ -38,5 +38,10 @@
     "**/tests/**/*.sol",
     "**/test/**/*.vy",
     "**/tests/**/*.vy"
+  ],
+  "exclude": [
+    "**/fixtures/**",
+    "**/testdata/**",
+    "**/__snapshots__/**"
   ]
 }

@@ -42,8 +42,10 @@ case "$effort" in low|medium|high) ;; *) usage ;; esac
 # ocr reads 0 as no deadline (or no budget) and a leading zero as octal
 # (080 fails); its own floor for the tool cap is 50.
 [[ "$timeout" =~ ^[1-9][0-9]*$ ]] || usage
-[[ "$max_tools" =~ ^[1-9][0-9]*$ ]] && (( max_tools >= 50 )) || usage
-[[ "$budget" =~ ^[1-9][0-9]*$ ]] || usage
+# The digit caps keep a value inside bash and ocr integers; a longer one
+# wraps in bash arithmetic and slips past the floor.
+[[ "$max_tools" =~ ^[1-9][0-9]{0,8}$ ]] && (( max_tools >= 50 )) || usage
+[[ "$budget" =~ ^[1-9][0-9]{0,17}$ ]] || usage
 # The wrapper cds into the repo before invoking the tool, so relative
 # output and brief paths would resolve against the wrong directory.
 case "$out" in /*) ;; *) printf 'out must be an absolute path\n' >&2; exit 2 ;; esac
@@ -86,9 +88,12 @@ mkdir -p "$out"
 # rule.json replaces ocr's default path filter for test files only, so
 # the reviewer reads the tests a PR adds. Lockfiles, generated code, build
 # output and vendored code stay excluded, as a tool or a third party writes
-# them; test data stays excluded too, as it holds no logic to review.
+# them; test data stays excluded too, as it holds no logic to review. Its
+# exclude list repeats ocr's test-data globs, since an include re-admits
+# anything it matches and only an exclude wins over it.
 # --rule also replaces a repo's own .opencodereview/rule.json.
 rule="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/rule.json"
+[[ -f "$rule" ]] || { printf 'rule.json not found: %s\n' "$rule" >&2; exit 2; }
 args=(review --format json --output "$out/review.json"
       --concurrency 1 --max-tools "$max_tools" --max-tokens-budget "$budget"
       --timeout "$timeout" --effort "$effort" --rule "$rule")
