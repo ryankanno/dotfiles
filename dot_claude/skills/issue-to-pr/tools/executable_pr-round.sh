@@ -8,7 +8,8 @@
 #
 # Interface in:  --repo <dir> --pr <n> --round <N> [--brief <file>]
 #                [--dispositions <file>] [--expect-branch <branch-name>]
-#                [--effort low|medium|high] [--timeout <minutes>] (passed
+#                [--effort low|medium|high] [--timeout <minutes>]
+#                [--max-tools <n>] [--max-tokens-budget <n>] (passed
 #                to every review run; the binding owns the defaults)
 #                [--rerun] [--convergence: a base merge with no PR change
 #                reviews the whole PR instead of nothing]
@@ -51,11 +52,11 @@
 set -euo pipefail
 
 usage() {
-  printf 'usage: pr-round.sh --repo <dir> --pr <n> --round <N> [--brief <file>] [--dispositions <file>] [--expect-branch <branch-name>] [--effort low|medium|high] [--timeout <minutes>] [--rerun] [--convergence]\n' >&2
+  printf 'usage: pr-round.sh --repo <dir> --pr <n> --round <N> [--brief <file>] [--dispositions <file>] [--expect-branch <branch-name>] [--effort low|medium|high] [--timeout <minutes>] [--max-tools <n>] [--max-tokens-budget <n>] [--rerun] [--convergence]\n' >&2
   exit 2
 }
 
-repo="" pr="" round="" brief="" dispositions="" expect="" rerun="" effort="" timeout="" convergence=""
+repo="" pr="" round="" brief="" dispositions="" expect="" rerun="" effort="" timeout="" max_tools="" token_budget="" convergence=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --repo) [[ $# -ge 2 ]] || usage; repo="$2"; shift 2 ;;
@@ -66,6 +67,8 @@ while [[ $# -gt 0 ]]; do
     --expect-branch) [[ $# -ge 2 ]] || usage; expect="$2"; shift 2 ;;
     --effort) [[ $# -ge 2 ]] || usage; effort="$2"; shift 2 ;;
     --timeout) [[ $# -ge 2 ]] || usage; timeout="$2"; shift 2 ;;
+    --max-tools) [[ $# -ge 2 ]] || usage; max_tools="$2"; shift 2 ;;
+    --max-tokens-budget) [[ $# -ge 2 ]] || usage; token_budget="$2"; shift 2 ;;
     --rerun) rerun=1; shift ;;
     --convergence) convergence=1; shift ;;
     *) usage ;;
@@ -76,6 +79,10 @@ done
 # every run of the round and leave a round dir that only --rerun clears.
 case "$effort" in ""|low|medium|high) ;; *) usage ;; esac
 [[ -z "$timeout" || "$timeout" =~ ^[1-9][0-9]*$ ]] || usage
+# The digit caps keep a value inside bash and ocr integers; a longer one
+# wraps in bash arithmetic and slips past the floor.
+[[ -z "$max_tools" || ( "$max_tools" =~ ^[1-9][0-9]{0,8}$ && max_tools -ge 50 ) ]] || usage
+[[ -z "$token_budget" || "$token_budget" =~ ^[1-9][0-9]{0,17}$ ]] || usage
 # Callers mistake --repo for the gh owner/name; say so instead of the generic usage line.
 [[ -d "$repo" ]] || { printf "pr-round.sh: --repo must be the local checkout directory, got '%s'\n" "$repo" >&2; exit 2; }
 case "$repo" in /*) ;; *) printf 'repo must be an absolute path\n' >&2; exit 2 ;; esac
@@ -528,7 +535,7 @@ fi
 range_status=none
 if [[ "$scope" != none:* ]]; then
   set +e
-  "$review" --repo "$repo" --out "$round_dir" ${brief:+--brief "$brief"} ${effort:+--effort "$effort"} ${timeout:+--timeout "$timeout"} --base "$review_from" --head "$review_to"
+  "$review" --repo "$repo" --out "$round_dir" ${brief:+--brief "$brief"} ${effort:+--effort "$effort"} ${timeout:+--timeout "$timeout"} ${max_tools:+--max-tools "$max_tools"} ${token_budget:+--max-tokens-budget "$token_budget"} --base "$review_from" --head "$review_to"
   rc=$?
   set -e
   range_status=$(status_of "$round_dir")
@@ -553,7 +560,7 @@ elif [[ "$range_status" == missing || "$range_status" == skipped ]]; then
     i=$((i + 1))
     commit_dir="$round_dir/commit-$i"
     set +e
-    "$review" --repo "$repo" --out "$commit_dir" ${brief:+--brief "$brief"} ${effort:+--effort "$effort"} ${timeout:+--timeout "$timeout"} --commit "$sha"
+    "$review" --repo "$repo" --out "$commit_dir" ${brief:+--brief "$brief"} ${effort:+--effort "$effort"} ${timeout:+--timeout "$timeout"} ${max_tools:+--max-tools "$max_tools"} ${token_budget:+--max-tokens-budget "$token_budget"} --commit "$sha"
     crc=$?
     set -e
     cstatus=$(status_of "$commit_dir")
