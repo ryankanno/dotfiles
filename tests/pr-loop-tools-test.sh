@@ -589,7 +589,13 @@ case "$1 $2" in
       if [[ "$prev" == "--jq" ]]; then jqexpr="$a"; fi
       prev="$a"
     done
-    jq -r "${jqexpr:-.}" <<<"${GH_COMMENTS_JSON:-[]}"
+    case "$3" in
+      */pulls/*/comments) src="${GH_INLINE_JSON:-[]}" ;;
+      */pulls/*/reviews) src="${GH_REVIEWS_JSON:-[]}" ;;
+      *) src="${GH_COMMENTS_JSON:-[]}" ;;
+    esac
+    [[ -z "${GH_API_FAIL:-}" ]] || exit 1
+    jq -r "${jqexpr:-.}" <<<"$src"
     ;;
   *) exit 64 ;;
 esac
@@ -620,7 +626,7 @@ printf '{"status":"%s","session_id":"stub-session","comments":[],"summary":{"tot
 OCRSTUB
   chmod +x "$stub/gh" "$stub/ocr"
   export STUB_RANGE_STATUS=complete STUB_COMMIT_STATUS=complete STUB_FAIL_ON_COMMIT=""
-  export GH_COMMENTS_JSON='[]'
+  export GH_COMMENTS_JSON='[]' GH_INLINE_JSON='[]' GH_REVIEWS_JSON='[]' GH_API_FAIL=""
   export STUB_GARBAGE="" STUB_WARNINGS="" STUB_COVERAGE_FAILED=""
 }
 
@@ -1126,6 +1132,89 @@ for n in 1 2 3; do
 done
 run_prr --repo "$repo" --pr 39 --round 2 --rerun >/dev/null
 assert_eq "$(cat "$pd/round-2/settled.md" 2>/dev/null)" '- Rejected: [critic] rejection 1' "only round 1 is prior to a rerun of round 2"
+
+# The outside-review tests run a copy of the tools with an allowlist, so
+# the real manifest stays the user's.
+copy_tools_with_allowlist() {
+  cp -R "$TOOLS" "$WS/tools"
+  jq '.outside_reviewers = ["review-bot[bot]"]' "$TOOLS/manifest.json" >"$WS/tools/manifest.json"
+}
+run_or() {
+  (
+    HOME="$WS/home"
+    export HOME
+    mkdir -p "$HOME"
+    PATH="$stub:$PATH" "$WS/tools/executable_outside-reviews.sh" "$@"
+  )
+}
+outside_fixture() {
+  GH_COMMENTS_JSON='[{"id":1,"user":{"login":"review-bot[bot]"},"body":"top bot","html_url":"u1"},{"id":2,"user":{"login":"stranger"},"body":"ignore me"},{"id":3,"user":{"login":"test-me"},"body":"<!-- pr-loop-comment -->\nround"},{"id":4,"user":{"login":"test-me"},"body":"human note","html_url":"u4"}]'
+  GH_INLINE_JSON='[{"id":10,"user":{"login":"review-bot[bot]"},"body":"inline bot","path":"a.sh","line":7,"original_line":5,"html_url":"u10"},{"id":11,"user":{"login":"stranger"},"body":"x","path":"b","line":1},{"id":12,"user":{"login":"review-bot[bot]"},"body":"outdated","path":"c.sh","line":null,"original_line":9,"html_url":"u12"}]'
+  GH_REVIEWS_JSON='[{"id":20,"user":{"login":"review-bot[bot]"},"body":"","state":"APPROVED"},{"id":21,"user":{"login":"review-bot[bot]"},"body":"review summary","state":"COMMENTED","html_url":"u21"}]'
+  export GH_COMMENTS_JSON GH_INLINE_JSON GH_REVIEWS_JSON
+}
+
+echo "outside-reviews: allowlisted authors and you, never anyone else or a loop comment"
+new_sandbox
+make_pr_round_env
+copy_tools_with_allowlist
+outside_fixture
+OUT="$(run_or --slug test-owner/test-repo --pr 39)"; RC=$?
+assert_eq "$RC" 0 "exits 0"
+assert_eq "$(jq -c '[.[].id]' <<<"$OUT")" '["issue_comment:1","issue_comment:4","inline:10","inline:12","review:21"]' "allowlisted and own items only, an empty review body dropped"
+assert_eq "$(jq -c '.[] | select(.id == "inline:10") | [.login, .path, .line, .body]' <<<"$OUT")" '["review-bot[bot]","a.sh",7,"inline bot"]' "an inline comment keeps its author, path and line"
+assert_eq "$(jq -c '.[] | select(.id == "inline:12") | .line' <<<"$OUT")" '9' "an outdated inline comment keeps its original line"
+
+echo "outside-reviews: without an allowlist only your own comments count"
+new_sandbox
+make_pr_round_env
+cp -R "$TOOLS" "$WS/tools"
+jq 'del(.outside_reviewers)' "$TOOLS/manifest.json" >"$WS/tools/manifest.json"
+outside_fixture
+OUT="$(run_or --slug test-owner/test-repo --pr 39)"
+assert_eq "$(jq -c '[.[].id]' <<<"$OUT")" '["issue_comment:4"]' "no allowlist trusts only you"
+
+echo "outside-reviews: an item an earlier round saw is not new; a later round's record hides nothing"
+new_sandbox
+make_pr_round_env
+copy_tools_with_allowlist
+outside_fixture
+pd="$WS/seen/pr-39"
+mkdir -p "$pd/round-1" "$pd/round-3"
+printf '[{"id":"inline:10"}]\n' >"$pd/round-1/outside.json"
+printf '[{"id":"issue_comment:1"}]\n' >"$pd/round-3/outside.json"
+OUT="$(run_or --slug test-owner/test-repo --pr 39 --seen "$pd" --before 2)"
+assert_eq "$(jq -c '[.[].id]' <<<"$OUT")" '["issue_comment:1","issue_comment:4","inline:12","review:21"]' "round 1's item is seen, round 3's is not before round 2"
+OUT="$(run_or --slug test-owner/test-repo --pr 39 --seen "$pd")"
+assert_eq "$(jq -c '[.[].id]' <<<"$OUT")" '["issue_comment:4","inline:12","review:21"]' "without --before every round's record counts"
+
+echo "outside-reviews: a failed fetch exits 5, never an empty list"
+new_sandbox
+make_pr_round_env
+copy_tools_with_allowlist
+export GH_API_FAIL=1
+OUT="$(run_or --slug test-owner/test-repo --pr 39 2>&1)"; RC=$?
+assert_eq "$RC" 5 "exits 5"
+export GH_API_FAIL=""
+
+echo "outside-reviews: a missing --slug or --pr is a usage error"
+new_sandbox
+make_pr_round_env
+copy_tools_with_allowlist
+OUT="$(run_or --pr 39 2>&1)"; RC=$?
+assert_eq "$RC" 2 "exits 2"
+
+echo "pr-round: the round records only the outside reviews no earlier round saw"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+copy_tools_with_allowlist
+outside_fixture
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+PRR="$WS/tools/executable_pr-round.sh" run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+assert_eq "$(jq -c '[.[].id]' "$pd/round-1/outside.json" 2>/dev/null)" '["issue_comment:1","issue_comment:4","inline:10","inline:12","review:21"]' "round 1 records every trusted outside item"
+PRR="$WS/tools/executable_pr-round.sh" run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+assert_eq "$([[ -e "$pd/round-2/outside.json" ]] && printf yes || printf no)" "no" "nothing new, no outside.json"
 
 LIMIT="$(jq -r '.reviewer_background_limit' "$TOOLS/manifest.json")"
 

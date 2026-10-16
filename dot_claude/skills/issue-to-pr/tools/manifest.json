@@ -1,5 +1,6 @@
 {
   "reviewer": "ocr",
   "reviewer_background_limit": 8000,
-  "critic": "subagent"
+  "critic": "subagent",
+  "outside_reviewers": []
 }

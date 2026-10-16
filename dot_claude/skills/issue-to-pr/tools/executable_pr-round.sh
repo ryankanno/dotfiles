@@ -40,8 +40,10 @@
 #                dispositions (read from this loop's own round comments,
 #                each earlier round's comment.md on disk before its PR
 #                copy, unless --dispositions names a file; newest first
-#                within the manifest's reviewer_background_limit), and
-#                the directory path on stdout.
+#                within the manifest's reviewer_background_limit),
+#                outside.json (the allowlisted outside reviews no earlier
+#                round recorded, from outside-reviews.sh) when there are
+#                any, and the directory path on stdout.
 # Exit codes: 0 the round ran; 2 usage, the environment is unusable
 # (HOME unset), or the brief cannot fit the reviewer's background limit,
 # alone or once the standing dispositions assemble into it; 3 identity
@@ -259,6 +261,16 @@ bodies=$(printf '%s\n%s\n' "$disk" "$bodies" | jq -rs '
   | map(select((.n | tostring) as $k | $disk | has($k) | not))
   | . + ($disk | to_entries | map({n: (.key | tonumber), b: .value}))
   | sort_by(.n) | .[] | .b | @json')
+outside_tool=""
+for cand in "$here/outside-reviews.sh" "$here/executable_outside-reviews.sh"; do
+  if [[ -f "$cand" ]]; then outside_tool="$cand"; break; fi
+done
+[[ -n "$outside_tool" ]] || { printf 'outside-reviews.sh not found in %s\n' "$here" >&2; exit 2; }
+outside=$("$outside_tool" --slug "$owner_repo" --pr "$pr" \
+    --seen "$HOME/.cache/pr-loop/$owner_repo/pr-$pr" --before "$((10#$round))") || {
+  printf 'cannot read the outside reviews\n' >&2
+  exit 5
+}
 if [[ -n "$dispositions" ]]; then
   settled=$(cat "$dispositions")
 else
@@ -497,6 +509,7 @@ fi
 
 if [[ -n "$settled" ]]; then printf '%s\n' "$settled" >"$round_dir/settled.md"; fi
 if [[ -n "$prior_findings" ]]; then printf '%s\n' "$prior_findings" >"$round_dir/prior-findings.md"; fi
+if [[ "$(jq 'length' <<<"$outside")" -gt 0 ]]; then printf '%s\n' "$outside" >"$round_dir/outside.json"; fi
 
 # The background was assembled and size-checked in the temp file above,
 # before the round dir was touched; committing it here is safe.
