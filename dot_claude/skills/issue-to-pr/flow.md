@@ -103,6 +103,7 @@ flowchart LR
 | Slot manifest and bindings | `$HOME/.claude/skills/issue-to-pr/tools/` |
 | Leak gate | `$HOME/.claude/skills/issue-to-pr/tools/scan.sh` |
 | Branch-name tool | `$HOME/.claude/skills/issue-to-pr/tools/branch-name.sh` |
+| Round comment (read before the PR copy) | `$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/round-<N>/comment.md` |
 | Finding classifier | `$HOME/.claude/skills/issue-to-pr/tools/finding-scope.sh` |
 | Critic prompt builder | `$HOME/.claude/skills/issue-to-pr/tools/subagent/critic-input.sh` |
 | Round artifacts | `$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/round-<N>/` |

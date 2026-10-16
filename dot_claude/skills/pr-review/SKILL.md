@@ -258,7 +258,9 @@ which only the orchestrator's convergence round writes.
 
 ## 7. Scan before posting
 
-Write the body to a file, never inline. Scan it before it leaves the
+Write the body to `<round-dir>/comment.md`, never inline and never to a
+scratchpad. The next round and pr-refine read this file before the PR,
+so a refine does not wait for the post. Scan it before it leaves the
 machine:
 
 ```bash
@@ -275,7 +277,7 @@ leaked; the blocked post surfaces in the loop's final report.
 ## 8. Post
 
 ```bash
-gh pr comment <n> --body-file <file>
+gh pr comment <n> --body-file <round-dir>/comment.md
 ```
 
 Record the comment URL and the round directory: the final report needs

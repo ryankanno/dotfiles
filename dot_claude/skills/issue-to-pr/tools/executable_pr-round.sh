@@ -37,10 +37,11 @@
 #                files the prior round's reviewer did not finish) when
 #                there are any, which critic-input.sh reads, background.md
 #                when there are prior
-#                dispositions (read from this loop's own round comments
-#                unless --dispositions names a file; newest first within
-#                the manifest's reviewer_background_limit), and the
-#                directory path on stdout.
+#                dispositions (read from this loop's own round comments,
+#                each earlier round's comment.md on disk before its PR
+#                copy, unless --dispositions names a file; newest first
+#                within the manifest's reviewer_background_limit), and
+#                the directory path on stdout.
 # Exit codes: 0 the round ran; 2 usage, the environment is unusable
 # (HOME unset), or the brief cannot fit the reviewer's background limit,
 # alone or once the standing dispositions assemble into it; 3 identity
@@ -212,6 +213,22 @@ bodies=$(gh api --paginate "repos/$owner_repo/issues/$pr/comments" \
 # (issue #58). A comment without the round heading stays.
 bodies=$(jq -c --argjson r "$((10#$round))" \
   'select(((capture("(?m)^## Review round (?<n>[0-9]+):") | .n | tonumber) // 0) < $r)' <<<"$bodies")
+# A round's own comment.md is the scanned text its comment posts, and it
+# exists before anyone posts it: a refine must not wait on the post. The
+# disk copy replaces that round's PR copy; the PR fills rounds with no
+# file. Oldest first, so the last line is the newest earlier round.
+disk='{}'
+for f in "$HOME/.cache/pr-loop/$owner_repo/pr-$pr"/round-*/comment.md; do
+  [[ -f "$f" ]] || continue
+  n="${f%/comment.md}"; n="${n##*/round-}"
+  [[ "$n" =~ ^[0-9]+$ && $((10#$n)) -lt $((10#$round)) ]] || continue
+  disk=$(jq -c --arg k "$((10#$n))" --rawfile b "$f" '. + {($k): $b}' <<<"$disk")
+done
+bodies=$(jq -rs --argjson disk "$disk" '
+  map({n: ((capture("(?m)^## Review round (?<n>[0-9]+):") | .n | tonumber) // 0), b: .})
+  | map(select((.n | tostring) as $k | $disk | has($k) | not))
+  | . + ($disk | to_entries | map({n: (.key | tonumber), b: .value}))
+  | sort_by(.n) | .[] | .b | @json' <<<"$bodies")
 if [[ -n "$dispositions" ]]; then
   settled=$(cat "$dispositions")
 else
