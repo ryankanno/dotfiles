@@ -53,7 +53,32 @@ from=$(jq -r 'if .range.reviewed_from then .range.reviewed_from
              else (.range.base // "") end' "$dir/round.json")
 prior=$(jq -r '.range.prior_head // empty' "$dir/round.json")
 scope=$(jq -r '.range.review_scope // empty' "$dir/round.json")
-diff=$(git -C "$repo" diff --no-color --no-ext-diff "$from" "$head") || {
+
+# A generated file's hunks are its generator's output: the critic reviews
+# the source change that produced them, and drift between the two is the
+# generator's own check. Inlined, one regenerated docs bundle (single-line
+# strings) made the prompt 354 KB, too large to pass to a subagent in one
+# call. A file whose first lines at the head say "do not edit" is generated;
+# its hunks are replaced by one line naming the file and its line count.
+# Binary files already diff as one line and are not read for the marker.
+critic_diff() {  # <from> <to> [paths...]: the diff, generated files noted
+  local a="$1" b="$2" path add del out hdr excl=() notes=""
+  shift 2
+  while IFS=$'\t' read -r add del path; do
+    [[ -n "$path" && "$add" != "-" ]] || continue
+    # Captured, not piped into grep -q: under pipefail an early-exiting grep
+    # kills its upstream with SIGPIPE and a match reads as a miss.
+    hdr=$(git -C "$repo" show "$b:$path" 2>/dev/null | head -3 || true)
+    if grep -qi 'do not edit' <<<"$hdr"; then
+      excl+=(":(exclude,literal)$path")
+      notes+="$path: generated file (its header says do not edit), +$add -$del lines, hunks omitted; review its source change in this diff"$'\n'
+    fi
+  done < <(git -C "$repo" diff --numstat --no-renames "$a" "$b" -- "$@")
+  out=$(git -C "$repo" diff --no-color --no-ext-diff "$a" "$b" -- "${@:-.}" ${excl[@]+"${excl[@]}"}) || return 1
+  printf '%s%s' "$notes" "$out"
+}
+
+diff=$(critic_diff "$from" "$head") || {
   printf 'cannot diff %s..%s\n' "$from" "$head" >&2
   exit 5
 }
@@ -109,7 +134,9 @@ if [[ -s "$dir/prior-unfinished.txt" && "$scope" == delta ]]; then
   base=$(jq -r '.range.base' "$dir/round.json")
   files=()
   while IFS= read -r f; do [[ -n "$f" ]] && files+=("$f"); done <"$dir/prior-unfinished.txt"
-  gap=$(GIT_LITERAL_PATHSPECS=1 git -C "$repo" diff --no-color --no-ext-diff "$base" "$head" -- "${files[@]}") || {
+  literal=()
+  for f in "${files[@]}"; do literal+=(":(literal)$f"); done
+  gap=$(critic_diff "$base" "$head" "${literal[@]}") || {
     printf 'cannot diff the unfinished files %s..%s\n' "$base" "$head" >&2
     exit 5
   }
