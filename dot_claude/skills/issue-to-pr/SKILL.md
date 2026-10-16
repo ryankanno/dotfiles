@@ -18,6 +18,11 @@ the PR's ref range, post the findings as a comment, refine until clean or
 capped at 3 rounds, and end with a report. After intake, everything runs
 unattended; the human gets the report and nothing else.
 
+**The implementer owns every review round; the orchestrator owns the
+verdict.** The orchestrator runs no review; it ratifies the pane's
+rounds (step 6). Two owners of rounds collided in the logs: duplicate
+round comments and `pr-round.sh` exit 6.
+
 The final message of a run IS the report. A future queue runner invokes
 this skill once per task and reads that message. Keep it self-contained.
 
@@ -64,8 +69,7 @@ One interactive moment. Collect and confirm, then go silent:
    rounds, `25000000` tokens) unless the human sets them. A set value
    goes to `pr-round.sh` as `--effort` / `--timeout` / `--max-tools` /
    `--max-tokens-budget` in every round of
-   the loop: your review and convergence rounds, and the implementer's
-   refine rounds through the dispatch prompt.
+   the loop, all run by the implementer through the dispatch prompt.
 6. **The grill.** On or off. On when the task leaves decisions to the
    human (product calls, open questions in the source): the implementer
    writes its plan, then grills it with the human in the workmux window,
@@ -100,7 +104,9 @@ Every step below spells the full `<branch-name>` it printed; there is no
 shorter form to substitute.
 
 An existing PR means a previous run: do not create anything. Verify its
-state and resume the loop at step 5. If the prior run left
+state and resume the loop at step 5. If no pane runs on the worktree,
+reopen it with `workmux open <handle>` and a re-entry prompt that tells
+the implementer to continue its round loop. If the prior run left
 `$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/final-report.md`, read it and
 carry its verdict forward into the resume: a capped-unrecovered resume
 inherits the remaining findings instead of rediscovering them, and a
@@ -146,65 +152,69 @@ gh pr view <n> --json state,headRefName
 The PR counts as verified only if its head is `<branch-name>`. The
 round script re-checks with `--expect-branch` before any review runs.
 
-## 5. The review round
+## 5. The implementer's round loop
 
-Run the review round exactly as `$HOME/.claude/skills/pr-review/SKILL.md`
-defines it, over the PR's ref range. Reviews never touch the checkout's
-`HEAD`.
+The dispatch prompt's "Review rounds" section is the loop: round 1
+after the PR, refine rounds capped at 3, the convergence round after
+a refine (`--convergence`, the whole PR on the final head), then a stop
+state. A clean round 1 is final: it already reviewed the whole PR.
+Round numbers never repeat; `pr-round.sh` exit 6 means a number was
+reused.
 
-## 6. Refine rounds
+Watch the pane with `workmux status` / `capture`. Verify each round's
+push with `gh pr view` and each round's comment on the PR. Never run a
+review round yourself, and never send the pane a round it did not ask
+for.
 
-If the round has findings, send the implementer pane a refine instruction
-naming the PR:
+## 6. Ratification
 
-```bash
-workmux send <handle> "Refine round <N> on PR <n>: run the pr-refine skill."
-```
+Only this skill declares the loop clean or converged, and only on its
+own evidence. When the pane stops, verify every item below. The
+newest round directory is
+`$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/round-<N>/`.
 
-The implementer fixes under TDD, runs the gate, pushes, re-runs the
-review round, and posts the round's comment itself, per
-`$HOME/.claude/skills/pr-refine/SKILL.md`. Watch it with `workmux status` /
-`capture`, and verify each round's push with `gh pr view` before the next
-step.
+1. **The reviewed head is the PR's head.** `range.head` in the newest
+   `round.json` equals `headRefOid` from
+   `gh pr view <n> --json headRefOid`.
+2. **The newest round reviewed the whole PR.** `range.review_scope`
+   starts with `full:`. A `delta`, `none:`, partial or unrecovered
+   round declares nothing.
+3. **The round's comment is on the PR** with the same round number and
+   verdict as `round.json`.
+4. **The gate is green on the PR's code, not your checkout.** Run it in
+   the implementer's worktree (`workmux path <handle>` prints it), after
+   verifying the worktree's HEAD equals the PR's headRefOid
+   (`git -C <worktree> rev-parse HEAD`). A green gate on any other tree
+   declares nothing.
+5. **Every Rejected and Accepted disposition holds.** Read the
+   Dispositions blocks of every round comment. Check each reason
+   against the diff. The author of the code wrote these reasons, so
+   this audit is the loop's independent check.
 
-**Cap: 3 refine rounds.** After a third round with findings remaining,
-stop and report unrecovered.
+Then decide:
 
-**Converged candidate.** When the implementer reports a converged
-candidate (a round whose blocking findings were all low and every one fixed,
-rejected, or accepted with a recorded reason, per pr-refine's value
-brake), send no further refine instructions; go straight to
-convergence. The asymptote ends where the dispositions do.
-
-## 7. Convergence
-
-Only this skill declares the branch clean or converged, and only on its
-own evidence. When the implementer reports clean, a converged
-candidate, or the cap hits, run the full review
-round yourself on the final SHA, and run the gate yourself. Pass
-`--convergence` to `pr-round.sh`: a base merge with no PR change then
-reviews the whole merged PR instead of nothing, so the loop's verdict
-rests on a review of the head it declares. Gate the
-PR's code, not your checkout: run the gate in the implementer's
-worktree (`workmux path <handle>` prints it), after verifying the
-worktree's HEAD equals the PR's headRefOid
-(`git -C <worktree> rev-parse HEAD`). A green gate on any other tree
-declares nothing.
-
-Your round classifies its findings like any other (pr-review step 5):
-on the head the last refine round already reviewed, only a high
-finding blocks.
-
-- both clean: the loop ends clean.
-- blocking findings all low and every one dispositioned: your
-  convergence comment's verdict is `converged (all blocking findings
-  low and dispositioned).` and the loop ends converged, with the
+- All five hold and the newest round (a clean round 1 or the
+  convergence round) is `No issues found.`: the
+  loop ends `clean`.
+- All five hold and the convergence round is `converged (all blocking
+  findings low and dispositioned).`: the loop ends `converged`, with the
   accepted judgment calls listed in the final report.
-- blocking findings otherwise: one more refine round while rounds
-  remain under the cap; when the cap is spent, the loop ends
-  unrecovered, with your findings quoted in the report.
+- A disposition does not hold, and refine rounds remain: send one
+  refine instruction that names the finding and why the reason fails.
+  The pane fixes it, then runs the convergence round again.
 
-## 8. The final report
+  ```bash
+  workmux send <handle> "Refine round <k> on PR <n>: the orchestrator overrules <finding>: <reason>. Run the pr-refine skill on it, then the convergence round."
+  ```
+
+- A disposition does not hold and the cap is spent, or the pane
+  stopped on `cap spent`: the loop ends `capped-unrecovered`, with the
+  remaining findings quoted in the report.
+- Items 1 to 4 fail: send the pane what failed (a stale head, a missing
+  full-PR round, a missing comment). A second failure on the same item
+  ends the loop `blocked`.
+
+## 7. The final report
 
 The last message of the run, verbatim to the future runner:
 
@@ -218,6 +228,8 @@ The last message of the run, verbatim to the future runner:
   `pr-round.sh` exit 4, 5, 6, or 127, or
   a partial or unrecovered reviewer with nothing from any source)
 - per-round one-liners: round number, short SHA, verdict, who ran it
+- the ratification: each item of step 6 and its result, and every
+  disposition you overruled, with the reason
 - the follow-ups from the final round's comment, verbatim: findings on
   reviewed code the loop left for the human
 - the gate: the command and its final printed result
@@ -252,12 +264,6 @@ report; the file is its durable copy, the exact text, no summary layer.
   `--rerun` on your own.
 - **PR creation failed:** capture the pane's error, report blocked. Do
   not redispatch the whole task.
-- **Degraded critic harness:** if your own critic subagent cannot run,
-  relay the critic through the implementer's pane: `workmux send` the
-  critic prompt, and read the findings from its report-back. The
-  commissioned findings still do not create a round: they enter the next
-  round as caller-supplied input, the round numbering never moves, and
-  no partial comment posts.
 
 ## Never
 

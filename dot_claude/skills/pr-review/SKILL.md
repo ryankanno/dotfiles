@@ -13,8 +13,8 @@ description: >-
 
 One review round over a pull request's ref range: the reviewer binding,
 the adversarial critic binding, the caller's own read, one report
-comment. The caller (the issue-to-pr orchestrator, the implementer in a
-refine round, or a human) assembles nothing by hand; this skill defines
+comment. The caller (the implementer in the issue-to-pr loop, which
+runs every round, or a human) assembles nothing by hand; this skill defines
 every step.
 
 Two independent reviews plus the caller's read is the whole point: a
@@ -104,7 +104,7 @@ head's tree equals the baseline's), the round reviews nothing:
 `range.review_scope` starts with `none:`, `runs` is empty,
 `reviewer_complete` is `false`, and nothing is billed. A PR change
 with no added lines (a deletion) is still a change and reviews the
-whole PR. The orchestrator's convergence round passes `--convergence`,
+whole PR. The convergence round passes `--convergence`,
 and the round then reviews the whole PR from the merge base, with the
 scope `full: only a base merge since the prior round`.
 
@@ -254,7 +254,7 @@ the binding ended unrecovered with nothing else to report,
 `**Verdict:** nothing to review (only a base merge since the prior round).`
 when `range.review_scope` starts with `none:`, or
 `**Verdict:** converged (all blocking findings low and dispositioned).`,
-which only the orchestrator's convergence round writes.
+which only a convergence round writes.
 
 ## 7. Scan before posting
 

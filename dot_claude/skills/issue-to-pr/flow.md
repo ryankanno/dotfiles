@@ -22,10 +22,13 @@ gets fixed.
   source ran; the prior round's blocking findings carry forward
   verbatim; the loop cannot declare the branch clean off that round.
 - `converged (all blocking findings low and dispositioned).` — the
-  orchestrator's convergence round only: blocking findings existed,
+  convergence round only: blocking findings existed,
   every one low and fixed,
-  rejected, or accepted with a recorded reason. The loop ends unless a
-  human names a finding.
+  rejected, or accepted with a recorded reason. The loop ends when the
+  orchestrator ratifies it, unless a human names a finding.
+
+**Ownership:** the implementer pane runs every round (round 1, refine,
+convergence). The orchestrator runs none; it ratifies.
 
 **Loop end states** (the final message, the runner's contract): `clean`,
 `converged` (all blocking findings low and dispositioned; accepted
@@ -48,7 +51,7 @@ flowchart TD
     D["Implementer pane<br/>TDD, gate, conventional commits,<br/>push, gh pr create with Closes for gh issues"]
     D --> E{"PR verified and bound<br/>to branch-name?"}
     E -- "no: a real number, someone else's PR" --> X["Blocked: report and stop"]
-    E -- "yes" --> R["Review round<br/>pr-round.sh: range resolved from the PR,<br/>identity check, reviewer binding,<br/>per-commit empty-retry"]
+    E -- "yes" --> R["Review round, run by the pane<br/>pr-round.sh: range resolved from the PR,<br/>identity check, reviewer binding,<br/>per-commit empty-retry"]
     R --> F["Adversarial critic: fresh clean-context subagent<br/>plus the caller's own read"]
     F --> FS["finding-scope.sh per finding:<br/>high or on the delta blocks,<br/>the rest are follow-ups"]
     FS --> G["Assemble the comment per report-template<br/>marker first line, six-state verdict"]
@@ -56,17 +59,20 @@ flowchart TD
     S -- "hit: do not leak" --> Y["Abort the post, record it,<br/>the final report surfaces it"]
     S -- "clean" --> H["Post the round comment<br/>append per round"]
     H --> I{"Verdict"}
-    I -- "No issues found" --> J["Convergence<br/>the orchestrator runs pr-round.sh itself<br/>and gates in the implementer worktree,<br/>after rev-parse HEAD equals headRefOid"]
+    I -- "No issues found, round 1" --> N
+    I -- "No issues found, after a refine" --> J["Convergence round, run by the pane<br/>pr-round.sh --convergence on the same head:<br/>the whole PR from the merge base"]
     I -- "blocking findings" --> K{"Refine rounds<br/>under the cap of 3?"}
-    K -- "yes" --> L["workmux send: run pr-refine<br/>named blocking findings only, one re-run,<br/>validate, value brake, severity gates,<br/>TDD fix, gate, commit, push"]
+    K -- "yes" --> L["The pane runs pr-refine<br/>named blocking findings only, one re-run,<br/>validate, value brake, severity gates,<br/>TDD fix, gate, commit, push"]
     L --> RC{"All blocking findings low<br/>and all dispositioned?"}
     RC -- "yes: converged candidate" --> J
     RC -- "no" --> R
     I -- "partial or unrecovered" --> P["Neither clean nor failing;<br/>nothing to fix, no clean claim"]
     K -- "no" --> M["Capped-unrecovered:<br/>findings remain after 3 rounds"]
-    J --> N{"Convergence round clean<br/>and the gate green?"}
-    N -- "yes" --> O["Clean: the loop ends"]
-    N -- "no" --> K
+    J --> JB{"Convergence round blocking?"}
+    JB -- "yes" --> K
+    JB -- "no: the pane stops" --> N{"Orchestrator ratifies:<br/>round.json head = headRefOid,<br/>review_scope full, comment posted,<br/>gate green in the worktree,<br/>every Rejected/Accepted holds"}
+    N -- "yes" --> O["Clean or converged: the loop ends"]
+    N -- "a disposition fails" --> K
     X --> Z["Final message: the report"]
     Y --> Z
     P --> Z
