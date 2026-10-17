@@ -912,6 +912,19 @@ run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
 assert_eq "$(cat "$pd/round-2/settled.md" 2>/dev/null)" '- Rejected: [critic] disk rejection' "the disk copy settles, the PR copy does not"
 assert_contains "$(cat "$pd/round-2/prior-findings.md" 2>/dev/null)" "disk finding" "the disk copy's findings are the ones answered"
 
+echo "pr-round: a comment on disk that fails the scan is not read"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+round_comment 1 "disk finding" "seen at /var/folders/xy/leak" >"$pd/round-1/comment.md"
+GH_COMMENTS_JSON="$(jq -cn --arg b "$(round_comment 1 "pr finding" "pr rejection")" '[{user: {login: "test-me"}, body: $b}]')"
+export GH_COMMENTS_JSON
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+assert_eq "$(cat "$pd/round-2/settled.md" 2>/dev/null)" '- Rejected: [critic] pr rejection' "the PR copy settles"
+assert_not_contains "$(cat "$pd/round-2/background.md" 2>/dev/null)" "/var/folders/" "the blocked text stays out of the reviewer's background"
+
 echo "pr-round: a round with no comment on disk falls back to the PR's copy"
 new_sandbox
 make_pr_round_env

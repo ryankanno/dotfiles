@@ -120,6 +120,9 @@ for cand in "$here/$reviewer/review.sh" "$here/$reviewer/executable_review.sh"; 
   if [[ -f "$cand" ]]; then review="$cand"; break; fi
 done
 [[ -n "$review" ]] || { printf 'reviewer binding has no review.sh: %s\n' "$reviewer" >&2; exit 2; }
+scan="$here/scan.sh"
+[[ -f "$scan" ]] || scan="$here/executable_scan.sh"
+[[ -f "$scan" ]] || { printf 'scan.sh not found in %s\n' "$here" >&2; exit 2; }
 # ocr aborts on a background over 8000 characters before reviewing
 # anything, and the per-commit retry then repeats the abort once per
 # commit (measured on sudoku PR 191: an 11083-character brief, 15 runs, no
@@ -222,6 +225,9 @@ for f in "$HOME/.cache/pr-loop/$owner_repo/pr-$pr"/round-*/comment.md; do
   [[ -f "$f" ]] || continue
   n="${f%/comment.md}"; n="${n##*/round-}"
   [[ "$n" =~ ^[0-9]+$ && $((10#$n)) -lt $((10#$round)) ]] || continue
+  # A file that failed the scan was never posted, and background.md leaves
+  # the machine through the reviewer: that round falls back to the PR's copy.
+  "$scan" "$f" >/dev/null 2>&1 || continue
   disk=$(jq -c --arg k "$((10#$n))" --rawfile b "$f" '. + {($k): $b}' <<<"$disk")
 done
 bodies=$(jq -rs --argjson disk "$disk" '
