@@ -896,7 +896,7 @@ assert_eq "$(cat "$rd/prior-findings.md" 2>/dev/null)" '1. **[critic] bug/medium
 assert_eq "$(cat "$rd/settled.md" 2>/dev/null)" '- Rejected: [critic] round one rejection' "the rerun settles nothing a later round decided"
 
 round_comment() { # round, finding, rejection -> a round comment body
-  printf '<!-- pr-loop-comment -->\n\n## Review round %s: abc\n\n**Verdict:** 1 finding(s).\n\n**Findings:**\n1. **[critic] bug/medium** `a.sh:1`: %s\n\n<details><summary>Dispositions</summary>\n\n- Rejected: [critic] %s\n\n</details>\n' "$1" "$2" "$3"
+  printf '<!-- pr-loop-comment -->\n\n## Review round %s: abc\n\n**Verdict:** 1 finding(s).\n\n**Findings:**\n1. **[critic] bug/medium** `a.sh:1`: %s\n\n<details><summary>Dispositions</summary>\n\n- Rejected: [critic] %s\n\n</details>\n\n*Round %s | abc | reviewer ocr | critic subagent*\n' "$1" "$2" "$3" "$1"
 }
 
 echo "pr-round: a prior round's comment on disk wins over the PR's copy"
@@ -961,6 +961,18 @@ make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
 pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
 printf '<!-- pr-loop-comment -->\n\n## Review round 1: abc\n\n' >"$pd/round-1/comment.md"
+GH_COMMENTS_JSON="$(jq -cn --arg b "$(round_comment 1 "pr finding" "pr rejection")" '[{user: {login: "test-me"}, body: $b}]')"
+export GH_COMMENTS_JSON
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+assert_eq "$(cat "$pd/round-2/settled.md" 2>/dev/null)" '- Rejected: [critic] pr rejection' "the PR's copy settles"
+
+echo "pr-round: a comment on disk cut off before its footer is not read"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+round_comment 1 "disk finding" "disk rejection" | sed '$d' >"$pd/round-1/comment.md"
 GH_COMMENTS_JSON="$(jq -cn --arg b "$(round_comment 1 "pr finding" "pr rejection")" '[{user: {login: "test-me"}, body: $b}]')"
 export GH_COMMENTS_JSON
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null

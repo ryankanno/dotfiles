@@ -230,12 +230,12 @@ for f in "$HOME/.cache/pr-loop/$owner_repo/pr-$pr"/round-*/comment.md; do
   rc=0; "$scan" "$f" >/dev/null 2>&1 || rc=$?
   [[ $rc -eq 0 || $rc -eq 1 ]] || printf 'scan failed on %s; using the PR copy of round %s\n' "$f" "$((10#$n))" >&2
   [[ $rc -eq 0 ]] || continue
-  # The same contract as a PR copy: the marker on line 1, this round's
-  # heading, and the verdict line every body carries below it, so a file
-  # cut off before its findings or misplaced cannot replace a whole one.
+  # The same contract as a PR copy: the marker on line 1 and this round's
+  # heading; and the template's footer, its last line, so a file cut off
+  # anywhere above it or misplaced cannot replace a whole one.
   [[ "$(head -1 "$f")" == '<!-- pr-loop-comment -->' ]] || continue
   grep -q "^## Review round $((10#$n)):" "$f" || continue
-  grep -q '^\*\*Verdict:\*\*' "$f" || continue
+  grep -q "^\*Round $((10#$n)) |" "$f" || continue
   disk=$(jq -c --arg k "$((10#$n))" --rawfile b "$f" '. + {($k): $b}' <<<"$disk")
 done
 bodies=$(jq -rs --argjson disk "$disk" '
