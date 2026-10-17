@@ -75,7 +75,8 @@ critic_diff() {  # <from> <to> [paths...]: the diff, generated files noted
     hdr=$(git -C "$repo" show "$rev:$path" 2>/dev/null | head -3 || true)
     if grep -qi 'do not edit' <<<"$hdr"; then
       excl+=(":(exclude,literal)$path")
-      notes+="$path: generated file (its header says do not edit), +$add -$del lines, hunks omitted; review its source change in this diff"$'\n'
+      # Escaped, so a newline in the name cannot start a line of its own in the notes.
+      notes+="${path//$'\n'/\\n}: generated file (its header says do not edit), +$add -$del lines, hunks omitted; review its source change in this diff"$'\n'
     fi
   done < <(git -C "$repo" diff --numstat -z --no-renames "$a" "$b" -- "$@")
   out=$(git -C "$repo" diff --no-color --no-ext-diff "$a" "$b" -- "${@:-.}" ${excl[@]+"${excl[@]}"}) || return 1
