@@ -29,6 +29,7 @@
 - When anything fails, the next output is words, not another tool call. State the error, the theory, the proposed action, and the expected outcome. Then wait.
 - Proceed when the next step is low-risk and reversible. Ask first when it is consequential, irreversible, or likely to surprise.
 - Post to GitHub (issues, comments, PR reviews) only on repositories I own. Everywhere else, never post, even if I say yes: write the draft and hand it to me, and I post it. This binds `gh pr review` hardest, since a review carries an approval verdict in my name. Filing issues on my own repos needs no ask.
+- When you start work on an issue or a PR in a repository I own, assign it to me (`gh issue edit <n> --add-assignee @me`, `gh pr edit <n> --add-assignee @me`). This applies to subagents and to agents in other windows that you dispatch. The assignee shows which issues and PRs my agents hold.
 
 ## Tools
 - Python: `uv` + `just`. Node: `pnpm`.
