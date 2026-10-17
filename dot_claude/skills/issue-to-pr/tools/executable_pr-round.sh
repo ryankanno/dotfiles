@@ -227,7 +227,13 @@ for f in "$HOME/.cache/pr-loop/$owner_repo/pr-$pr"/round-*/comment.md; do
   [[ "$n" =~ ^[0-9]+$ && $((10#$n)) -lt $((10#$round)) ]] || continue
   # A file that failed the scan was never posted, and background.md leaves
   # the machine through the reviewer: that round falls back to the PR's copy.
-  "$scan" "$f" >/dev/null 2>&1 || continue
+  rc=0; "$scan" "$f" >/dev/null 2>&1 || rc=$?
+  [[ $rc -eq 2 ]] && printf 'scan failed on %s; using the PR copy of round %s\n' "$f" "$((10#$n))" >&2
+  [[ $rc -eq 0 ]] || continue
+  # The same contract as a PR copy: the marker on line 1 and this round's
+  # heading, so a truncated or misplaced file cannot replace a whole one.
+  [[ "$(head -1 "$f")" == '<!-- pr-loop-comment -->' ]] || continue
+  grep -q "^## Review round $((10#$n)):" "$f" || continue
   disk=$(jq -c --arg k "$((10#$n))" --rawfile b "$f" '. + {($k): $b}' <<<"$disk")
 done
 bodies=$(jq -rs --argjson disk "$disk" '

@@ -925,6 +925,32 @@ run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
 assert_eq "$(cat "$pd/round-2/settled.md" 2>/dev/null)" '- Rejected: [critic] pr rejection' "the PR copy settles"
 assert_not_contains "$(cat "$pd/round-2/background.md" 2>/dev/null)" "/var/folders/" "the blocked text stays out of the reviewer's background"
 
+echo "pr-round: a truncated or misnumbered comment on disk is not read"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+printf -- '- Rejected: [critic] truncated rejection\n' >"$pd/round-1/comment.md"
+round_comment 1 "misnumbered finding" "misnumbered rejection" >"$pd/round-2/comment.md"
+GH_COMMENTS_JSON="$(jq -cn --arg a "$(round_comment 1 "pr one" "pr one rejection")" --arg b "$(round_comment 2 "pr two" "pr two rejection")" '[{user: {login: "test-me"}, body: $a}, {user: {login: "test-me"}, body: $b}]')"
+export GH_COMMENTS_JSON
+run_prr --repo "$repo" --pr 39 --round 3 >/dev/null
+assert_eq "$(cat "$pd/round-3/settled.md" 2>/dev/null)" $'- Rejected: [critic] pr one rejection\n- Rejected: [critic] pr two rejection' "both rounds fall back to the PR's copy"
+
+echo "pr-round: a scan that fails on a disk comment says so"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+round_comment 1 "disk finding" "disk rejection" >"$pd/round-1/comment.md"
+chmod 000 "$pd/round-1/comment.md"
+ERR="$(run_prr --repo "$repo" --pr 39 --round 2 2>&1 >/dev/null)"
+chmod 644 "$pd/round-1/comment.md"
+assert_contains "$ERR" "round-1/comment.md" "the warning names the file"
+
 echo "pr-round: a round with no comment on disk falls back to the PR's copy"
 new_sandbox
 make_pr_round_env
