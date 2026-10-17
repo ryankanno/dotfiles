@@ -67,6 +67,8 @@ critic_diff() {  # <from> <to> [paths...]: the diff, generated files noted
   # NUL-delimited, so a path with a quote, tab or newline arrives unquoted.
   while IFS=$'\t' read -r -d '' add del path; do
     [[ -n "$path" && "$add" != "-" ]] || continue
+    # No lines changed (a mode change): its mode lines are not generator output, so they stay.
+    [[ "$add$del" == 00 ]] && continue
     # A deleted file, or a rename's old path, has no head blob: its marker is at the base.
     rev=$b
     git -C "$repo" cat-file -e "$b:$path" 2>/dev/null || rev=$a
