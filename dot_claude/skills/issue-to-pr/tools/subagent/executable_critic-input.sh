@@ -62,12 +62,13 @@ scope=$(jq -r '.range.review_scope // empty' "$dir/round.json")
 # its hunks are replaced by one line naming the file and its line count.
 # Binary files already diff as one line and are not read for the marker.
 critic_diff() {  # <from> <to> [paths...]: the diff, generated files noted
-  local a="$1" b="$2" path add del out hdr rev excl=() notes=""
+  local a="$1" b="$2" path add del out hdr rev mode excl=() notes=""
   shift 2
   # NUL-delimited, so a path with a quote, tab or newline arrives unquoted.
   while IFS=$'\t' read -r -d '' add del path; do
     [[ -n "$path" && "$add" != "-" ]] || continue
-    # No lines changed (a mode change): its mode lines are not generator output, so they stay.
+    # Mode lines are not generator output: a mode-only change stays in the diff,
+    # and an excluded file's mode change goes into its note.
     [[ "$add$del" == 00 ]] && continue
     # A deleted file, or a rename's old path, has no head blob: its marker is at the base.
     rev=$b
@@ -77,8 +78,10 @@ critic_diff() {  # <from> <to> [paths...]: the diff, generated files noted
     hdr=$(git -C "$repo" show "$rev:$path" 2>/dev/null | head -3 || true)
     if grep -qi 'do not edit' <<<"$hdr"; then
       excl+=(":(exclude,literal)$path")
+      mode=$(git -C "$repo" diff --summary "$a" "$b" -- ":(literal)$path" |
+        sed -n 's/^ mode change \([0-7]*\) => \([0-7]*\) .*/, mode \1 -> \2/p')
       # Escaped, so a newline in the name cannot start a line of its own in the notes.
-      notes+="${path//$'\n'/\\n}: generated file (its header says do not edit), +$add -$del lines, hunks omitted; review its source change in this diff"$'\n'
+      notes+="${path//$'\n'/\\n}: generated file (its header says do not edit), +$add -$del lines$mode, hunks omitted; review its source change in this diff"$'\n'
     fi
   done < <(git -C "$repo" diff --numstat -z --no-renames "$a" "$b" -- "$@")
   out=$(git -C "$repo" diff --no-color --no-ext-diff "$a" "$b" -- "${@:-.}" ${excl[@]+"${excl[@]}"}) || return 1
