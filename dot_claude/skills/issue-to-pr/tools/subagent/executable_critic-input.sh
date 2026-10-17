@@ -145,7 +145,7 @@ if [[ -s "$dir/prior-unfinished.txt" && "$scope" == delta ]]; then
     exit 5
   }
   printf '\n## Files the reviewer did not finish last round\n\n'
-  printf 'The reviewer stopped before finishing these files in the prior round. Any lines of these files that the delta below changes are part of the delta, and the usual rules hold there; the rest of each file sits outside the delta, so rule 3 applies to it: report only high findings there. Their diff (%s..%s -- %s) runs to the next line that starts with "## "; no diff line starts that way.\n\n' \
+  printf 'The reviewer stopped before finishing these files in the prior round. Any lines of these files that the delta below changes are part of the delta, and the usual rules hold there; the rest of each file sits outside the delta, so rule 3 applies to it: report only high findings there. Their diff (%s..%s -- %s) runs to the next line that starts with "## "; no diff line starts that way. Lines before its first "diff --git" line (every line, when it has none) are notes, one per file whose generated hunks it leaves out.\n\n' \
     "$base" "$head" "${files[*]}"
   printf '%s\n' "$gap"
 fi
