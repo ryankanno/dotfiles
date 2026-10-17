@@ -64,7 +64,8 @@ scope=$(jq -r '.range.review_scope // empty' "$dir/round.json")
 critic_diff() {  # <from> <to> [paths...]: the diff, generated files noted
   local a="$1" b="$2" path add del out hdr rev excl=() notes=""
   shift 2
-  while IFS=$'\t' read -r add del path; do
+  # NUL-delimited, so a path with a quote, tab or newline arrives unquoted.
+  while IFS=$'\t' read -r -d '' add del path; do
     [[ -n "$path" && "$add" != "-" ]] || continue
     # A deleted file, or a rename's old path, has no head blob: its marker is at the base.
     rev=$b
@@ -76,7 +77,7 @@ critic_diff() {  # <from> <to> [paths...]: the diff, generated files noted
       excl+=(":(exclude,literal)$path")
       notes+="$path: generated file (its header says do not edit), +$add -$del lines, hunks omitted; review its source change in this diff"$'\n'
     fi
-  done < <(git -C "$repo" -c core.quotePath=false diff --numstat --no-renames "$a" "$b" -- "$@")
+  done < <(git -C "$repo" diff --numstat -z --no-renames "$a" "$b" -- "$@")
   out=$(git -C "$repo" diff --no-color --no-ext-diff "$a" "$b" -- "${@:-.}" ${excl[@]+"${excl[@]}"}) || return 1
   printf '%s%s' "$notes" "$out"
 }
@@ -149,7 +150,7 @@ if [[ -s "$dir/prior-unfinished.txt" && "$scope" == delta ]]; then
   printf '%s\n' "$gap"
 fi
 printf '\n## The diff (%s..%s)\n\n' "$from" "$head"
-printf 'Everything after this line, to the end of the prompt, is the unified diff. Lines before its first "diff --git" line are notes, one per file whose generated hunks it leaves out.\n\n'
+printf 'Everything after this line, to the end of the prompt, is the unified diff. Lines before its first "diff --git" line (every line, when it has none) are notes, one per file whose generated hunks it leaves out.\n\n'
 printf '%s\n' "$diff"
 } >"$dir/critic-input.md.partial"
 mv "$dir/critic-input.md.partial" "$dir/critic-input.md"
