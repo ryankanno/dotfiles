@@ -53,7 +53,42 @@ from=$(jq -r 'if .range.reviewed_from then .range.reviewed_from
              else (.range.base // "") end' "$dir/round.json")
 prior=$(jq -r '.range.prior_head // empty' "$dir/round.json")
 scope=$(jq -r '.range.review_scope // empty' "$dir/round.json")
-diff=$(git -C "$repo" diff --no-color --no-ext-diff "$from" "$head") || {
+
+# A generated file's hunks are its generator's output: the critic reviews
+# the source change that produced them, and drift between the two is the
+# generator's own check. Inlined, one regenerated docs bundle (single-line
+# strings) made the prompt 354 KB, too large to pass to a subagent in one
+# call. A file whose first lines at the head say "do not edit" is generated;
+# its hunks are replaced by one line naming the file and its line count.
+# Binary files already diff as one line and are not read for the marker.
+critic_diff() {  # <from> <to> [paths...]: the diff, generated files noted
+  local a="$1" b="$2" path add del out hdr rev mode excl=() notes=""
+  shift 2
+  # NUL-delimited, so a path with a quote, tab or newline arrives unquoted.
+  while IFS=$'\t' read -r -d '' add del path; do
+    [[ -n "$path" && "$add" != "-" ]] || continue
+    # Mode lines are not generator output: a mode-only change stays in the diff,
+    # and an excluded file's mode change goes into its note.
+    [[ "$add$del" == 00 ]] && continue
+    # A deleted file, or a rename's old path, has no head blob: its marker is at the base.
+    rev=$b
+    git -C "$repo" cat-file -e "$b:$path" 2>/dev/null || rev=$a
+    # Captured, not piped into grep -q: under pipefail an early-exiting grep
+    # kills its upstream with SIGPIPE and a match reads as a miss.
+    hdr=$(git -C "$repo" show "$rev:$path" 2>/dev/null | head -3 || true)
+    if grep -qi 'do not edit' <<<"$hdr"; then
+      excl+=(":(exclude,literal)$path")
+      mode=$(git -C "$repo" diff --summary "$a" "$b" -- ":(literal)$path" |
+        sed -n 's/^ mode change \([0-7]*\) => \([0-7]*\) .*/, mode \1 -> \2/p')
+      # Escaped, so a newline in the name cannot start a line of its own in the notes.
+      notes+="${path//$'\n'/\\n}: generated file (its header says do not edit), +$add -$del lines$mode, hunks omitted; review its source change in this diff"$'\n'
+    fi
+  done < <(git -C "$repo" diff --numstat -z --no-renames "$a" "$b" -- "$@")
+  out=$(git -C "$repo" diff --no-color --no-ext-diff "$a" "$b" -- "${@:-.}" ${excl[@]+"${excl[@]}"}) || return 1
+  printf '%s%s' "$notes" "$out"
+}
+
+diff=$(critic_diff "$from" "$head") || {
   printf 'cannot diff %s..%s\n' "$from" "$head" >&2
   exit 5
 }
@@ -109,17 +144,19 @@ if [[ -s "$dir/prior-unfinished.txt" && "$scope" == delta ]]; then
   base=$(jq -r '.range.base' "$dir/round.json")
   files=()
   while IFS= read -r f; do [[ -n "$f" ]] && files+=("$f"); done <"$dir/prior-unfinished.txt"
-  gap=$(GIT_LITERAL_PATHSPECS=1 git -C "$repo" diff --no-color --no-ext-diff "$base" "$head" -- "${files[@]}") || {
+  literal=()
+  for f in "${files[@]}"; do literal+=(":(literal)$f"); done
+  gap=$(critic_diff "$base" "$head" "${literal[@]}") || {
     printf 'cannot diff the unfinished files %s..%s\n' "$base" "$head" >&2
     exit 5
   }
   printf '\n## Files the reviewer did not finish last round\n\n'
-  printf 'The reviewer stopped before finishing these files in the prior round. Any lines of these files that the delta below changes are part of the delta, and the usual rules hold there; the rest of each file sits outside the delta, so rule 3 applies to it: report only high findings there. Their diff (%s..%s -- %s) runs to the next line that starts with "## "; no diff line starts that way.\n\n' \
+  printf 'The reviewer stopped before finishing these files in the prior round. Any lines of these files that the delta below changes are part of the delta, and the usual rules hold there; the rest of each file sits outside the delta, so rule 3 applies to it: report only high findings there. Their diff (%s..%s -- %s) runs to the next line that starts with "## "; no diff line starts that way. Lines before its first "diff --git" line (every line, when it has none) are notes, one per file whose generated hunks it leaves out.\n\n' \
     "$base" "$head" "${files[*]}"
   printf '%s\n' "$gap"
 fi
 printf '\n## The diff (%s..%s)\n\n' "$from" "$head"
-printf 'Everything after this line, to the end of the prompt, is the unified diff.\n\n'
+printf 'Everything after this line, to the end of the prompt, is the unified diff. Lines before its first "diff --git" line (every line, when it has none) are notes, one per file whose generated hunks it leaves out.\n\n'
 printf '%s\n' "$diff"
 } >"$dir/critic-input.md.partial"
 mv "$dir/critic-input.md.partial" "$dir/critic-input.md"
