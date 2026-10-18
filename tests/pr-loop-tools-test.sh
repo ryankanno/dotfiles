@@ -1016,8 +1016,9 @@ pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
 round_comment 1 "disk finding" "disk rejection" | sed '$d' >"$pd/round-1/comment.md"
 GH_COMMENTS_JSON="$(jq -cn --arg b "$(round_comment 1 "pr finding" "pr rejection")" '[{user: {login: "test-me"}, body: $b}]')"
 export GH_COMMENTS_JSON
-run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+ERR="$(run_prr --repo "$repo" --pr 39 --round 2 2>&1 >/dev/null)"
 assert_eq "$(cat "$pd/round-2/settled.md" 2>/dev/null)" '- Rejected: [critic] pr rejection' "the PR's copy settles"
+assert_contains "$ERR" "not a whole round 1 comment: $pd/round-1/comment.md; using the PR copy" "the skip is said, naming the file"
 
 echo "pr-round: a comment on disk cut off below a quoted footer is not read"
 new_sandbox
@@ -1025,13 +1026,52 @@ make_pr_round_env
 make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
 pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
-round_comment 1 "disk finding" "disk rejection" | sed '$d' | sed '/^\*\*Findings:\*\*/i\
+# The last line is prose, so only a check of the last line, not of any line, rejects it.
+{ round_comment 1 "disk finding" "disk rejection" | sed '/^\*\*Findings:\*\*/i\
 *Round 1 | abc | reviewer ocr | critic subagent*
-' >"$pd/round-1/comment.md"
+' | sed '/^<details><summary>Dispositions/,$d'; printf 'cut off here\n'; } >"$pd/round-1/comment.md"
+GH_COMMENTS_JSON="$(jq -cn --arg b "$(round_comment 1 "pr finding" "pr rejection")" '[{user: {login: "test-me"}, body: $b}]')"
+export GH_COMMENTS_JSON
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+assert_eq "$(tail -n 1 "$pd/round-1/comment.md")" "cut off here" "the fixture ends in prose, not a blank line"
+assert_eq "$(cat "$pd/round-2/settled.md" 2>/dev/null)" '- Rejected: [critic] pr rejection' "the PR's copy settles"
+
+echo "pr-round: a disk comment whose heading names another round is not read"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+round_comment 1 "disk finding" "disk rejection" | sed 's/^## Review round 1:/## Review round 2:/' >"$pd/round-1/comment.md"
 GH_COMMENTS_JSON="$(jq -cn --arg b "$(round_comment 1 "pr finding" "pr rejection")" '[{user: {login: "test-me"}, body: $b}]')"
 export GH_COMMENTS_JSON
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
 assert_eq "$(cat "$pd/round-2/settled.md" 2>/dev/null)" '- Rejected: [critic] pr rejection' "the PR's copy settles"
+
+echo "pr-round: a disk comment whose footer names another round is not read"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+round_comment 1 "disk finding" "disk rejection" | sed 's/^\*Round 1 |/*Round 2 |/' >"$pd/round-1/comment.md"
+GH_COMMENTS_JSON="$(jq -cn --arg b "$(round_comment 1 "pr finding" "pr rejection")" '[{user: {login: "test-me"}, body: $b}]')"
+export GH_COMMENTS_JSON
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+assert_eq "$(cat "$pd/round-2/settled.md" 2>/dev/null)" '- Rejected: [critic] pr rejection' "the PR's copy settles"
+
+echo "pr-round: a disk comment's home path reaches the reviewer as ~"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+round_comment 1 "disk finding" "seen at $WS/home/x" >"$pd/round-1/comment.md"
+GH_COMMENTS_JSON='[]'
+export GH_COMMENTS_JSON
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+assert_contains "$(cat "$pd/round-2/background.md" 2>/dev/null)" "seen at ~/x" "the scan's rewrite reaches the background"
+assert_not_contains "$(cat "$pd/round-2/background.md" 2>/dev/null)" "$WS/home/x" "the home path does not"
 
 echo "pr-round: two rounds on disk both settle, oldest first"
 new_sandbox

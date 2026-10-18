@@ -219,7 +219,8 @@ bodies=$(jq -c --argjson r "$((10#$round))" \
 # A round's own comment.md is the scanned text its comment posts, and it
 # exists before anyone posts it: a refine must not wait on the post. The
 # disk copy replaces that round's PR copy; the PR fills rounds with no
-# file. Oldest first, so the last line is the newest earlier round.
+# file. The merge's sort_by(.n), not this loop's glob order, puts them
+# oldest first, so the last line is the newest earlier round.
 disk='{}'
 for f in "$HOME/.cache/pr-loop/$owner_repo/pr-$pr"/round-*/comment.md; do
   [[ -f "$f" ]] || continue
@@ -230,9 +231,12 @@ for f in "$HOME/.cache/pr-loop/$owner_repo/pr-$pr"/round-*/comment.md; do
   # anywhere above it or misplaced cannot replace a whole one. Checked
   # before the scan, which rewrites the file in place.
   [[ -r "$f" ]] || { printf 'cannot read %s; using the PR copy of round %s\n' "$f" "$((10#$n))" >&2; continue; }
-  [[ "$(head -1 "$f")" == '<!-- pr-loop-comment -->' ]] || continue
-  grep -q "^## Review round $((10#$n)):" "$f" || continue
-  [[ "$(tail -n 1 "$f")" == "*Round $((10#$n)) |"* ]] || continue
+  if [[ "$(head -1 "$f")" != '<!-- pr-loop-comment -->' ]] ||
+     ! grep -q "^## Review round $((10#$n)):" "$f" ||
+     [[ "$(tail -n 1 "$f")" != "*Round $((10#$n)) |"* ]]; then
+    printf 'not a whole round %s comment: %s; using the PR copy\n' "$((10#$n))" "$f" >&2
+    continue
+  fi
   # A file that failed the scan was never posted, and background.md leaves
   # the machine through the reviewer: that round falls back to the PR's copy.
   rc=0; "$scan" "$f" >/dev/null 2>&1 || rc=$?
@@ -242,7 +246,7 @@ for f in "$HOME/.cache/pr-loop/$owner_repo/pr-$pr"/round-*/comment.md; do
     *) printf 'scan failed on %s; using the PR copy of round %s\n' "$f" "$((10#$n))" >&2; continue ;;
   esac
   next=$(jq -c --arg k "$((10#$n))" --rawfile b "$f" '. + {($k): $b}' <<<"$disk") || {
-    printf 'cannot read %s; using the PR copy of round %s\n' "$f" "$((10#$n))" >&2
+    printf 'cannot merge %s; using the PR copy of round %s\n' "$f" "$((10#$n))" >&2
     continue
   }
   disk=$next
