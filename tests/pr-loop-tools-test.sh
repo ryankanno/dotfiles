@@ -595,6 +595,9 @@ case "$1 $2" in
       *) src="${GH_COMMENTS_JSON:-[]}" ;;
     esac
     [[ -z "${GH_API_FAIL:-}" ]] || exit 1
+    [[ -z "${GH_API_FAIL_ON:-}" || "$3" != *"$GH_API_FAIL_ON"* ]] || exit 1
+    # A file is served as it is: too big for the environment, or not JSON.
+    if [[ "$3" == */pulls/*/comments && -n "${GH_INLINE_FILE:-}" ]]; then cat "$GH_INLINE_FILE"; exit 0; fi
     jq -r "${jqexpr:-.}" <<<"$src"
     ;;
   *) exit 64 ;;
@@ -626,7 +629,7 @@ printf '{"status":"%s","session_id":"stub-session","comments":[],"summary":{"tot
 OCRSTUB
   chmod +x "$stub/gh" "$stub/ocr"
   export STUB_RANGE_STATUS=complete STUB_COMMIT_STATUS=complete STUB_FAIL_ON_COMMIT=""
-  export GH_COMMENTS_JSON='[]' GH_INLINE_JSON='[]' GH_REVIEWS_JSON='[]' GH_API_FAIL=""
+  export GH_COMMENTS_JSON='[]' GH_INLINE_JSON='[]' GH_REVIEWS_JSON='[]' GH_API_FAIL="" GH_API_FAIL_ON="" GH_INLINE_FILE=""
   export STUB_GARBAGE="" STUB_WARNINGS="" STUB_COVERAGE_FAILED=""
 }
 
@@ -1204,6 +1207,50 @@ copy_tools_with_allowlist
 OUT="$(run_or --pr 39 2>&1)"; RC=$?
 assert_eq "$RC" 2 "exits 2"
 
+echo "outside-reviews: comments larger than the argument limit still list"
+new_sandbox
+make_pr_round_env
+copy_tools_with_allowlist
+head -c 1100000 /dev/zero | tr '\0' x | jq -Rsc '[{id: 10, user: {login: "review-bot[bot]"}, body: ., path: "a.sh", line: 1}]' >"$WS/inline.json"
+assert_eq "$(( $(wc -c <"$WS/inline.json") > 1100000 ))" 1 "the fixture is over 1.1 MB"
+export GH_INLINE_FILE="$WS/inline.json"
+OUT="$(run_or --slug test-owner/test-repo --pr 39)"; RC=$?
+assert_eq "$RC" 0 "exits 0"
+assert_eq "$(jq -c '[.[].id]' <<<"$OUT")" '["inline:10"]' "the big comment is listed"
+export GH_INLINE_FILE=""
+
+echo "outside-reviews: a reply that is not JSON exits 5"
+new_sandbox
+make_pr_round_env
+copy_tools_with_allowlist
+printf 'not json\n' >"$WS/inline.json"
+export GH_INLINE_FILE="$WS/inline.json"
+OUT="$(run_or --slug test-owner/test-repo --pr 39 2>&1)"; RC=$?
+assert_eq "$RC" 5 "exits 5"
+assert_contains "$OUT" "cannot parse pulls/39/comments" "the bad reply is named"
+export GH_INLINE_FILE=""
+
+echo "outside-reviews: the allowlist matches a login in any case"
+new_sandbox
+make_pr_round_env
+cp -R "$TOOLS" "$WS/tools"
+jq '.outside_reviewers = ["Review-Bot[bot]"]' "$TOOLS/manifest.json" >"$WS/tools/manifest.json"
+outside_fixture
+OUT="$(run_or --slug test-owner/test-repo --pr 39)"
+assert_contains "$(jq -c '[.[].id]' <<<"$OUT")" '"inline:10"' "Review-Bot[bot] on the list admits review-bot[bot]"
+
+echo "outside-reviews: an earlier round's outside.json that does not parse says so"
+new_sandbox
+make_pr_round_env
+copy_tools_with_allowlist
+outside_fixture
+pd="$WS/seen/pr-39"
+mkdir -p "$pd/round-1"
+printf '[{"id":"inline:10"' >"$pd/round-1/outside.json"
+OUT="$(run_or --slug test-owner/test-repo --pr 39 --seen "$pd" 2>&1 >/dev/null)"; RC=$?
+assert_eq "$RC" 0 "exits 0"
+assert_contains "$OUT" "cannot read $pd/round-1/outside.json; its items count as unseen" "the warning names the file"
+
 echo "pr-round: the round records only the outside reviews no earlier round saw"
 new_sandbox
 make_pr_round_env
@@ -1211,10 +1258,28 @@ make_fixture_repo
 copy_tools_with_allowlist
 outside_fixture
 pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
-PRR="$WS/tools/executable_pr-round.sh" run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+RC=0; PRR="$WS/tools/executable_pr-round.sh" run_prr --repo "$repo" --pr 39 --round 1 >/dev/null || RC=$?
+assert_eq "$RC" 0 "round 1 runs"
 assert_eq "$(jq -c '[.[].id]' "$pd/round-1/outside.json" 2>/dev/null)" '["issue_comment:1","issue_comment:4","inline:10","inline:12","review:21"]' "round 1 records every trusted outside item"
-PRR="$WS/tools/executable_pr-round.sh" run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
-assert_eq "$([[ -e "$pd/round-2/outside.json" ]] && printf yes || printf no)" "no" "nothing new, no outside.json"
+GH_INLINE_JSON="$(jq -c '. + [{id: 13, user: {login: "review-bot[bot]"}, body: "new inline", path: "a.sh", line: 2}]' <<<"$GH_INLINE_JSON")"
+export GH_INLINE_JSON
+RC=0; PRR="$WS/tools/executable_pr-round.sh" run_prr --repo "$repo" --pr 39 --round 2 >/dev/null || RC=$?
+assert_eq "$RC" 0 "round 2 runs"
+assert_eq "$(jq -c '[.[].id]' "$pd/round-2/outside.json" 2>/dev/null)" '["inline:13"]' "round 2 records only the new item"
+RC=0; PRR="$WS/tools/executable_pr-round.sh" run_prr --repo "$repo" --pr 39 --round 3 >/dev/null || RC=$?
+assert_eq "$RC" 0 "round 3 runs"
+assert_eq "$([[ -e "$pd/round-3/outside.json" ]] && printf yes || printf no)" "no" "nothing new, no outside.json"
+
+echo "pr-round: a failed outside read stops the round with exit 5"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+copy_tools_with_allowlist
+export GH_API_FAIL_ON="/pulls/"
+RC=0; ERR="$(PRR="$WS/tools/executable_pr-round.sh" run_prr --repo "$repo" --pr 39 --round 1 2>&1 >/dev/null)" || RC=$?
+export GH_API_FAIL_ON=""
+assert_eq "$RC" 5 "exits 5"
+assert_contains "$ERR" "cannot read the outside reviews" "the outside read is named"
 
 LIMIT="$(jq -r '.reviewer_background_limit' "$TOOLS/manifest.json")"
 
@@ -1677,6 +1742,24 @@ assert_json '.reviewer_complete == false' "$rd/round.json" "nothing reviewed is 
 assert_json '.round_tokens == 0' "$rd/round.json" "nothing billed"
 assert_eq "$(jq -r '.range.head' "$rd/round.json")" "$FR_MERGE" "the next round chains from the merged head"
 assert_contains "$(cat "$rd/prior-findings.md")" "the finding still standing" "the prior round's findings carry forward"
+
+echo "pr-round: a base merge round leaves its outside reviews for the next round"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+copy_tools_with_allowlist
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+PRR="$WS/tools/executable_pr-round.sh" run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+outside_fixture
+merge_base_into_head
+RC=0; PRR="$WS/tools/executable_pr-round.sh" run_prr --repo "$repo" --pr 39 --round 2 >/dev/null || RC=$?
+assert_eq "$RC" 0 "round 2 runs"
+assert_eq "$(jq -r '.range.review_scope' "$pd/round-2/round.json")" "none: the PR's own code did not change since the prior round (a base merge only)" "round 2 reviews nothing"
+assert_eq "$([[ -e "$pd/round-2/outside.json" ]] && printf yes || printf no)" "no" "a round with no caller read records no outside item"
+advance_head g.txt 'new\n'
+RC=0; PRR="$WS/tools/executable_pr-round.sh" run_prr --repo "$repo" --pr 39 --round 3 >/dev/null || RC=$?
+assert_eq "$RC" 0 "round 3 runs"
+assert_contains "$(jq -c '[.[].id]' "$pd/round-3/outside.json" 2>/dev/null)" '"inline:10"' "the next reviewed round still lists them"
 
 echo "pr-round: a base-merge-only round carries the prior round's unfinished files forward"
 new_sandbox

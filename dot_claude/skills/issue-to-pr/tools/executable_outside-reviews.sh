@@ -46,14 +46,15 @@ allow=$(jq -c '.outside_reviewers // []' "$here/manifest.json") || {
   exit 2
 }
 me=$(gh api user --jq .login) || { printf 'cannot resolve the gh user\n' >&2; exit 5; }
-allow=$(jq -c --arg me "$me" '. + [$me] | unique' <<<"$allow")
+# GitHub logins are case-insensitive, and the allowlist is typed by hand.
+allow=$(jq -c --arg me "$me" '. + [$me] | map(ascii_downcase) | unique' <<<"$allow")
 
 # --paginate prints one array per page; slurping and adding joins them. A
 # failed read exits 5: an empty list would read as "no outside reviews".
 fetch() { # endpoint -> one JSON array
   local raw
   raw=$(gh api --paginate "repos/$slug/$1") || { printf 'cannot read %s\n' "$1" >&2; exit 5; }
-  jq -cs 'add // []' <<<"$raw"
+  jq -cs 'add // []' <<<"$raw" || { printf 'cannot parse %s\n' "$1" >&2; exit 5; }
 }
 issue=$(fetch "issues/$pr/comments")
 inline=$(fetch "pulls/$pr/comments")
@@ -66,17 +67,22 @@ if [[ -n "$seen" ]]; then
     n="${f%/outside.json}"; n="${n##*/round-}"
     [[ "$n" =~ ^[0-9]+$ ]] || continue
     if [[ -n "$before" && $((10#$n)) -ge $((10#$before)) ]]; then continue; fi
-    seen_ids=$(jq -c --argjson s "$seen_ids" '$s + [.[].id]' "$f" 2>/dev/null || printf '%s' "$seen_ids")
+    next=$(jq -c --argjson s "$seen_ids" '$s + [.[].id]' "$f" 2>/dev/null) || {
+      printf 'cannot read %s; its items count as unseen\n' "$f" >&2
+      continue
+    }
+    seen_ids=$next
   done
 fi
 
-jq -n --argjson allow "$allow" --argjson seen "$seen_ids" \
-      --argjson issue "$issue" --argjson inline "$inline" --argjson reviews "$reviews" '
+# The PR's comments ride on stdin, never in an argument: on a long PR they
+# outgrow the exec argument limit.
+printf '%s\n%s\n%s\n' "$issue" "$inline" "$reviews" | jq -s --argjson allow "$allow" --argjson seen "$seen_ids" '
   def item($kind): {id: "\($kind):\(.id)", kind: $kind, login: .user.login,
                     path: (.path // null), line: (.line // .original_line // null),
                     body: .body, url: (.html_url // null)};
-  [($issue[] | item("issue_comment")), ($inline[] | item("inline")), ($reviews[] | item("review"))]
-  | map(select(.login as $l | $allow | index($l)))
+  [(.[0][] | item("issue_comment")), (.[1][] | item("inline")), (.[2][] | item("review"))]
+  | map(select((.login // "" | ascii_downcase) as $l | $allow | index($l)))
   | map(select((.body // "") | length > 0))
   | map(select(.body | startswith("<!-- pr-loop-comment -->") | not))
   | map(select(.id as $i | $seen | index($i) | not))'

@@ -509,7 +509,6 @@ fi
 
 if [[ -n "$settled" ]]; then printf '%s\n' "$settled" >"$round_dir/settled.md"; fi
 if [[ -n "$prior_findings" ]]; then printf '%s\n' "$prior_findings" >"$round_dir/prior-findings.md"; fi
-if [[ "$(jq 'length' <<<"$outside")" -gt 0 ]]; then printf '%s\n' "$outside" >"$round_dir/outside.json"; fi
 
 # The background was assembled and size-checked in the temp file above,
 # before the round dir was touched; committing it here is safe.
@@ -590,6 +589,11 @@ if [[ "$scope" == delta && -z "$delta" ]]; then
   else
     scope="full: no change since the prior round"
   fi
+fi
+# A round that reviews nothing has no caller read, so its outside reviews
+# stay unrecorded for the next round to list.
+if [[ "$scope" != none:* && "$(jq 'length' <<<"$outside")" -gt 0 ]]; then
+  printf '%s\n' "$outside" >"$round_dir/outside.json"
 fi
 
 range_status=none
