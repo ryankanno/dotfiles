@@ -978,6 +978,20 @@ export GH_COMMENTS_JSON
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
 assert_eq "$(cat "$pd/round-2/settled.md" 2>/dev/null)" '- Rejected: [critic] pr rejection' "the PR's copy settles"
 
+echo "pr-round: a comment on disk cut off below a quoted footer is not read"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+round_comment 1 "disk finding" "disk rejection" | sed '$d' | sed '/^\*\*Findings:\*\*/i\
+*Round 1 | abc | reviewer ocr | critic subagent*
+' >"$pd/round-1/comment.md"
+GH_COMMENTS_JSON="$(jq -cn --arg b "$(round_comment 1 "pr finding" "pr rejection")" '[{user: {login: "test-me"}, body: $b}]')"
+export GH_COMMENTS_JSON
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+assert_eq "$(cat "$pd/round-2/settled.md" 2>/dev/null)" '- Rejected: [critic] pr rejection' "the PR's copy settles"
+
 echo "pr-round: two rounds on disk both settle, oldest first"
 new_sandbox
 make_pr_round_env

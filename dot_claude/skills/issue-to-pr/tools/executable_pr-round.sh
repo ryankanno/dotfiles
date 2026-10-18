@@ -235,7 +235,7 @@ for f in "$HOME/.cache/pr-loop/$owner_repo/pr-$pr"/round-*/comment.md; do
   # anywhere above it or misplaced cannot replace a whole one.
   [[ "$(head -1 "$f")" == '<!-- pr-loop-comment -->' ]] || continue
   grep -q "^## Review round $((10#$n)):" "$f" || continue
-  grep -q "^\*Round $((10#$n)) |" "$f" || continue
+  [[ "$(tail -n 1 "$f")" == "*Round $((10#$n)) |"* ]] || continue
   next=$(jq -c --arg k "$((10#$n))" --rawfile b "$f" '. + {($k): $b}' <<<"$disk") || {
     printf 'cannot read %s; using the PR copy of round %s\n' "$f" "$((10#$n))" >&2
     continue
