@@ -978,6 +978,34 @@ export GH_COMMENTS_JSON
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
 assert_eq "$(cat "$pd/round-2/settled.md" 2>/dev/null)" '- Rejected: [critic] pr rejection' "the PR's copy settles"
 
+echo "pr-round: two rounds on disk both settle, oldest first"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+round_comment 1 "disk one" "disk one rejection" >"$pd/round-1/comment.md"
+round_comment 2 "disk two" "disk two rejection" >"$pd/round-2/comment.md"
+GH_COMMENTS_JSON='[]'
+export GH_COMMENTS_JSON
+run_prr --repo "$repo" --pr 39 --round 3 >/dev/null
+assert_eq "$(cat "$pd/round-3/settled.md" 2>/dev/null)" $'- Rejected: [critic] disk one rejection\n- Rejected: [critic] disk two rejection' "both disk rounds settle, oldest first"
+assert_contains "$(cat "$pd/round-3/prior-findings.md" 2>/dev/null)" "disk two" "the newest disk round's findings are the ones answered"
+
+echo "pr-round: disk comments larger than the argument limit still merge"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+{ round_comment 1 "big finding" "big rejection" | sed '$d'; head -c 1100000 /dev/zero | tr '\0' x; printf '\n\n*Round 1 | abc | reviewer ocr | critic subagent*\n'; } >"$pd/round-1/comment.md"
+GH_COMMENTS_JSON='[]'
+export GH_COMMENTS_JSON
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null; RC=$?
+assert_eq "$RC" 0 "the round runs"
+assert_eq "$(cat "$pd/round-2/settled.md" 2>/dev/null)" '- Rejected: [critic] big rejection' "the big disk copy settles"
+
 echo "pr-round: a round with no comment on disk falls back to the PR's copy"
 new_sandbox
 make_pr_round_env

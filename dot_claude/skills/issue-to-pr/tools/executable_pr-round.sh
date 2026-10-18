@@ -236,13 +236,20 @@ for f in "$HOME/.cache/pr-loop/$owner_repo/pr-$pr"/round-*/comment.md; do
   [[ "$(head -1 "$f")" == '<!-- pr-loop-comment -->' ]] || continue
   grep -q "^## Review round $((10#$n)):" "$f" || continue
   grep -q "^\*Round $((10#$n)) |" "$f" || continue
-  disk=$(jq -c --arg k "$((10#$n))" --rawfile b "$f" '. + {($k): $b}' <<<"$disk")
+  next=$(jq -c --arg k "$((10#$n))" --rawfile b "$f" '. + {($k): $b}' <<<"$disk") || {
+    printf 'cannot read %s; using the PR copy of round %s\n' "$f" "$((10#$n))" >&2
+    continue
+  }
+  disk=$next
 done
-bodies=$(jq -rs --argjson disk "$disk" '
-  map({n: ((capture("(?m)^## Review round (?<n>[0-9]+):") | .n | tonumber) // 0), b: .})
+# The disk bodies ride on stdin ahead of the PR's, never in an argument:
+# every earlier round's body together outgrows the exec argument limit.
+bodies=$(printf '%s\n%s\n' "$disk" "$bodies" | jq -rs '
+  .[0] as $disk | .[1:]
+  | map({n: ((capture("(?m)^## Review round (?<n>[0-9]+):") | .n | tonumber) // 0), b: .})
   | map(select((.n | tostring) as $k | $disk | has($k) | not))
   | . + ($disk | to_entries | map({n: (.key | tonumber), b: .value}))
-  | sort_by(.n) | .[] | .b | @json' <<<"$bodies")
+  | sort_by(.n) | .[] | .b | @json')
 if [[ -n "$dispositions" ]]; then
   settled=$(cat "$dispositions")
 else
