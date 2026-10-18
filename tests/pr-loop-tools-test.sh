@@ -945,9 +945,10 @@ make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
 pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
 printf '<!-- pr-loop-comment -->\n\n## Review round 1: abc\n\nwritten under %s/x\n' "$WS/home" >"$pd/round-1/comment.md"
-before="$(cat "$pd/round-1/comment.md")"
-run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
-assert_eq "$(cat "$pd/round-1/comment.md")" "$before" "the unfinished file is left as it was"
+cp "$pd/round-1/comment.md" "$WS/before.md"
+RC=0; run_prr --repo "$repo" --pr 39 --round 2 >/dev/null || RC=$?
+assert_eq "$RC" 0 "the round runs"
+assert_eq "$(cmp -s "$pd/round-1/comment.md" "$WS/before.md" && printf same || printf differs)" same "the unfinished file is left as it was, byte for byte"
 
 echo "pr-round: a truncated or misnumbered comment on disk is not read"
 new_sandbox
@@ -976,6 +977,22 @@ chmod 000 "$pd/round-1/comment.md"
 ERR="$(run_prr --repo "$repo" --pr 39 --round 2 2>&1 >/dev/null)"
 chmod 644 "$pd/round-1/comment.md"
 assert_contains "$ERR" "cannot read $pd/round-1/comment.md; using the PR copy of round 1" "the warning names the file"
+assert_eq "$(cat "$pd/round-2/settled.md" 2>/dev/null)" '- Rejected: [critic] pr rejection' "the round falls back to the PR's copy"
+
+echo "pr-round: a scan that fails on a disk comment says so"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+round_comment 1 "disk finding" "disk rejection" >"$pd/round-1/comment.md"
+GH_COMMENTS_JSON="$(jq -cn --arg b "$(round_comment 1 "pr finding" "pr rejection")" '[{user: {login: "test-me"}, body: $b}]')"
+export GH_COMMENTS_JSON
+# A read-only round folder: scan.sh cannot stage its rewrite there and exits 2.
+chmod 555 "$pd/round-1"
+ERR="$(run_prr --repo "$repo" --pr 39 --round 2 2>&1 >/dev/null)"
+chmod 755 "$pd/round-1"
+assert_contains "$ERR" "scan failed on $pd/round-1/comment.md; using the PR copy of round 1" "the scan failure is said"
 assert_eq "$(cat "$pd/round-2/settled.md" 2>/dev/null)" '- Rejected: [critic] pr rejection' "the round falls back to the PR's copy"
 
 echo "pr-round: a comment on disk cut off after its heading is not read"
