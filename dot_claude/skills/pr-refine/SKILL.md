@@ -55,12 +55,13 @@ The objective is the reader's value, not the critic's zero.
 Read the newest round from disk first: `comment.md` in the newest
 `$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/round-<N>/` that has a
 `round.json`. That file is the scanned text the round posts, and it
-exists before the post, so the refine never waits for one. Run
-`$HOME/.claude/skills/issue-to-pr/tools/scan.sh` on it first. The next
-round's `pr-round.sh` skips a file that fails the scan, lacks the marker
-`<!-- pr-loop-comment -->` on line 1, or lacks the `## Review round <N>:`
-heading for its folder, or lacks the template's last line,
-`*Round <N> | ...*`; treat that round as having no `comment.md`.
+exists before the post, so the refine never waits for one. The next
+round's `pr-round.sh` skips a file that lacks the marker
+`<!-- pr-loop-comment -->` on line 1, the `## Review round <N>:` heading
+for its folder, or the template's last line, `*Round <N> | ...*`, or
+that then fails `$HOME/.claude/skills/issue-to-pr/tools/scan.sh`. Check
+it the same way, in that order; when it fails, treat that round as
+having no `comment.md`.
 
 When that round has no `comment.md`, select the newest matching comment
 on the PR: its first line is the marker `<!-- pr-loop-comment -->` and

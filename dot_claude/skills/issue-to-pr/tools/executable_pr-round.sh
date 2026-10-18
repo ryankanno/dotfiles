@@ -225,17 +225,22 @@ for f in "$HOME/.cache/pr-loop/$owner_repo/pr-$pr"/round-*/comment.md; do
   [[ -f "$f" ]] || continue
   n="${f%/comment.md}"; n="${n##*/round-}"
   [[ "$n" =~ ^[0-9]+$ && $((10#$n)) -lt $((10#$round)) ]] || continue
-  # A file that failed the scan was never posted, and background.md leaves
-  # the machine through the reviewer: that round falls back to the PR's copy.
-  rc=0; "$scan" "$f" >/dev/null 2>&1 || rc=$?
-  [[ $rc -eq 0 || $rc -eq 1 ]] || printf 'scan failed on %s; using the PR copy of round %s\n' "$f" "$((10#$n))" >&2
-  [[ $rc -eq 0 ]] || continue
   # The same contract as a PR copy: the marker on line 1 and this round's
   # heading; and the template's footer, its last line, so a file cut off
-  # anywhere above it or misplaced cannot replace a whole one.
+  # anywhere above it or misplaced cannot replace a whole one. Checked
+  # before the scan, which rewrites the file in place.
+  [[ -r "$f" ]] || { printf 'cannot read %s; using the PR copy of round %s\n' "$f" "$((10#$n))" >&2; continue; }
   [[ "$(head -1 "$f")" == '<!-- pr-loop-comment -->' ]] || continue
   grep -q "^## Review round $((10#$n)):" "$f" || continue
   [[ "$(tail -n 1 "$f")" == "*Round $((10#$n)) |"* ]] || continue
+  # A file that failed the scan was never posted, and background.md leaves
+  # the machine through the reviewer: that round falls back to the PR's copy.
+  rc=0; "$scan" "$f" >/dev/null 2>&1 || rc=$?
+  case $rc in
+    0) ;;
+    1) printf 'scan hits in %s; using the PR copy of round %s\n' "$f" "$((10#$n))" >&2; continue ;;
+    *) printf 'scan failed on %s; using the PR copy of round %s\n' "$f" "$((10#$n))" >&2; continue ;;
+  esac
   next=$(jq -c --arg k "$((10#$n))" --rawfile b "$f" '. + {($k): $b}' <<<"$disk") || {
     printf 'cannot read %s; using the PR copy of round %s\n' "$f" "$((10#$n))" >&2
     continue

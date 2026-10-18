@@ -921,9 +921,33 @@ pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
 round_comment 1 "disk finding" "seen at /var/folders/xy/leak" >"$pd/round-1/comment.md"
 GH_COMMENTS_JSON="$(jq -cn --arg b "$(round_comment 1 "pr finding" "pr rejection")" '[{user: {login: "test-me"}, body: $b}]')"
 export GH_COMMENTS_JSON
-run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+ERR="$(run_prr --repo "$repo" --pr 39 --round 2 2>&1 >/dev/null)"
 assert_eq "$(cat "$pd/round-2/settled.md" 2>/dev/null)" '- Rejected: [critic] pr rejection' "the PR copy settles"
 assert_not_contains "$(cat "$pd/round-2/background.md" 2>/dev/null)" "/var/folders/" "the blocked text stays out of the reviewer's background"
+assert_contains "$ERR" "scan hits in $pd/round-1/comment.md; using the PR copy of round 1" "the scan hit is said, naming the file"
+
+echo "pr-round: a comment on disk without the marker on line 1 is not read"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+round_comment 1 "disk finding" "disk rejection" | sed '1s/.*/<!-- quoted -->/' >"$pd/round-1/comment.md"
+GH_COMMENTS_JSON="$(jq -cn --arg b "$(round_comment 1 "pr finding" "pr rejection")" '[{user: {login: "test-me"}, body: $b}]')"
+export GH_COMMENTS_JSON
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+assert_eq "$(cat "$pd/round-2/settled.md" 2>/dev/null)" '- Rejected: [critic] pr rejection' "the PR copy settles"
+
+echo "pr-round: a comment on disk that fails the shape checks is never rewritten by the scan"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+printf '<!-- pr-loop-comment -->\n\n## Review round 1: abc\n\nwritten under %s/x\n' "$WS/home" >"$pd/round-1/comment.md"
+before="$(cat "$pd/round-1/comment.md")"
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+assert_eq "$(cat "$pd/round-1/comment.md")" "$before" "the unfinished file is left as it was"
 
 echo "pr-round: a truncated or misnumbered comment on disk is not read"
 new_sandbox
@@ -939,7 +963,7 @@ export GH_COMMENTS_JSON
 run_prr --repo "$repo" --pr 39 --round 3 >/dev/null
 assert_eq "$(cat "$pd/round-3/settled.md" 2>/dev/null)" $'- Rejected: [critic] pr one rejection\n- Rejected: [critic] pr two rejection' "both rounds fall back to the PR's copy"
 
-echo "pr-round: a scan that fails on a disk comment says so"
+echo "pr-round: an unreadable comment on disk says so"
 new_sandbox
 make_pr_round_env
 make_fixture_repo
@@ -951,7 +975,7 @@ export GH_COMMENTS_JSON
 chmod 000 "$pd/round-1/comment.md"
 ERR="$(run_prr --repo "$repo" --pr 39 --round 2 2>&1 >/dev/null)"
 chmod 644 "$pd/round-1/comment.md"
-assert_contains "$ERR" "round-1/comment.md" "the warning names the file"
+assert_contains "$ERR" "cannot read $pd/round-1/comment.md; using the PR copy of round 1" "the warning names the file"
 assert_eq "$(cat "$pd/round-2/settled.md" 2>/dev/null)" '- Rejected: [critic] pr rejection' "the round falls back to the PR's copy"
 
 echo "pr-round: a comment on disk cut off after its heading is not read"
