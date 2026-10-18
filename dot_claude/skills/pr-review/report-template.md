@@ -130,6 +130,8 @@ blocks when they contain markup.
 
 ## Scan before posting
 
+Write the body to `<round-dir>/comment.md`, never a temp folder: the next round and /pr-refine read it there before the PR.
+
 ```bash
 $HOME/.claude/skills/issue-to-pr/tools/scan.sh <file>
 ```

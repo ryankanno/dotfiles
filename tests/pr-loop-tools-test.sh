@@ -895,6 +895,238 @@ rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
 assert_eq "$(cat "$rd/prior-findings.md" 2>/dev/null)" '1. **[critic] bug/medium** `a.sh:1`: round one finding' "the rerun answers round 1's findings"
 assert_eq "$(cat "$rd/settled.md" 2>/dev/null)" '- Rejected: [critic] round one rejection' "the rerun settles nothing a later round decided"
 
+round_comment() { # round, finding, rejection -> a round comment body
+  printf '<!-- pr-loop-comment -->\n\n## Review round %s: abc\n\n**Verdict:** 1 finding(s).\n\n**Findings:**\n1. **[critic] bug/medium** `a.sh:1`: %s\n\n<details><summary>Dispositions</summary>\n\n- Rejected: [critic] %s\n\n</details>\n\n*Round %s | abc | reviewer ocr | critic subagent*\n' "$1" "$2" "$3" "$1"
+}
+
+echo "pr-round: a prior round's comment on disk wins over the PR's copy"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+round_comment 1 "disk finding" "disk rejection" >"$pd/round-1/comment.md"
+GH_COMMENTS_JSON="$(jq -cn --arg b "$(round_comment 1 "pr finding" "pr rejection")" '[{user: {login: "test-me"}, body: $b}]')"
+export GH_COMMENTS_JSON
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+assert_eq "$(cat "$pd/round-2/settled.md" 2>/dev/null)" '- Rejected: [critic] disk rejection' "the disk copy settles, the PR copy does not"
+assert_contains "$(cat "$pd/round-2/prior-findings.md" 2>/dev/null)" "disk finding" "the disk copy's findings are the ones answered"
+
+echo "pr-round: a comment on disk that fails the scan is not read"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+round_comment 1 "disk finding" "seen at /var/folders/xy/leak" >"$pd/round-1/comment.md"
+GH_COMMENTS_JSON="$(jq -cn --arg b "$(round_comment 1 "pr finding" "pr rejection")" '[{user: {login: "test-me"}, body: $b}]')"
+export GH_COMMENTS_JSON
+ERR="$(run_prr --repo "$repo" --pr 39 --round 2 2>&1 >/dev/null)"
+assert_eq "$(cat "$pd/round-2/settled.md" 2>/dev/null)" '- Rejected: [critic] pr rejection' "the PR copy settles"
+assert_not_contains "$(cat "$pd/round-2/background.md" 2>/dev/null)" "/var/folders/" "the blocked text stays out of the reviewer's background"
+assert_contains "$ERR" "scan hits in $pd/round-1/comment.md; using the PR copy of round 1" "the scan hit is said, naming the file"
+
+echo "pr-round: a comment on disk without the marker on line 1 is not read"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+round_comment 1 "disk finding" "disk rejection" | sed '1s/.*/<!-- quoted -->/' >"$pd/round-1/comment.md"
+GH_COMMENTS_JSON="$(jq -cn --arg b "$(round_comment 1 "pr finding" "pr rejection")" '[{user: {login: "test-me"}, body: $b}]')"
+export GH_COMMENTS_JSON
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+assert_eq "$(cat "$pd/round-2/settled.md" 2>/dev/null)" '- Rejected: [critic] pr rejection' "the PR copy settles"
+
+echo "pr-round: a comment on disk that fails the shape checks is never rewritten by the scan"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+printf '<!-- pr-loop-comment -->\n\n## Review round 1: abc\n\nwritten under %s/x\n' "$WS/home" >"$pd/round-1/comment.md"
+cp "$pd/round-1/comment.md" "$WS/before.md"
+RC=0; run_prr --repo "$repo" --pr 39 --round 2 >/dev/null || RC=$?
+assert_eq "$RC" 0 "the round runs"
+assert_eq "$(cmp -s "$pd/round-1/comment.md" "$WS/before.md" && printf same || printf differs)" same "the unfinished file is left as it was, byte for byte"
+
+echo "pr-round: a truncated or misnumbered comment on disk is not read"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+printf -- '- Rejected: [critic] truncated rejection\n' >"$pd/round-1/comment.md"
+round_comment 1 "misnumbered finding" "misnumbered rejection" >"$pd/round-2/comment.md"
+GH_COMMENTS_JSON="$(jq -cn --arg a "$(round_comment 1 "pr one" "pr one rejection")" --arg b "$(round_comment 2 "pr two" "pr two rejection")" '[{user: {login: "test-me"}, body: $a}, {user: {login: "test-me"}, body: $b}]')"
+export GH_COMMENTS_JSON
+run_prr --repo "$repo" --pr 39 --round 3 >/dev/null
+assert_eq "$(cat "$pd/round-3/settled.md" 2>/dev/null)" $'- Rejected: [critic] pr one rejection\n- Rejected: [critic] pr two rejection' "both rounds fall back to the PR's copy"
+
+echo "pr-round: an unreadable comment on disk says so"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+round_comment 1 "disk finding" "disk rejection" >"$pd/round-1/comment.md"
+GH_COMMENTS_JSON="$(jq -cn --arg b "$(round_comment 1 "pr finding" "pr rejection")" '[{user: {login: "test-me"}, body: $b}]')"
+export GH_COMMENTS_JSON
+chmod 000 "$pd/round-1/comment.md"
+ERR="$(run_prr --repo "$repo" --pr 39 --round 2 2>&1 >/dev/null)"
+chmod 644 "$pd/round-1/comment.md"
+assert_contains "$ERR" "cannot read $pd/round-1/comment.md; using the PR copy of round 1" "the warning names the file"
+assert_eq "$(cat "$pd/round-2/settled.md" 2>/dev/null)" '- Rejected: [critic] pr rejection' "the round falls back to the PR's copy"
+
+echo "pr-round: a scan that fails on a disk comment says so"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+round_comment 1 "disk finding" "disk rejection" >"$pd/round-1/comment.md"
+GH_COMMENTS_JSON="$(jq -cn --arg b "$(round_comment 1 "pr finding" "pr rejection")" '[{user: {login: "test-me"}, body: $b}]')"
+export GH_COMMENTS_JSON
+# A read-only round folder: scan.sh cannot stage its rewrite there and exits 2.
+chmod 555 "$pd/round-1"
+ERR="$(run_prr --repo "$repo" --pr 39 --round 2 2>&1 >/dev/null)"
+chmod 755 "$pd/round-1"
+assert_contains "$ERR" "scan failed on $pd/round-1/comment.md; using the PR copy of round 1" "the scan failure is said"
+assert_eq "$(cat "$pd/round-2/settled.md" 2>/dev/null)" '- Rejected: [critic] pr rejection' "the round falls back to the PR's copy"
+
+echo "pr-round: a comment on disk cut off after its heading is not read"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+printf '<!-- pr-loop-comment -->\n\n## Review round 1: abc\n\n' >"$pd/round-1/comment.md"
+GH_COMMENTS_JSON="$(jq -cn --arg b "$(round_comment 1 "pr finding" "pr rejection")" '[{user: {login: "test-me"}, body: $b}]')"
+export GH_COMMENTS_JSON
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+assert_eq "$(cat "$pd/round-2/settled.md" 2>/dev/null)" '- Rejected: [critic] pr rejection' "the PR's copy settles"
+
+echo "pr-round: a comment on disk cut off before its footer is not read"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+round_comment 1 "disk finding" "disk rejection" | sed '$d' >"$pd/round-1/comment.md"
+GH_COMMENTS_JSON="$(jq -cn --arg b "$(round_comment 1 "pr finding" "pr rejection")" '[{user: {login: "test-me"}, body: $b}]')"
+export GH_COMMENTS_JSON
+ERR="$(run_prr --repo "$repo" --pr 39 --round 2 2>&1 >/dev/null)"
+assert_eq "$(cat "$pd/round-2/settled.md" 2>/dev/null)" '- Rejected: [critic] pr rejection' "the PR's copy settles"
+assert_contains "$ERR" "not a whole round 1 comment: $pd/round-1/comment.md; using the PR copy" "the skip is said, naming the file"
+
+echo "pr-round: a comment on disk cut off below a quoted footer is not read"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+# The last line is prose, so only a check of the last line, not of any line, rejects it.
+{ round_comment 1 "disk finding" "disk rejection" | sed '/^\*\*Findings:\*\*/i\
+*Round 1 | abc | reviewer ocr | critic subagent*
+' | sed '/^<details><summary>Dispositions/,$d'; printf 'cut off here\n'; } >"$pd/round-1/comment.md"
+GH_COMMENTS_JSON="$(jq -cn --arg b "$(round_comment 1 "pr finding" "pr rejection")" '[{user: {login: "test-me"}, body: $b}]')"
+export GH_COMMENTS_JSON
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+assert_eq "$(tail -n 1 "$pd/round-1/comment.md")" "cut off here" "the fixture ends in prose, not a blank line"
+assert_eq "$(cat "$pd/round-2/settled.md" 2>/dev/null)" '- Rejected: [critic] pr rejection' "the PR's copy settles"
+
+echo "pr-round: a disk comment whose heading names another round is not read"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+round_comment 1 "disk finding" "disk rejection" | sed 's/^## Review round 1:/## Review round 2:/' >"$pd/round-1/comment.md"
+GH_COMMENTS_JSON="$(jq -cn --arg b "$(round_comment 1 "pr finding" "pr rejection")" '[{user: {login: "test-me"}, body: $b}]')"
+export GH_COMMENTS_JSON
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+assert_eq "$(cat "$pd/round-2/settled.md" 2>/dev/null)" '- Rejected: [critic] pr rejection' "the PR's copy settles"
+
+echo "pr-round: a disk comment whose footer names another round is not read"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+round_comment 1 "disk finding" "disk rejection" | sed 's/^\*Round 1 |/*Round 2 |/' >"$pd/round-1/comment.md"
+GH_COMMENTS_JSON="$(jq -cn --arg b "$(round_comment 1 "pr finding" "pr rejection")" '[{user: {login: "test-me"}, body: $b}]')"
+export GH_COMMENTS_JSON
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+assert_eq "$(cat "$pd/round-2/settled.md" 2>/dev/null)" '- Rejected: [critic] pr rejection' "the PR's copy settles"
+
+echo "pr-round: a disk comment's home path reaches the reviewer as ~"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+round_comment 1 "disk finding" "seen at $WS/home/x" >"$pd/round-1/comment.md"
+GH_COMMENTS_JSON='[]'
+export GH_COMMENTS_JSON
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+assert_contains "$(cat "$pd/round-2/background.md" 2>/dev/null)" "seen at ~/x" "the scan's rewrite reaches the background"
+assert_not_contains "$(cat "$pd/round-2/background.md" 2>/dev/null)" "$WS/home/x" "the home path does not"
+
+echo "pr-round: two rounds on disk both settle, oldest first"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+round_comment 1 "disk one" "disk one rejection" >"$pd/round-1/comment.md"
+round_comment 2 "disk two" "disk two rejection" >"$pd/round-2/comment.md"
+GH_COMMENTS_JSON='[]'
+export GH_COMMENTS_JSON
+run_prr --repo "$repo" --pr 39 --round 3 >/dev/null
+assert_eq "$(cat "$pd/round-3/settled.md" 2>/dev/null)" $'- Rejected: [critic] disk one rejection\n- Rejected: [critic] disk two rejection' "both disk rounds settle, oldest first"
+assert_contains "$(cat "$pd/round-3/prior-findings.md" 2>/dev/null)" "disk two" "the newest disk round's findings are the ones answered"
+
+echo "pr-round: disk comments larger than the argument limit still merge"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+{ round_comment 1 "big finding" "big rejection" | sed '$d'; head -c 1100000 /dev/zero | tr '\0' x; printf '\n\n*Round 1 | abc | reviewer ocr | critic subagent*\n'; } >"$pd/round-1/comment.md"
+GH_COMMENTS_JSON='[]'
+export GH_COMMENTS_JSON
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null; RC=$?
+assert_eq "$RC" 0 "the round runs"
+assert_eq "$(cat "$pd/round-2/settled.md" 2>/dev/null)" '- Rejected: [critic] big rejection' "the big disk copy settles"
+
+echo "pr-round: a round with no comment on disk falls back to the PR's copy"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+round_comment 2 "round two on disk only" "round two rejection" >"$pd/round-2/comment.md"
+GH_COMMENTS_JSON="$(jq -cn --arg b "$(round_comment 1 "round one" "round one rejection")" '[{user: {login: "test-me"}, body: $b}]')"
+export GH_COMMENTS_JSON
+run_prr --repo "$repo" --pr 39 --round 3 >/dev/null
+assert_eq "$(cat "$pd/round-3/settled.md" 2>/dev/null)" $'- Rejected: [critic] round one rejection\n- Rejected: [critic] round two rejection' "the PR fills round 1, the disk round 2, oldest first"
+assert_contains "$(cat "$pd/round-3/prior-findings.md" 2>/dev/null)" "round two on disk only" "a comment the PR never got is still the newest round"
+
+echo "pr-round: a rerun reads no disk comment of its own round or a later one"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+for n in 1 2 3; do
+  run_prr --repo "$repo" --pr 39 --round "$n" >/dev/null
+  round_comment "$n" "finding $n" "rejection $n" >"$pd/round-$n/comment.md"
+done
+run_prr --repo "$repo" --pr 39 --round 2 --rerun >/dev/null
+assert_eq "$(cat "$pd/round-2/settled.md" 2>/dev/null)" '- Rejected: [critic] rejection 1' "only round 1 is prior to a rerun of round 2"
+
 LIMIT="$(jq -r '.reviewer_background_limit' "$TOOLS/manifest.json")"
 
 echo "pr-round: a brief over the reviewer's background limit stops before any review"

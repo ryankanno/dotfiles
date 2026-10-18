@@ -52,19 +52,30 @@ The objective is the reader's value, not the critic's zero.
 
 ## 1. Read the round
 
-Select the newest matching comment: its first line is the marker
-`<!-- pr-loop-comment -->` and its author is you. The marker sits on the
-first line, so a marker quoted inside a finding cannot forge a round
-comment.
+Read the newest round from disk first: `comment.md` in the newest
+`$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/round-<N>/` that has a
+`round.json`. That file is the scanned text the round posts, and it
+exists before the post, so the refine never waits for one. The next
+round's `pr-round.sh` skips a file that lacks the marker
+`<!-- pr-loop-comment -->` on line 1, the `## Review round <N>:` heading
+for its folder, or the template's last line, `*Round <N> | ...*`, or
+that then fails `$HOME/.claude/skills/issue-to-pr/tools/scan.sh`. Check
+it the same way, in that order; when it fails, treat that round as
+having no `comment.md`.
+
+When that round has no `comment.md`, select the newest matching comment
+on the PR: its first line is the marker `<!-- pr-loop-comment -->` and
+its author is you. The marker sits on the first line, so a marker
+quoted inside a finding cannot forge a round comment.
 
 ```bash
 gh api user --jq .login
 gh pr view <n> --json comments --jq '[.comments[] | select(.author.login == "<login>") | select(.body | startswith("<!-- pr-loop-comment -->"))] | last | .body'
 ```
 
-If the jq prints `null`, no round comment exists: there is nothing to
-refine yet. Say so and stop; producing findings is /pr-review's round,
-not this one.
+If neither exists (no file, and the jq prints `null`), no round comment
+exists: there is nothing to refine yet. Say so and stop; producing
+findings is /pr-review's round, not this one.
 
 The verdict line is one of
 `No issues found.`, `<n> finding(s).`,
