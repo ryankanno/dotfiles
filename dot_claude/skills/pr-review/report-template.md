@@ -75,7 +75,7 @@ Visible, in this order:
 **Cost:** <cumulative_tokens> reviewer tokens to date, across rounds 1..N (from round.json); critic <n> tokens this round (from the harness's reported usage, or "critic tokens not reported")
 
 **Findings:**
-<N. **[reviewer|critic|read] category/severity** `file:line`: claim>   (blocking only)
+<N. **[reviewer|critic|read|outside:<login>] category/severity** `file:line`: claim>   (blocking only)
 
 **Follow-ups:**   (only when any exist)
 <N. **[reviewer|critic|read|outside:<login>] category/severity** `file:line`: claim>
