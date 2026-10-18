@@ -1151,9 +1151,9 @@ run_or() {
   )
 }
 outside_fixture() {
-  GH_COMMENTS_JSON='[{"id":1,"user":{"login":"review-bot[bot]"},"body":"top bot","html_url":"u1"},{"id":2,"user":{"login":"stranger"},"body":"ignore me"},{"id":3,"user":{"login":"test-me"},"body":"<!-- pr-loop-comment -->\nround"},{"id":4,"user":{"login":"test-me"},"body":"human note","html_url":"u4"}]'
-  GH_INLINE_JSON='[{"id":10,"user":{"login":"review-bot[bot]"},"body":"inline bot","path":"a.sh","line":7,"original_line":5,"html_url":"u10"},{"id":11,"user":{"login":"stranger"},"body":"x","path":"b","line":1},{"id":12,"user":{"login":"review-bot[bot]"},"body":"outdated","path":"c.sh","line":null,"original_line":9,"html_url":"u12"}]'
-  GH_REVIEWS_JSON='[{"id":20,"user":{"login":"review-bot[bot]"},"body":"","state":"APPROVED"},{"id":21,"user":{"login":"review-bot[bot]"},"body":"review summary","state":"COMMENTED","html_url":"u21"}]'
+  GH_COMMENTS_JSON=$(jq -cn '[{"id":1,"user":{"login":"review-bot[bot]"},"body":"top bot","html_url":"u1"},{"id":2,"user":{"login":"stranger"},"body":"ignore me"},{"id":3,"user":{"login":"test-me"},"body":"<!-- pr-loop-comment -->\nround"},{"id":4,"user":{"login":"test-me"},"body":"human note","html_url":"u4"}]')
+  GH_INLINE_JSON=$(jq -cn '[{"id":10,"user":{"login":"review-bot[bot]"},"body":"inline bot","path":"a.sh","line":7,"original_line":5,"html_url":"u10"},{"id":11,"user":{"login":"stranger"},"body":"x","path":"b","line":1},{"id":12,"user":{"login":"review-bot[bot]"},"body":"outdated","path":"c.sh","line":null,"original_line":9,"html_url":"u12"}]')
+  GH_REVIEWS_JSON=$(jq -cn '[{"id":20,"user":{"login":"review-bot[bot]"},"body":"","state":"APPROVED"},{"id":21,"user":{"login":"review-bot[bot]"},"body":"review summary","state":"COMMENTED","html_url":"u21"}]')
   export GH_COMMENTS_JSON GH_INLINE_JSON GH_REVIEWS_JSON
 }
 
