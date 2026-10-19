@@ -50,15 +50,33 @@ Brief file: `<absolute path of the brief file>`
 - If an open PR already exists on this branch, do not create another:
   verify it with `gh pr view` and continue the work on it.
 
-## When findings arrive
+## Review rounds: you run every one
 
-A refine instruction arrives by `workmux send`, naming the PR. Run the
-pr-refine skill against that PR: read the newest matching comment,
-validate every finding against the diff before touching code, fix under
-TDD, run the gate, commit, push, re-run the review round, post the
-round's comment.
+The orchestrator runs no review. It ratifies your rounds when you stop.
+Every round has a unique number, and every round posts its comment.
+
+1. **Round 1:** right after the PR is filed, run the pr-review skill on
+   the PR, with `--expect-branch <branch-name>`.
+2. **Refine rounds:** while the newest round has blocking findings, run
+   the pr-refine skill on the PR. Refine round k writes review round
+   k+1. Run at most 3 refine rounds.
+3. **The convergence round:** after a refine round, when the newest
+   round is `No issues found.` or a converged candidate, run the
+   pr-review skill once more on the same head, and pass `--convergence`
+   to `pr-round.sh`. It takes the next free round number. A blocking
+   finding in it sends you back to step 2 while refine rounds remain.
+   A clean round 1 needs no convergence round: it already reviewed the
+   whole PR at this head.
+4. **Stop** and report one stop state: `clean` (after a clean round 1
+   or the convergence round), `converged candidate` (after the
+   convergence round), `cap spent`, or `blocked: <reason>`.
+
 Every review round passes `--brief <the brief file above>` to
 `pr-round.sh` and `critic-input.sh`.
+
+After you stop, a refine instruction can arrive by `workmux send`. It
+names a disposition the orchestrator overrules. Run the pr-refine skill
+on that finding, then the convergence round again, then stop.
 <only when intake set the reviewer's effort, timeout, tool cap or token
 budget; omit this line otherwise, and keep only the flags intake set:>
 Every review round passes `--effort <level> --timeout <minutes>
@@ -66,5 +84,6 @@ Every review round passes `--effort <level> --timeout <minutes>
 
 ## When you are done
 
-Finish with the PR number and URL as your last message, and nothing
-else: the orchestrator verifies with `gh pr view` on its own.
+Finish with two lines as your last message, and nothing else: the PR
+URL, then `Stop: <stop state>`. The orchestrator verifies both on its
+own.

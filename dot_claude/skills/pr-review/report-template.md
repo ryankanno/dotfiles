@@ -37,7 +37,7 @@ reads quickly and loses nothing.
     stand for /pr-refine. The loop cannot declare the branch clean off
     this round.
   - `**Verdict:** converged (all blocking findings low and dispositioned).` —
-    only the orchestrator's convergence round writes this: blocking
+    only a convergence round writes this: blocking
     findings exist, every one is low, and every one is fixed, rejected,
     or accepted with a recorded reason in the Dispositions block. The
     loop ends here unless a human names a specific finding.

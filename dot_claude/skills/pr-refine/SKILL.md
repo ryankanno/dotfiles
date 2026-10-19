@@ -45,10 +45,10 @@ The objective is the reader's value, not the critic's zero.
   never silently dropped.
 - **Converged candidate.** When a round's blocking findings are all low
   and every one is fixed, rejected, or accepted with a recorded reason,
-  report "converged candidate" to the orchestrator with the
-  Dispositions block attached, and start no further fixes. The
-  orchestrator decides; only its convergence round writes the converged
-  verdict.
+  it is a converged candidate: start no further fixes. In the
+  issue-to-pr loop, the implementer runs the convergence round next;
+  only a convergence round writes the converged verdict, and the
+  orchestrator ratifies it.
 
 ## 1. Read the round
 
@@ -86,7 +86,8 @@ The verdict line is one of
 unrecovered mean nothing to fix and no clean claim. Nothing to review
 means no clean claim: its Findings are the prior round's, carried
 verbatim, and you fix them like any round's. A converged verdict
-means the orchestrator closed the loop: nothing to fix, no new round.
+means the convergence round closed the loop: nothing to fix, no new
+round.
 
 ## 2. Validate every finding
 
@@ -152,10 +153,11 @@ cumulative cost line from round.json.
 
 ## 7. Report back
 
-Clean, findings-remaining, or converged candidate, to the orchestrator
-or the human, with the judgment calls listed. The convergence decision
-is never this skill's: only the orchestrator's own review plus gate
-declares the branch clean or converged.
+Clean, findings-remaining, or converged candidate, with the judgment
+calls listed. In the issue-to-pr loop, the implementer continues its
+round loop on this result; a human caller gets it as the report. The
+loop's end state is never this skill's: only the orchestrator's
+ratification declares the loop clean or converged.
 
 ## Never
 
