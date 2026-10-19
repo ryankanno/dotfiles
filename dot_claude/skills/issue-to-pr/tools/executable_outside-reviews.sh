@@ -41,7 +41,7 @@ command -v gh >/dev/null || { printf 'gh: not found\n' >&2; exit 127; }
 command -v jq >/dev/null || { printf 'jq: not found\n' >&2; exit 127; }
 
 here="$(cd "$(dirname "$0")" && pwd)"
-allow=$(jq -c '.outside_reviewers // [] | if all(type == "string") then . else error end' "$here/manifest.json") || {
+allow=$(jq -c '.outside_reviewers // [] | if type == "array" and all(type == "string" and test("\\S")) then . else error end' "$here/manifest.json") || {
   printf 'cannot read the manifest: %s\n' "$here/manifest.json" >&2
   exit 2
 }

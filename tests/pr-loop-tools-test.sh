@@ -1248,12 +1248,17 @@ outside_fixture
 OUT="$(run_or --slug test-owner/test-repo --pr 39 2>&1)"; RC=$?
 assert_eq "$RC" 2 "exits 2"
 assert_contains "$OUT" "cannot read the manifest" "the manifest is named"
+for bad in '{}' '["review-bot[bot]", " "]'; do
+  jq --argjson bad "$bad" '.outside_reviewers = $bad' "$TOOLS/manifest.json" >"$WS/tools/manifest.json"
+  OUT="$(run_or --slug test-owner/test-repo --pr 39 2>&1)"; RC=$?
+  assert_eq "$RC" 2 "an allowlist of $bad exits 2"
+  assert_contains "$OUT" "cannot read the manifest" "an allowlist of $bad names the manifest"
+done
 
 echo "outside-reviews: an item with no author never matches the allowlist"
 new_sandbox
 make_pr_round_env
-cp -R "$TOOLS" "$WS/tools"
-jq '.outside_reviewers = ["review-bot[bot]", ""]' "$TOOLS/manifest.json" >"$WS/tools/manifest.json"
+copy_tools_with_allowlist
 outside_fixture
 GH_INLINE_JSON=$(jq -cn '[{"id":30,"user":null,"body":"ghost","path":"a.sh","line":1}]')
 export GH_INLINE_JSON
