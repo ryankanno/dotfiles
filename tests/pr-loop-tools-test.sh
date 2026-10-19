@@ -1248,7 +1248,7 @@ outside_fixture
 OUT="$(run_or --slug test-owner/test-repo --pr 39 2>&1)"; RC=$?
 assert_eq "$RC" 2 "exits 2"
 assert_contains "$OUT" "cannot read the manifest" "the manifest is named"
-for bad in '{}' '["review-bot[bot]", " "]'; do
+for bad in '{}' '["review-bot[bot]", " "]' '[" review-bot[bot]"]'; do
   jq --argjson bad "$bad" '.outside_reviewers = $bad' "$TOOLS/manifest.json" >"$WS/tools/manifest.json"
   OUT="$(run_or --slug test-owner/test-repo --pr 39 2>&1)"; RC=$?
   assert_eq "$RC" 2 "an allowlist of $bad exits 2"
