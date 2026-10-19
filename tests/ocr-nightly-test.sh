@@ -57,6 +57,7 @@ assert_eq "$(sed -n 2p "$LOG")" "ocr session export -o review.html" "exports rev
 assert_contains "$(sed -n 3p "$LOG")" "opencode --prompt Read review.html." "opens opencode with the explore prompt"
 assert_not_contains "$calls" "fix/review-critical-highs" "explore does not send the fix prompt"
 assert_eq "$(wc -l <"$LOG" | tr -d ' ')" "3" "explore prompt is sent as one line"
+assert_contains "$calls" "Assign each issue that you file to me." "explore assigns filed issues to me"
 
 echo "fix: opencode gets the fix prompt"
 new_sandbox
@@ -65,6 +66,8 @@ calls="$(cat "$LOG")"
 assert_eq "$(wc -l <"$LOG" | tr -d ' ')" "3" "fix prompt is sent as one line"
 assert_contains "$calls" "opencode --prompt Make a new worktree named fix/review-critical-highs." "opens opencode with the fix prompt"
 assert_contains "$calls" "Write the final summary to review_output.html, then stop." "fix prompt is sent whole"
+assert_contains "$calls" "Open each PR as a draft, and keep it as a draft." "fix keeps PRs as drafts"
+assert_contains "$calls" "Assign each PR to me." "fix assigns PRs to me"
 
 echo "scan failure stops the run"
 new_sandbox

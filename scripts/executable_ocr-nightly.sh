@@ -19,7 +19,8 @@ Find the most critical issues and the architectural issues.
 Verify each issue in the code.
 File a GitHub issue only for an issue that you verify.
 Use your judgment to select the issues to file.
-Give each issue the labels and details that the repository requires."
+Give each issue the labels and details that the repository requires.
+Assign each issue that you file to me."
     ;;
   fix)
     PROMPT="Make a new worktree named fix/review-critical-highs.
@@ -27,6 +28,8 @@ If you use workmux, set the agent to opencode, because the workmux default agent
 Read review.html, the ocr scan output.
 Fix each critical bug and each high bug.
 Fix one bug at a time.
+Open each PR as a draft, and keep it as a draft.
+Assign each PR to me.
 For each bug, do these steps:
 1. Verify that the bug is real, because the scan can report bugs that do not exist.
 2. Fix the bug with TDD through /issue-to-pr.
