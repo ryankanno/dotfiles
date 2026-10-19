@@ -48,7 +48,7 @@ flowchart TD
     G1 -- "yes" --> G2["In the pane: plan, grill-me with the human,<br/>restate decisions, get a yes<br/>(the pane waits on the human; not pane death)"]
     G2 --> D
     G1 -- "no" --> D
-    D["Implementer pane<br/>TDD, gate, conventional commits,<br/>push, gh pr create with Closes for gh issues"]
+    D["Implementer pane<br/>TDD, gate, conventional commits,<br/>push, gh pr create --draft with Closes for gh issues"]
     D --> E{"PR verified and bound<br/>to branch-name?"}
     E -- "no: a real number, someone else's PR" --> X["Blocked: report and stop"]
     E -- "yes" --> R["Review round, run by the pane<br/>pr-round.sh: range resolved from the PR,<br/>identity check, reviewer binding,<br/>per-commit empty-retry"]

@@ -47,8 +47,11 @@ Brief file: `<absolute path of the brief file>`
 
   ```
   git push -u origin HEAD
-  gh pr create --title "<title>" --body "<body>"
+  gh pr create --draft --assignee @me --title "<title>" --body "<body>"
   ```
+
+  Keep the PR a draft. A repository that auto-merges on green CI
+  merges a ready PR before its review rounds finish.
 
   The PR body carries `Closes #<n>` <only for gh issue sources; omit this
   line entirely for markdown or HTML sources>.
