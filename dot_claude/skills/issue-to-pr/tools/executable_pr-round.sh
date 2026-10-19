@@ -43,7 +43,8 @@
 #                within the manifest's reviewer_background_limit),
 #                outside.json (the allowlisted outside reviews no earlier
 #                round recorded, from outside-reviews.sh) when there are
-#                any, and the directory path on stdout.
+#                any and the scope is not none:, and the directory path on
+#                stdout.
 # Exit codes: 0 the round ran; 2 usage, the environment is unusable
 # (HOME unset), or the brief cannot fit the reviewer's background limit,
 # alone or once the standing dispositions assemble into it; 3 identity
