@@ -1239,6 +1239,28 @@ outside_fixture
 OUT="$(run_or --slug test-owner/test-repo --pr 39)"
 assert_contains "$(jq -c '[.[].id]' <<<"$OUT")" '"inline:10"' "Review-Bot[bot] on the list admits review-bot[bot]"
 
+echo "outside-reviews: an allowlist entry that is not a login is a manifest error"
+new_sandbox
+make_pr_round_env
+cp -R "$TOOLS" "$WS/tools"
+jq '.outside_reviewers = ["review-bot[bot]", null]' "$TOOLS/manifest.json" >"$WS/tools/manifest.json"
+outside_fixture
+OUT="$(run_or --slug test-owner/test-repo --pr 39 2>&1)"; RC=$?
+assert_eq "$RC" 2 "exits 2"
+assert_contains "$OUT" "cannot read the manifest" "the manifest is named"
+
+echo "outside-reviews: an item with no author never matches the allowlist"
+new_sandbox
+make_pr_round_env
+cp -R "$TOOLS" "$WS/tools"
+jq '.outside_reviewers = ["review-bot[bot]", ""]' "$TOOLS/manifest.json" >"$WS/tools/manifest.json"
+outside_fixture
+GH_INLINE_JSON=$(jq -cn '[{"id":30,"user":null,"body":"ghost","path":"a.sh","line":1}]')
+export GH_INLINE_JSON
+OUT="$(run_or --slug test-owner/test-repo --pr 39)"; RC=$?
+assert_eq "$RC" 0 "exits 0"
+assert_eq "$(jq -c '[.[].id | select(startswith("inline:"))]' <<<"$OUT")" '[]' "a deleted account's comment is not listed"
+
 echo "outside-reviews: an earlier round's outside.json that does not parse says so"
 new_sandbox
 make_pr_round_env

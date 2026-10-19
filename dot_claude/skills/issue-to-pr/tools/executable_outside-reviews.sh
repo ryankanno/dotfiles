@@ -41,7 +41,7 @@ command -v gh >/dev/null || { printf 'gh: not found\n' >&2; exit 127; }
 command -v jq >/dev/null || { printf 'jq: not found\n' >&2; exit 127; }
 
 here="$(cd "$(dirname "$0")" && pwd)"
-allow=$(jq -c '.outside_reviewers // []' "$here/manifest.json") || {
+allow=$(jq -c '.outside_reviewers // [] | if all(type == "string") then . else error end' "$here/manifest.json") || {
   printf 'cannot read the manifest: %s\n' "$here/manifest.json" >&2
   exit 2
 }
@@ -82,7 +82,7 @@ printf '%s\n%s\n%s\n' "$issue" "$inline" "$reviews" | jq -s --argjson allow "$al
                     path: (.path // null), line: (.line // .original_line // null),
                     body: .body, url: (.html_url // null)};
   [(.[0][] | item("issue_comment")), (.[1][] | item("inline")), (.[2][] | item("review"))]
-  | map(select((.login // "" | ascii_downcase) as $l | $allow | index($l)))
+  | map(select(.login != null and ((.login | ascii_downcase) as $l | $allow | index($l))))
   | map(select((.body // "") | length > 0))
   | map(select(.body | startswith("<!-- pr-loop-comment -->") | not))
   | map(select(.id as $i | $seen | index($i) | not))'
