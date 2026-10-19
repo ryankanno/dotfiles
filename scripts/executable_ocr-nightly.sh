@@ -2,7 +2,7 @@
 # Nightly review: ocr scan <path>, export review.html, then hand it to opencode.
 #   explore -> issue-exploration workflow (verify and file GitHub issues)
 #   fix     -> fix the critical/high findings in a worktree
-# Run from the repository root.
+# Run from the repository root. An existing review.html skips the scan.
 set -euo pipefail
 
 usage() {
@@ -28,6 +28,8 @@ If you use workmux, set the agent to opencode, because the workmux default agent
 Read review.html, the ocr scan output.
 Fix each critical bug and each high bug.
 Fix one bug at a time.
+Record the progress of each bug in review-progress.md.
+If review-progress.md exists, read it first, and skip each bug that it marks as done.
 Open each PR as a draft, and keep it as a draft.
 Assign each PR to me.
 For each bug, do these steps:
@@ -43,7 +45,12 @@ Write the final summary to review_output.html, then stop."
   *) usage ;;
 esac
 
-ocr scan --path "$2"
-ocr session export -o review.html
+# A stopped run resumes on the same findings instead of a new scan.
+if [[ -f review.html ]]; then
+  echo "reusing review.html; delete review.html to scan again" >&2
+else
+  ocr scan --path "$2"
+  ocr session export -o review.html
+fi
 # One line, so the TUI cannot read a newline as Enter and submit early.
 exec opencode --prompt "${PROMPT//$'\n'/ }"

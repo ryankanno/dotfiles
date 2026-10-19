@@ -44,6 +44,7 @@ echo "opencode $*" >>"$LOG"
 OC
   chmod +x "$WS/bin/ocr" "$WS/bin/opencode"
   export PATH="$WS/bin:$PATH"
+  cd "$WS" || exit 1
 }
 
 echo "explore: scan, export, then opencode with the issue prompt"
@@ -68,6 +69,17 @@ assert_contains "$calls" "opencode --prompt Make a new worktree named fix/review
 assert_contains "$calls" "Write the final summary to review_output.html, then stop." "fix prompt is sent whole"
 assert_contains "$calls" "Open each PR as a draft, and keep it as a draft." "fix keeps PRs as drafts"
 assert_contains "$calls" "Assign each PR to me." "fix assigns PRs to me"
+assert_contains "$calls" "Record the progress of each bug in review-progress.md." "fix records progress"
+assert_contains "$calls" "If review-progress.md exists, read it first, and skip each bug that it marks as done." "fix resumes from progress"
+
+echo "an existing review.html is reused"
+new_sandbox
+echo "old" >review.html
+out="$(bash "$SCRIPT" fix src 2>&1)"
+assert_eq "$(wc -l <"$LOG" | tr -d ' ')" "1" "runs only opencode"
+assert_contains "$(cat "$LOG")" "opencode --prompt" "opens opencode"
+assert_eq "$(cat review.html)" "old" "keeps review.html"
+assert_contains "$out" "delete review.html" "says how to get a new scan"
 
 echo "scan failure stops the run"
 new_sandbox
