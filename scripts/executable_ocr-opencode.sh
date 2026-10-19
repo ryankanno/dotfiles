@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Nightly review: ocr scan <path>, export review.html, then hand it to opencode.
+# ocr scan <path>, export review.html, then hand it to opencode.
 #   explore -> issue-exploration workflow (verify and file GitHub issues)
 #   fix     -> fix the critical/high findings in a worktree
 # Run from the repository root. An existing review.html skips the scan.

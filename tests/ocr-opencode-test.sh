@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Black-box tests for ocr-nightly.sh. Mocks only the external boundaries:
+# Black-box tests for ocr-opencode.sh. Mocks only the external boundaries:
 #   ocr -> LLM scan        opencode -> agent TUI
 set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SCRIPT="$HERE/../scripts/executable_ocr-nightly.sh"
+SCRIPT="$HERE/../scripts/executable_ocr-opencode.sh"
 
 PASS=0
 FAIL=0
