@@ -689,6 +689,17 @@ assert_eq "$(jq '.runs | length' "$rd/round.json")" 2 "range plus one commit run
 assert_eq "$(jq -r '.runs[0].status' "$rd/round.json")" "missing" "the failed range is recorded verbatim"
 assert_eq "$(jq -r '.runs[0].exit_code' "$rd/round.json")" 1 "the range run failed the way ocr fails: non-zero, no review.json"
 
+echo "pr-round: a range and every commit retry with no review text is unrecovered"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+export STUB_RANGE_STATUS=missing STUB_COMMIT_STATUS=missing
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
+assert_json '.reviewer_complete == false' "$rd/round.json" "no review text anywhere is never a complete review"
+assert_eq "$(jq '.runs | length' "$rd/round.json")" 2 "range plus one commit retry"
+assert_eq "$(jq -r '[.runs[].status] | unique | join(",")' "$rd/round.json")" "missing" "every run is recorded missing, none complete"
+
 echo "pr-round: a skipped range is recorded once and not retried per commit"
 new_sandbox
 make_pr_round_env
