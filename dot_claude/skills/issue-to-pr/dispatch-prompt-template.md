@@ -80,7 +80,7 @@ Every round has a unique number, and every round posts its comment.
 Every review round passes `--brief <the brief file above>` to
 `pr-round.sh` and `critic-input.sh`.
 
-A round runs longer than one tool call. Start it detached and poll, as
+A round runs longer than one tool call. Start it in the background as
 pr-review §1 says. When `pr-round.sh` exits 6 and the round dir has no
 `round.json`, your earlier run of that round died: pass `--rerun` once.
 When it exits 7, another process runs that round: wait for it, and

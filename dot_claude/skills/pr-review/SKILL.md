@@ -37,15 +37,19 @@ $HOME/.claude/skills/issue-to-pr/tools/pr-round.sh \
 `<checkout-dir>` is the absolute path of the local clone or worktree
 that holds the PR branch. It is not the `owner/name` slug.
 
-A round runs for 15 to 80 minutes or more. A harness tool call has a
-shorter limit (opencode's bash default is 120 seconds), and a killed
-call kills the round. Start the round in a detached tmux session, with
-its log beside the round dir, not in it. A tmux session survives the
-end of the tool call; a background `&` job of the call can die with it.
+A round runs for 15 to 80 minutes or more, and a killed call kills the
+round. Use the harness's own background run when it has one that
+outlives the tool call's time limit and reports the exit (Claude Code's
+Bash `run_in_background`). Write the log beside the round dir, not in
+it, and end the command with `echo "exit=$?" >>"<log>"`.
 
-The log's directory does not exist before round 1, and a tmux session
-gets the tmux server's environment, not yours (a PATH without `gh`
-exits 127). Create the directory and pass your PATH:
+Only when the harness has no such run (opencode's bash tool stops a
+call after 120 seconds by default), start the round in a detached tmux
+session. A tmux session survives the end of the tool call; a background
+`&` job of the call can die with it. The log's directory does not exist
+before round 1, and a tmux session gets the tmux server's environment,
+not yours (a PATH without `gh` exits 127). Create the directory and pass
+your PATH:
 
 ```bash
 mkdir -p "$HOME/.cache/pr-loop/<owner/repo>/pr-<n>"
@@ -55,9 +59,9 @@ tmux new-session -d -e PATH="$PATH" -s pr-round-<n>-<N> sh -c \
 ```
 
 Then poll. Each poll is one tool call with a sleep shorter than the
-tool's limit (`sleep 100` under opencode's default). The round is done
-when the log's last line is `exit=<code>`. While it runs, the round dir
-has a `round-<N>.lock` file beside it.
+tool's limit (`sleep 100` under opencode's default). Either way, the
+round is done when the log's last line is `exit=<code>`. While it runs,
+the round dir has a `round-<N>.lock` file beside it.
 
 `--effort` and `--timeout` go to every review run of the round. Pass
 them only when the caller gives them; without them the binding's
