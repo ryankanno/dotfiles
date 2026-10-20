@@ -160,9 +160,12 @@ while :; do
     printf 'cannot view PR %s\n' "$pr" >&2
     exit 4
   }
-  # A PR that is not open never gets the head; the state check below refuses it.
-  [[ -z "$expect_head" || "$(jq -r .headRefOid <<<"$pr_json")" == "$expect_head" ]] && break
-  [[ "$(jq -r .state <<<"$pr_json")" == OPEN ]] || break
+  [[ -z "$expect_head" ]] && break
+  # A PR that is not open, has no head, or is not this loop's branch never
+  # gets the pushed head: the checks below refuse it with their own code.
+  jq -e --arg h "$expect_head" --arg b "$expect" '
+    .headRefOid == $h or .state != "OPEN" or (.headRefOid // "") == ""
+    or ($b != "" and (.headRefName != $b or .isCrossRepository == true))' <<<"$pr_json" >/dev/null && break
   tries=$((tries + 1))
   if [[ "$tries" -ge 30 ]]; then
     printf 'PR %s head is %s after %s views, expected %s\n' "$pr" "$(jq -r .headRefOid <<<"$pr_json")" "$tries" "$expect_head" >&2

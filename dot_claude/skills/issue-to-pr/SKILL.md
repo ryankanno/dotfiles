@@ -282,8 +282,8 @@ report; the file is its durable copy, the exact text, no summary layer.
 - **Empty reviewer result:** handled inside the review round (retry once
   per-commit). Two empties: the round is unrecovered, never clean and
   never failing.
-- **`pr-round.sh` exit 4, 5, or 127, or an exit 6 after the pane's one
-  `--rerun`:** the round reports blocked, with the script's stderr line
+- **`pr-round.sh` exit 4, 5, or 127, an exit 6 after the pane's one
+  `--rerun`, or an exit 8 after the pane's one retry:** the round reports blocked, with the script's stderr line
   in the final report. The `--rerun` is the pane's, once, after a dead
   run (the dispatch template's "Review rounds" section). An exit 7 is a
   live round, not a failure.

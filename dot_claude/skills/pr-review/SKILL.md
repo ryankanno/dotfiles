@@ -154,7 +154,7 @@ push (`git rev-parse HEAD` after the push). Right after a push,
 `gh pr view` can still report the previous head. The script waits up to
 about a minute until GitHub reports the pushed head, then reviews only
 that head. When GitHub never reports it, the script exits 8 before it
-creates or changes any round evidence: run the round again. The script
+creates or changes any round evidence: run the round again once. The script
 resolves the range from the PR (never the checkout's `HEAD`), fetches
 the refs, runs the active reviewer binding over the round's range,
 applies the per-commit

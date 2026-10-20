@@ -1361,6 +1361,50 @@ run_prr --repo "$repo" --pr 39 --round 1 --expect-head "$FR_HEAD" >/dev/null 2>&
 assert_eq "$rc" 4 "a merged PR exits 4"
 assert_eq "$([[ -e "$WS/sleeps" ]] && printf yes || printf no)" "no" "it does not wait for a head"
 
+echo "pr-round: --expect-head that GitHub already reports runs without a pause"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+stale_head_after_push 0
+out=$(run_prr --repo "$repo" --pr 39 --round 1 --expect-head "$FR_HEAD"); rc=$?
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
+assert_eq "$rc" 0 "the round runs"
+assert_eq "$(jq -r '.range.head' "$rd/round.json")" "$FR_HEAD" "it reviews the pushed head"
+assert_eq "$([[ -e "$WS/sleeps" ]] && printf yes || printf no)" "no" "it does not pause"
+
+echo "pr-round: --expect-head on another branch's PR exits 3 without waiting"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+stale_head_after_push 1000
+run_prr --repo "$repo" --pr 39 --round 1 --expect-branch loop/someone-else --expect-head "$FR_HEAD" >/dev/null 2>&1; rc=$?
+assert_eq "$rc" 3 "a wrong PR is an identity mismatch, not a late head"
+assert_eq "$([[ -e "$WS/sleeps" ]] && printf yes || printf no)" "no" "it does not wait for a head"
+
+echo "pr-round: --expect-head on a PR whose head does not resolve exits 4 without waiting"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+stale_head_after_push 1000
+GH_PR_STALE_JSON="$(jq -c '.headRefOid = null' <<<"$GH_PR_STALE_JSON")"
+run_prr --repo "$repo" --pr 39 --round 1 --expect-head "$FR_HEAD" >/dev/null 2>&1; rc=$?
+assert_eq "$rc" 4 "an unresolvable PR exits 4"
+assert_eq "$([[ -e "$WS/sleeps" ]] && printf yes || printf no)" "no" "it does not wait for a head"
+
+echo "pr-round: --expect-head that never arrives leaves a finished round's evidence unchanged"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+export STUB_TOKENS=100
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
+before=$(cat "$rd/round.json")
+stale_head_after_push 1000
+run_prr --repo "$repo" --pr 39 --round 1 --rerun --expect-head "$FR_HEAD" >/dev/null 2>&1; rc=$?
+assert_eq "$rc" 8 "a head that never arrives exits 8"
+assert_eq "$(cat "$rd/round.json")" "$before" "round.json is unchanged"
+assert_eq "$(find "$rd" -maxdepth 1 -name 'superseded-*' | wc -l | tr -d ' ')" 0 "nothing is superseded"
+
 echo "pr-round: --expect-head takes only a full commit SHA"
 new_sandbox
 make_pr_round_env

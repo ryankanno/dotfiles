@@ -89,8 +89,8 @@ pr-review §1 says. When `pr-round.sh` exits 6 and the round dir has no
 `round.json`, your earlier run of that round died: pass `--rerun` once.
 When it exits 7, another process runs that round: wait for it, and
 never `--rerun` over it. When it exits 8, GitHub did not report the
-pushed head in time, and the round left no evidence: run it again,
-without `--rerun`.
+pushed head in time, and the round left no evidence: run it again
+once, without `--rerun`. A second exit 8 stops the loop as blocked.
 
 After you stop, a refine instruction can arrive by `workmux send`. It
 names a disposition the orchestrator overrules. Run the pr-refine skill
