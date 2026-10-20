@@ -43,12 +43,14 @@
 #                within the manifest's reviewer_background_limit), and
 #                the directory path on stdout.
 # Exit codes: 0 the round ran; 2 usage, the environment is unusable
-# (HOME unset), or the brief cannot fit the reviewer's background limit,
+# (HOME unset, or the round lock cannot be created), or the brief cannot
+# fit the reviewer's background limit,
 # alone or once the standing dispositions assemble into it; 3 identity
 # mismatch; 4 the PR is
 # missing, not open, or not resolvable; 5 the repository, its refs, or
 # the changed-file listing could not be resolved; 6 the round dir already holds
-# evidence and --rerun was not passed; 127 a dependency is missing. A
+# evidence and --rerun was not passed; 7 another live process runs this
+# round (its pid is in round-<N>.lock); 127 a dependency is missing. A
 # review run's own failure is recorded in round.json, not propagated.
 set -euo pipefail
 
@@ -178,6 +180,63 @@ owner_repo=$(cd "$repo" && gh repo view --json nameWithOwner --jq .nameWithOwner
 round_dir="$HOME/.cache/pr-loop/$owner_repo/pr-$pr/round-$round"
 mkdir -p "$round_dir"
 
+# Two callers once ran the same round at once, and one's --rerun moved the
+# other's in-flight evidence (PRs 137, 230). The lock sits beside the round
+# dir so --rerun never moves it; a holder that died (a harness kill) leaves
+# a stale lock that the next caller takes over.
+lock="$round_dir.lock"
+tmp_bg=""
+# Only a lock that still holds this pid is ours to remove: after a takeover
+# race the path can name a newer holder's lock.
+trap '[[ -n "${tmp_bg:-}" ]] && rm -f "$tmp_bg"; rm -f "$lock.$$"; [[ "$(cat "$lock" 2>/dev/null)" == "$$" ]] && rm -f "$lock"' EXIT
+lock_error() {
+  printf 'cannot create the round lock %s: %s\n' "$lock" "$1" >&2
+  exit 2
+}
+# The pid is written before the link publishes the lock, so a reader never
+# sees an empty lock from a live caller: an empty one is a crash leftover.
+# Only a failed link with a lock in place is contention; any other failure
+# (a full disk, no hard links) would otherwise read as a live round forever.
+take_lock() {
+  local err
+  err=$({ printf '%s\n' "$$" >"$lock.$$"; } 2>&1) || lock_error "$err"
+  if err=$(ln "$lock.$$" "$lock" 2>&1); then rm -f "$lock.$$"; return 0; fi
+  rm -f "$lock.$$"
+  [[ -e "$lock" ]] && return 1
+  # A holder can release the lock between the failed link and the check.
+  if [[ -z "${1:-}" ]]; then take_lock retry; return; fi
+  lock_error "$err"
+}
+lock_busy() {
+  trap '[[ -n "${tmp_bg:-}" ]] && rm -f "$tmp_bg"' EXIT
+  printf 'round %s is already running (%s); wait for its round.json, never --rerun over a live round\n' "$round" "$1" >&2
+  exit 7
+}
+if ! take_lock; then
+  holder=$(cat "$lock" 2>/dev/null || true)
+  if [[ "$holder" =~ ^[0-9]+$ ]] && kill -0 "$holder" 2>/dev/null; then
+    lock_busy "pid $holder"
+  fi
+  # Two callers can both read the same dead holder. A rename moves exactly
+  # one file, and the content check catches a caller that renamed a newer
+  # caller's live lock instead of the dead one: it links that lock back.
+  claim="$lock.stale-$$"
+  if ! mv "$lock" "$claim" 2>/dev/null; then
+    # The holder released the lock after the read: it is free, not taken.
+    [[ -e "$lock" ]] && lock_busy "another caller is taking over its lock"
+    take_lock || lock_busy "another caller took over its lock"
+  elif [[ "$(cat "$claim" 2>/dev/null || true)" != "$holder" ]]; then
+    if ln "$claim" "$lock" 2>/dev/null; then
+      rm -f "$claim"
+      lock_busy "another caller took over its lock"
+    fi
+    lock_busy "another caller took over its lock; a third caller's lock blocked restoring it, so it is kept at $claim"
+  else
+    rm -f "$claim"
+    take_lock || lock_busy "another caller took over its lock"
+  fi
+fi
+
 # The refs resolve before any prior evidence is touched: a network or
 # resolution failure must leave the round dir exactly as it was, not
 # half-superseded with the old round.json already moved away.
@@ -289,8 +348,6 @@ prior_findings=$(tail -n 1 <<<"$bodies" | jq -r '.' \
 # and before any --rerun superseding: a size refusal must leave the dir
 # exactly as it was, so the documented recovery (condense and rerun) hits
 # no leftover guard, and a refusal of a --rerun displaces no record.
-tmp_bg=""
-trap '[[ -n "${tmp_bg:-}" ]] && rm -f "$tmp_bg"' EXIT
 kept="$settled" omitted=0
 if [[ -n "$settled" ]]; then
   tmp_bg=$(mktemp "${TMPDIR:-/tmp}/pr-round-bg.XXXXXX") || {

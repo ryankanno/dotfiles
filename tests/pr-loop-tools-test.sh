@@ -614,6 +614,10 @@ if [[ -n "$STUB_GARBAGE" ]]; then
   printf '{"status": "complete", tri' >"$out"
   exit 0
 fi
+if [[ -n "$STUB_LOCK_SWAP" ]]; then
+  # Another caller took the round's lock over while this run reviewed.
+  printf '%s\n' "$STUB_LOCK_PID" >"$STUB_LOCK_SWAP"
+fi
 status="$STUB_RANGE_STATUS"
 if [[ "$mode" == "commit" ]]; then status="$STUB_COMMIT_STATUS"; fi
 printf '{"status":"%s","session_id":"stub-session","comments":[],"summary":{"total_tokens":%s},"warnings":%s,"manifest":{"coverage":{"failed":%s}}}' "$status" "${STUB_TOKENS:-0}" "${STUB_WARNINGS:-[]}" "${STUB_COVERAGE_FAILED:-[]}" >"$out"
@@ -622,6 +626,7 @@ OCRSTUB
   export STUB_RANGE_STATUS=complete STUB_COMMIT_STATUS=complete STUB_FAIL_ON_COMMIT=""
   export GH_COMMENTS_JSON='[]'
   export STUB_GARBAGE="" STUB_WARNINGS="" STUB_COVERAGE_FAILED=""
+  export STUB_LOCK_SWAP="" STUB_LOCK_PID=""
 }
 
 make_fixture_repo() {
@@ -1339,6 +1344,112 @@ rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
 assert_eq "$(find "$rd" -maxdepth 2 -name round.json | wc -l | tr -d ' ')" 2 "old and new round.json both exist"
 assert_json '.cumulative_tokens == 250' "$rd/round.json" "the fresh round.json is the active one"
 assert_json '.summary.total_tokens == 100' "$rd"/superseded-*/review.json "the superseded evidence is retained"
+
+echo "pr-round: a round another live process runs is refused, even with --rerun"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+export STUB_TOKENS=100
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+sleep 30 &
+holder=$!
+printf '%s\n' "$holder" >"$pd/round-1.lock"
+export STUB_TOKENS=250
+err=$(run_prr --repo "$repo" --pr 39 --round 1 --rerun 2>&1 >/dev/null); rc=$?
+kill "$holder" 2>/dev/null; wait "$holder" 2>/dev/null
+assert_eq "$rc" 7 "a live holder exits 7"
+assert_contains "$err" "pid $holder" "the refusal names the holder"
+assert_json '.cumulative_tokens == 100' "$pd/round-1/round.json" "the live round's evidence is intact"
+assert_eq "$(find "$pd/round-1" -maxdepth 1 -name 'superseded-*' | wc -l | tr -d ' ')" 0 "nothing was superseded"
+assert_eq "$(cat "$pd/round-1.lock")" "$holder" "the holder's lock stays"
+
+echo "pr-round: a lock whose holder died is taken over and released"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+mkdir -p "$pd"
+sh -c 'exit 0' &
+dead=$!
+wait "$dead"
+printf '%s\n' "$dead" >"$pd/round-1.lock"
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null 2>&1; rc=$?
+assert_eq "$rc" 0 "a stale lock does not block the round"
+assert_json '.reviewer_complete == true' "$pd/round-1/round.json" "the round ran"
+assert_eq "$([[ -e "$pd/round-1.lock" ]] && printf exists || printf absent)" "absent" "the round releases its lock"
+
+echo "pr-round: a round leaves a lock it no longer holds in place"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+export STUB_LOCK_SWAP="$pd/round-1.lock" STUB_LOCK_PID=424242
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null 2>&1; rc=$?
+assert_eq "$rc" 0 "the round ran"
+assert_eq "$(cat "$pd/round-1.lock" 2>/dev/null)" "424242" "the newer holder's lock survives this round's exit"
+
+echo "pr-round: a lock that cannot be written is an error, not a live round"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+mkdir -p "$pd/round-1"
+chmod 555 "$pd"
+err=$(run_prr --repo "$repo" --pr 39 --round 1 2>&1 >/dev/null); rc=$?
+chmod 755 "$pd"
+assert_eq "$rc" 2 "an unwritable lock directory exits 2, not 7"
+assert_contains "$err" "round lock" "the error names the lock"
+assert_not_contains "$err" "already running" "the error does not claim a live round"
+
+echo "pr-round: a lock released right after a failed link is taken, not an error"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+# The first link fails as contention does, then the holder is gone.
+cat >"$stub/ln" <<'LNSTUB'
+#!/usr/bin/env bash
+if [[ ! -e "$STUB_LN_FAILED" ]]; then
+  : >"$STUB_LN_FAILED"
+  printf 'ln: %s: File exists\n' "${*: -1}" >&2
+  exit 1
+fi
+exec /bin/ln "$@"
+LNSTUB
+chmod +x "$stub/ln"
+export STUB_LN_FAILED="$WS/ln-failed"
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null 2>&1; rc=$?
+assert_eq "$rc" 0 "the round takes the released lock"
+assert_json '.reviewer_complete == true' "$pd/round-1/round.json" "the round ran"
+
+echo "pr-round: each lock attempt gets its own retry"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+# Link 1 fails with no lock in place (the first attempt's retry runs); link 2
+# fails because a dead holder's lock appeared (the caller takes it over);
+# link 3, inside the takeover, fails with no lock in place again; link 4 works.
+cat >"$stub/ln" <<'LNSTUB'
+#!/usr/bin/env bash
+n=$(( $(cat "$STUB_LN_COUNT" 2>/dev/null || echo 0) + 1 ))
+printf '%s\n' "$n" >"$STUB_LN_COUNT"
+case $n in
+  1|3) printf 'ln: %s: File exists\n' "${*: -1}" >&2; exit 1 ;;
+  2) printf '%s\n' "$STUB_DEAD_PID" >"${*: -1}"; printf 'ln: %s: File exists\n' "${*: -1}" >&2; exit 1 ;;
+esac
+exec "$REAL_LN" "$@"
+LNSTUB
+chmod +x "$stub/ln"
+sh -c 'exit 0' &
+STUB_DEAD_PID=$!
+wait "$STUB_DEAD_PID"
+REAL_LN=$(command -v ln)
+export STUB_LN_COUNT="$WS/ln-count" STUB_DEAD_PID REAL_LN
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null 2>&1; rc=$?
+assert_eq "$rc" 0 "the takeover's attempt still gets its retry"
+assert_json '.reviewer_complete == true' "$pd/round-1/round.json" "the round ran"
 
 echo "pr-round: cumulative tokens span rounds"
 new_sandbox

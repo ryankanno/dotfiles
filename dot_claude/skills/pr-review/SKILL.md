@@ -37,6 +37,37 @@ $HOME/.claude/skills/issue-to-pr/tools/pr-round.sh \
 `<checkout-dir>` is the absolute path of the local clone or worktree
 that holds the PR branch. It is not the `owner/name` slug.
 
+A round runs for 15 to 80 minutes or more, and a killed call kills the
+round. The round's log goes beside the round dir, not in it, and that
+directory does not exist before round 1. Create it first, on either
+path below:
+
+```bash
+mkdir -p "$HOME/.cache/pr-loop/<owner/repo>/pr-<n>"
+```
+
+Use the harness's own background run when it has one that outlives the
+tool call's time limit and reports the exit (Claude Code's Bash
+`run_in_background`). End the command with `echo "exit=$?" >>"<log>"`.
+
+Only when the harness has no such run (opencode's bash tool stops a
+call after 120 seconds by default), start the round in a detached tmux
+session. A tmux session survives the end of the tool call; a background
+`&` job of the call can die with it. A tmux session gets the tmux
+server's environment, not yours (a PATH without `gh` exits 127), so
+pass your PATH:
+
+```bash
+tmux new-session -d -e PATH="$PATH" -s pr-round-<n>-<N> sh -c \
+  '$HOME/.claude/skills/issue-to-pr/tools/pr-round.sh <args> >"$0" 2>&1; echo "exit=$?" >>"$0"' \
+  "$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/round-<N>.log"
+```
+
+Then poll. Each poll is one tool call with a sleep shorter than the
+tool's limit (`sleep 100` under opencode's default). Either way, the
+round is done when the log's last line is `exit=<code>`. While it runs,
+the round dir has a `round-<N>.lock` file beside it.
+
 `--effort` and `--timeout` go to every review run of the round. Pass
 them only when the caller gives them; without them the binding's
 defaults apply (ocr: `medium`, `80`). For ocr, effort sets the review
@@ -134,7 +165,12 @@ resolvable, 5 when the repository, its refs, or the changed-file
 listing cannot be resolved, and 127 when `gh`, `jq`, or `git` is
 missing. It exits 6 when the round directory already holds evidence:
 `--rerun` moves that evidence into a `superseded-*/` subdirectory, then
-runs the round.
+runs the round. Pass `--rerun` only when the earlier run of this round
+died and left no `round.json` (a harness timeout kills it). A round dir
+with a `round.json` and a `comment.md` is a finished round: use it. The
+script exits 7 when another live process runs the same round. Wait for
+that round. Never pass `--rerun` over it: two callers on one round
+overwrote each other's evidence on PRs 137 and 230.
 
 ## 2. Read round.json
 
@@ -173,8 +209,17 @@ The round's cost is a fact the comment carries: `round.json`'s
 see what the loop has spent to date. The critic's tokens are not in
 `round.json` (the critic is a subagent, not the reviewer binding): take
 them from the usage the harness reports when the subagent returns, and
-put them on the Cost line beside the reviewer's. When the harness
-reports none, the line says so; a guessed number is never written.
+put them on the Cost line beside the reviewer's. opencode's task tool
+reports no usage, but its result starts with `<task id="ses_...">`, and
+the opencode database holds that session's tokens:
+
+```bash
+sqlite3 -readonly "file:$HOME/.local/share/opencode/opencode.db?mode=ro" \
+  "select tokens_input + tokens_output + tokens_reasoning + tokens_cache_read + tokens_cache_write from session where id = '<ses_id>'"
+```
+
+When neither source has a number, the line says so; a guessed number is
+never written.
 
 ## 3. The adversarial critic
 
@@ -209,7 +254,8 @@ Read the diff against the brief yourself:
   feature, tests weakened to pass, tests deleted. A deleted test is a
   high-severity finding.
 - **Gate output:** in refine and convergence rounds, scrutinize the
-  gate transcript, not its exit code alone.
+  gate transcript (the whole log file the gate line writes), not its
+  exit code alone.
 - **Corroboration:** agreement between two sources counts only when
   both could see the code the claim is about. A factual dispute
   settles against the code, not by counting sources.
@@ -234,6 +280,13 @@ $HOME/.claude/skills/issue-to-pr/tools/finding-scope.sh <round-dir> <path>:<star
   3 to 6 sat on reviewed code). Follow-ups are listed, never fixed in
   the loop and never dispositioned; the final report hands them to the
   human.
+- **Follow-up, also when `new`:** a low finding on test assertions or
+  on code-comment wording that the previous refine round added. Each
+  refine that pins one assertion or rewords one comment gives the next
+  critic a new low to flag (PRs 217, 607, 616: the refine cap spent on
+  one test's assertions or one comment's wording). A medium or high
+  finding there still blocks: a test that does not pin its fix is a
+  real defect.
 
 ## 6. Assemble the comment
 
@@ -290,3 +343,6 @@ the session ids and token totals from the round's `review.json`.
   not at all.
 - Never post a comment that failed the scan.
 - Never report an empty result as clean or as a failure.
+- Never write, wrap, or prefix the critic's prompt, also after a context
+  compaction: the prompt is `critic-input.sh`'s output and nothing else.
+- Never run two rounds of one PR at the same time.

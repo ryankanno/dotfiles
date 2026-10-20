@@ -36,8 +36,10 @@ The objective is the reader's value, not the critic's zero.
   formalization, say so and stop; the report marks them as judgment
   calls instead of fixes.
 - Only blocking findings are refine work. Follow-ups sit on code an
-  earlier round already reviewed; they are listed for the human, never
-  fixed or dispositioned here.
+  earlier round already reviewed, or are low findings on test
+  assertions or comment wording that the previous refine added
+  (pr-review §5); they are listed for the human, never fixed or
+  dispositioned here.
 - Severity gates effort. High and medium findings are fixed or rejected
   with reasons; both outcomes are reported. Low findings are the
   implementer's recorded judgment: fix them when the fix is cheap and
@@ -128,7 +130,17 @@ brake.
 
 ## 4. The gate
 
-Run the intake-confirmed gate command. If none was confirmed, discover
+Run the intake-confirmed gate command with its words as written: add no
+flags. Judge it by its exit code, not by a summary line in its output:
+
+```bash
+<gate command> >"<log file>" 2>&1; echo "gate exit=$?"
+```
+
+Read only the log's tail, and only when the exit is not 0. Run the gate
+once per push. The exit code decides whether you push. The review
+round's own read (pr-review §4) still scrutinizes the whole log. If
+none was confirmed, discover
 by: documented command, task runner combined recipe, language tooling
 by manifest. None found: the round reports blocked. Never invent one,
 and never suppress a failure to pass.

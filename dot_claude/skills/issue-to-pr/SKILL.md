@@ -131,8 +131,13 @@ Verify the pane binary with tmux, never a capture and never the agent's
 word:
 
 ```bash
-tmux list-panes -t <session>:<index> -F '#{pane_current_command}'
+tmux list-panes -t <session>:<handle> -F '#{pane_current_command}'
 ```
+
+`<handle>` is the window name that `workmux status` prints for this
+worktree. Read it there after `workmux add`. Never derive it from the
+branch name: workmux changes characters, and a branch name gives "can't
+find window".
 
 The pane must name the chosen harness's binary. Monitor with
 `workmux status` and `workmux capture <handle>`.
@@ -159,7 +164,8 @@ after the PR, refine rounds capped at 3, the convergence round after
 a refine (`--convergence`, the whole PR on the final head), then a stop
 state. A clean round 1 is final: it already reviewed the whole PR.
 Round numbers never repeat; `pr-round.sh` exit 6 means a number was
-reused.
+reused, or the pane's earlier run of that round died before its
+`round.json`.
 
 Watch the pane with `workmux status` / `capture`. Verify each round's
 push with `gh pr view` and each round's comment on the PR. Never run a
@@ -185,7 +191,9 @@ newest round directory is
    the implementer's worktree (`workmux path <handle>` prints it), after
    verifying the worktree's HEAD equals the PR's headRefOid
    (`git -C <worktree> rev-parse HEAD`). A green gate on any other tree
-   declares nothing.
+   declares nothing. Use the intake gate words as written. The exit code
+   decides green; read the log for what pr-review §4 names (skipped,
+   deselected, or deleted tests).
 5. **Every Rejected and Accepted disposition holds.** Read the
    Dispositions blocks of every round comment. Check each reason
    against the diff. The author of the code wrote these reasons, so
@@ -207,6 +215,13 @@ Then decide:
   workmux send <handle> "Refine round <k> on PR <n>: the orchestrator overrules <finding>: <reason>. Run the pr-refine skill on it, then the convergence round."
   ```
 
+  `<k>` is the count of refine rounds the PR has had, plus 1, as the
+  dispatch template counts them. Add nothing beyond the finding and the
+  reason: no fix directions and no retry policy. `workmux send` prints
+  nothing when it succeeds. Verify the delivery with
+  `workmux capture <handle>`, and send again only when the capture does
+  not show the instruction.
+
 - A disposition does not hold and the cap is spent, or the pane
   stopped on `cap spent`: the loop ends `capped-unrecovered`, with the
   remaining findings quoted in the report.
@@ -216,7 +231,10 @@ Then decide:
 
 ## 7. The final report
 
-The last message of the run, verbatim to the future runner:
+The last message of the run, verbatim to the future runner. Fill in
+[`final-report-template.md`](final-report-template.md): every field
+stays, also after a context compaction, and a field you cannot fill says
+why.
 
 - task ref (source locator and title), PR link
 - verdict: `clean` (convergence round found nothing and the gate printed
@@ -225,7 +243,7 @@ The last message of the run, verbatim to the future runner:
   calls are listed), `capped-unrecovered` (blocking findings remain
   after 3 rounds), or
   `blocked` (pane death after redispatch, no gate found, scan hit, a
-  `pr-round.sh` exit 4, 5, 6, or 127, or
+  `pr-round.sh` exit 4, 5, or 127, an exit 6 after the one `--rerun`, or
   a partial or unrecovered reviewer with nothing from any source)
 - per-round one-liners: round number, short SHA, verdict, who ran it
 - the ratification: each item of step 6 and its result, and every
@@ -259,9 +277,11 @@ report; the file is its durable copy, the exact text, no summary layer.
 - **Empty reviewer result:** handled inside the review round (retry once
   per-commit). Two empties: the round is unrecovered, never clean and
   never failing.
-- **`pr-round.sh` exit 4, 5, 6, or 127:** the round reports blocked,
-  with the script's stderr line in the final report. Never pass
-  `--rerun` on your own.
+- **`pr-round.sh` exit 4, 5, or 127, or an exit 6 after the pane's one
+  `--rerun`:** the round reports blocked, with the script's stderr line
+  in the final report. The `--rerun` is the pane's, once, after a dead
+  run (the dispatch template's "Review rounds" section). An exit 7 is a
+  live round, not a failure.
 - **PR creation failed:** capture the pane's error, report blocked. Do
   not redispatch the whole task.
 
@@ -272,3 +292,7 @@ report; the file is its durable copy, the exact text, no summary layer.
 - Never force-push, and never push before the round's gate is green.
 - Never post a comment that failed the scan.
 - Never trust an agent's self-report where a command can verify.
+- Never type a branch name or a handle by hand: copy `branch-name.sh`'s
+  output and `workmux status`'s window name.
+- Never do the implementer's work (commit, push, file the PR) in its
+  worktree.
