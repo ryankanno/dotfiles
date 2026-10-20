@@ -37,8 +37,9 @@ convergence). The orchestrator runs none; it ratifies.
 `converged` (all blocking findings low and dispositioned; accepted
 judgment calls listed), `capped-unrecovered` (blocking findings remain
 after 3 refine rounds),
-`blocked` (pane death after redispatch, no gate, scan hit, or a partial
-or unrecovered reviewer with nothing from any source).
+`blocked` (pane death after redispatch, no gate, scan hit, or a partial,
+nothing reviewable, or unrecovered reviewer with nothing from any
+source).
 
 ## The loop
 
@@ -57,7 +58,7 @@ flowchart TD
     E -- "yes" --> R["Review round, run by the pane<br/>pr-round.sh: range resolved from the PR,<br/>identity check, reviewer binding,<br/>per-commit empty-retry"]
     R --> F["Adversarial critic: fresh clean-context subagent<br/>plus the caller's own read"]
     F --> FS["finding-scope.sh per finding:<br/>high or on the delta blocks,<br/>the rest are follow-ups"]
-    FS --> G["Assemble the comment per report-template<br/>marker first line, six-state verdict"]
+    FS --> G["Assemble the comment per report-template<br/>marker first line, seven-state verdict"]
     G --> S{"Scan before posting"}
     S -- "hit: do not leak" --> Y["Abort the post, record it,<br/>the final report surfaces it"]
     S -- "clean" --> H["Post the round comment<br/>append per round"]
@@ -69,7 +70,7 @@ flowchart TD
     L --> RC{"All blocking findings low<br/>and all dispositioned?"}
     RC -- "yes: converged candidate" --> J
     RC -- "no" --> R
-    I -- "partial or unrecovered" --> P["Neither clean nor failing;<br/>nothing to fix, no clean claim"]
+    I -- "partial, nothing reviewable,<br/>or unrecovered" --> P["Neither clean nor failing;<br/>nothing to fix, no clean claim"]
     K -- "no" --> M["Capped-unrecovered:<br/>findings remain after 3 rounds"]
     J --> JB{"Convergence round blocking?"}
     JB -- "yes" --> K
