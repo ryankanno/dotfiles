@@ -1381,6 +1381,16 @@ run_prr --repo "$repo" --pr 39 --round 1 --expect-branch loop/someone-else --exp
 assert_eq "$rc" 3 "a wrong PR is an identity mismatch, not a late head"
 assert_eq "$([[ -e "$WS/sleeps" ]] && printf yes || printf no)" "no" "it does not wait for a head"
 
+echo "pr-round: --expect-head on a fork PR with the loop's branch name exits 3 without waiting"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+stale_head_after_push 1000
+GH_PR_STALE_JSON="$(jq -c '.isCrossRepository = true' <<<"$GH_PR_STALE_JSON")"
+run_prr --repo "$repo" --pr 39 --round 1 --expect-branch loop/x-y-abc12345 --expect-head "$FR_HEAD" >/dev/null 2>&1; rc=$?
+assert_eq "$rc" 3 "a fork head is an identity mismatch, not a late head"
+assert_eq "$([[ -e "$WS/sleeps" ]] && printf yes || printf no)" "no" "it does not wait for a head"
+
 echo "pr-round: --expect-head on a PR whose head does not resolve exits 4 without waiting"
 new_sandbox
 make_pr_round_env
