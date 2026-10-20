@@ -203,6 +203,8 @@ take_lock() {
   if err=$(ln "$lock.$$" "$lock" 2>&1); then rm -f "$lock.$$"; return 0; fi
   rm -f "$lock.$$"
   [[ -e "$lock" ]] && return 1
+  # A holder can release the lock between the failed link and the check.
+  if [[ -z "${lock_retried:-}" ]]; then lock_retried=1; take_lock; return; fi
   lock_error "$err"
 }
 lock_busy() {

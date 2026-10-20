@@ -1402,6 +1402,27 @@ assert_eq "$rc" 2 "an unwritable lock directory exits 2, not 7"
 assert_contains "$err" "round lock" "the error names the lock"
 assert_not_contains "$err" "already running" "the error does not claim a live round"
 
+echo "pr-round: a lock released right after a failed link is taken, not an error"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+# The first link fails as contention does, then the holder is gone.
+cat >"$stub/ln" <<'LNSTUB'
+#!/usr/bin/env bash
+if [[ ! -e "$STUB_LN_FAILED" ]]; then
+  : >"$STUB_LN_FAILED"
+  printf 'ln: %s: File exists\n' "${*: -1}" >&2
+  exit 1
+fi
+exec /bin/ln "$@"
+LNSTUB
+chmod +x "$stub/ln"
+export STUB_LN_FAILED="$WS/ln-failed"
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null 2>&1; rc=$?
+assert_eq "$rc" 0 "the round takes the released lock"
+assert_json '.reviewer_complete == true' "$pd/round-1/round.json" "the round ran"
+
 echo "pr-round: cumulative tokens span rounds"
 new_sandbox
 make_pr_round_env
