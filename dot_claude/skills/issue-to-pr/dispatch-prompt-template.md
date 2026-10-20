@@ -50,8 +50,10 @@ Brief file: `<absolute path of the brief file>`
   gh pr create --title "<title>" --body-file <body file>
   ```
 
-  Write the body to a file first: an inline `--body` breaks on the
-  quotes and backticks a multi-line body holds. The PR body carries `Closes #<n>` <only for gh issue sources; omit this
+  Write the body to a file outside the worktree first (`mktemp`): an
+  inline `--body` breaks on the quotes and backticks a multi-line body
+  holds, and a body file inside the worktree can be committed. The PR
+  body carries `Closes #<n>` <only for gh issue sources; omit this
   line entirely for markdown or HTML sources>.
 - Never force-push.
 - If an open PR already exists on this branch, do not create another:
