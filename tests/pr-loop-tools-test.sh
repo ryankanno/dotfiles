@@ -1720,6 +1720,17 @@ assert_json '.round_tokens == 0' "$rd/round.json" "nothing billed"
 assert_eq "$(jq -r '.range.head' "$rd/round.json")" "$FR_MERGE" "the next round chains from the merged head"
 assert_contains "$(cat "$rd/prior-findings.md")" "the finding still standing" "the prior round's findings carry forward"
 
+echo "pr-round: the per-commit retry skips a base-merge commit (issue #104)"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+merge_base_into_head
+export STUB_RANGE_STATUS=skipped STUB_COMMIT_STATUS=complete
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
+assert_eq "$(jq -r '[.runs[].mode] | join(" ")' "$rd/round.json")" "range commit:$FR_HEAD" "only the PR's own commit is retried, never the merge that brings in the base"
+assert_json '.reviewer_complete == true' "$rd/round.json" "the PR's own commit recovers the round"
+
 echo "pr-round: a base-merge-only round carries the prior round's unfinished files forward"
 new_sandbox
 make_pr_round_env
