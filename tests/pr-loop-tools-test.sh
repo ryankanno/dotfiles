@@ -584,7 +584,11 @@ case "$1 $2" in
     if [[ -n "${GH_PR_STALE_JSON:-}" ]]; then
       n=$(cat "$GH_PR_VIEWS_FILE" 2>/dev/null || printf 0)
       printf '%s\n' "$((n + 1))" >"$GH_PR_VIEWS_FILE"
-      if [[ "$n" -lt "$GH_PR_STALE_VIEWS" ]]; then printf '%s\n' "$GH_PR_STALE_JSON"; exit 0; fi
+      if [[ "$n" -lt "$GH_PR_STALE_VIEWS" ]]; then
+        # A hung gh: the test's sleep stub only counts pauses, so call the real one.
+        [[ -n "${GH_PR_STALE_HANG:-}" ]] && exec /bin/sleep "$GH_PR_STALE_HANG"
+        printf '%s\n' "$GH_PR_STALE_JSON"; exit 0
+      fi
     fi
     printf '%s\n' "$GH_PR_JSON"
     ;;
@@ -638,7 +642,7 @@ OCRSTUB
   export GH_COMMENTS_JSON='[]'
   export STUB_GARBAGE="" STUB_WARNINGS="" STUB_COVERAGE_FAILED=""
   export STUB_LOCK_SWAP="" STUB_LOCK_PID=""
-  export GH_PR_STALE_JSON="" GH_PR_STALE_VIEWS=0 GH_PR_VIEWS_FILE="$WS/gh-pr-views"
+  export GH_PR_STALE_JSON="" GH_PR_STALE_VIEWS=0 GH_PR_VIEWS_FILE="$WS/gh-pr-views" GH_PR_STALE_HANG=""
 }
 
 make_fixture_repo() {
@@ -1431,6 +1435,47 @@ run_prr --repo "$repo" --pr 39 --round 1 --rerun --expect-head "$FR_HEAD" >/dev/
 assert_eq "$rc" 8 "a head that never arrives exits 8"
 assert_eq "$(cat "$rd/round.json")" "$before" "round.json is unchanged"
 assert_eq "$(find "$rd" -maxdepth 1 -name 'superseded-*' | wc -l | tr -d ' ')" 0 "nothing is superseded"
+
+echo "pr-round: --expect-head with the pushed head on a merged PR exits 4 without waiting"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+stale_head_after_push 0
+GH_PR_JSON="$(jq -c '.state = "MERGED"' <<<"$GH_PR_JSON")"
+export GH_PR_JSON
+run_prr --repo "$repo" --pr 39 --round 1 --expect-head "$FR_HEAD" >/dev/null 2>&1; rc=$?
+assert_eq "$rc" 4 "a merged PR exits 4"
+assert_eq "$([[ -e "$WS/sleeps" ]] && printf yes || printf no)" "no" "it does not pause"
+
+echo "pr-round: --expect-head with a hung gh exits 8 at the wait's deadline"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+stale_head_after_push 1000
+export GH_PR_STALE_HANG=30
+started=$SECONDS
+PR_ROUND_HEAD_WAIT=2 run_prr --repo "$repo" --pr 39 --round 1 --expect-head "$FR_HEAD" >/dev/null 2>&1; rc=$?
+assert_eq "$rc" 8 "a head that never arrives exits 8"
+assert_eq "$(( SECONDS - started < 10 ))" 1 "a hung view does not extend the wait past its deadline"
+assert_eq "$([[ -d "$WS/home/.cache/pr-loop" ]] && printf yes || printf no)" "no" "no round dir created"
+
+echo "pr-round: --expect-head with an empty value is a usage error"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 --expect-head "" >/dev/null 2>&1; rc=$?
+assert_eq "$rc" 2 "an empty SHA is a usage error"
+assert_eq "$([[ -d "$WS/home/.cache/pr-loop" ]] && printf yes || printf no)" "no" "no round dir created"
+
+echo "pr-round: --expect-head with a gh view that is not JSON exits 4 without waiting"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+stale_head_after_push 1000
+export GH_PR_STALE_JSON="not json"
+run_prr --repo "$repo" --pr 39 --round 1 --expect-head "$FR_HEAD" >/dev/null 2>&1; rc=$?
+assert_eq "$rc" 4 "an unreadable view exits 4, not 8"
+assert_eq "$([[ -e "$WS/sleeps" ]] && printf yes || printf no)" "no" "it does not wait for a head"
 
 echo "pr-round: --expect-head takes only a full commit SHA"
 new_sandbox
