@@ -110,8 +110,10 @@ shorter form to substitute.
 
 An existing PR means a previous run: do not create anything. Verify its
 state and resume the loop at step 5. If no pane runs on the worktree,
-reopen it with `workmux open <handle>` and a re-entry prompt that tells
-the implementer to continue its round loop. If the prior run left
+reopen it with `workmux open <handle>` and the dispatch prompt from
+[`dispatch-prompt-template.md`](dispatch-prompt-template.md), with its
+"Resuming" section filled in: never a re-entry text of your own. If the
+prior run left
 `$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/final-report.md`, read it and
 carry its verdict forward into the resume: a capped-unrecovered resume
 inherits the remaining findings instead of rediscovering them, and a
@@ -123,7 +125,15 @@ the final report rather than orphaning it silently.
 
 Write the dispatch prompt from
 [`dispatch-prompt-template.md`](dispatch-prompt-template.md) and the
-confirmed brief, to a file. Then:
+confirmed brief, to a file. Keep `--assignee @me` in its `gh pr create`
+line only when this prints `ADMIN`, because the human takes PRs only on
+repositories they own:
+
+```bash
+gh repo view --json viewerPermission -q .viewerPermission
+```
+
+Then:
 
 ```bash
 workmux add <branch-name> -b -l <layout> -P <prompt-file>
@@ -212,6 +222,10 @@ Then decide:
 - All five hold and the convergence round is `converged (all blocking
   findings low and dispositioned).`: the loop ends `converged`, with the
   accepted judgment calls listed in the final report.
+- The loop ends `clean` or `converged`, and
+  `gh pr view <n> --json isDraft -q .isDraft` prints `true`: mark the
+  PR ready with `gh pr ready <n>`. When it fails, the final report's
+  Draft line carries its error, so the human marks the PR ready.
 - A disposition does not hold, and refine rounds remain: send one
   refine instruction that names the finding and why the reason fails.
   The pane fixes it, then runs the convergence round again.
@@ -241,7 +255,8 @@ The last message of the run, verbatim to the future runner. Fill in
 stays, also after a context compaction, and a field you cannot fill says
 why.
 
-- task ref (source locator and title), PR link
+- task ref (source locator and title), PR link, and whether the PR is
+  still a draft
 - verdict: `clean` (convergence round found nothing and the gate printed
   green), `converged` (blocking findings existed but the convergence
   round found every one low and dispositioned; the accepted judgment
@@ -276,15 +291,17 @@ report; the file is its durable copy, the exact text, no summary layer.
 
 - **Pane death or failed pane check:** redispatch once by reopening the
   surviving worktree (`workmux open <handle>`, worktree and branch
-  persist), with a re-entry prompt. Second failure: blocked.
+  persist), with the dispatch prompt from the template again: its
+  "Resuming" section filled in when the PR exists. Second failure:
+  blocked.
 - **No gate found:** the round reports blocked. Never invent one.
 - **Scan hit on a comment body:** do not post it. Record the finding; it
   surfaces in the final report. Unattended does not mean leaked.
 - **Empty reviewer result:** handled inside the review round (retry once
   per-commit). Two empties: the round is unrecovered, never clean and
   never failing.
-- **`pr-round.sh` exit 4, 5, or 127, or an exit 6 after the pane's one
-  `--rerun`:** the round reports blocked, with the script's stderr line
+- **`pr-round.sh` exit 4, 5, or 127, an exit 6 after the pane's one
+  `--rerun`, or an exit 8 after the pane's one retry:** the round reports blocked, with the script's stderr line
   in the final report. The `--rerun` is the pane's, once, after a dead
   run (the dispatch template's "Review rounds" section). An exit 7 is a
   live round, not a failure.

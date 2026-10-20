@@ -579,7 +579,15 @@ make_pr_round_env() {
   cat >"$stub/gh" <<'GHSTUB'
 #!/usr/bin/env bash
 case "$1 $2" in
-  "pr view") printf '%s\n' "$GH_PR_JSON" ;;
+  "pr view")
+    # GitHub can report the previous head for a while after a push.
+    if [[ -n "${GH_PR_STALE_JSON:-}" ]]; then
+      n=$(cat "$GH_PR_VIEWS_FILE" 2>/dev/null || printf 0)
+      printf '%s\n' "$((n + 1))" >"$GH_PR_VIEWS_FILE"
+      if [[ "$n" -lt "$GH_PR_STALE_VIEWS" ]]; then printf '%s\n' "$GH_PR_STALE_JSON"; exit 0; fi
+    fi
+    printf '%s\n' "$GH_PR_JSON"
+    ;;
   "repo view") printf 'test-owner/test-repo\n' ;;
   "api user") printf 'test-me\n' ;;
   "api --paginate")
@@ -630,6 +638,7 @@ OCRSTUB
   export GH_COMMENTS_JSON='[]'
   export STUB_GARBAGE="" STUB_WARNINGS="" STUB_COVERAGE_FAILED=""
   export STUB_LOCK_SWAP="" STUB_LOCK_PID=""
+  export GH_PR_STALE_JSON="" GH_PR_STALE_VIEWS=0 GH_PR_VIEWS_FILE="$WS/gh-pr-views"
 }
 
 make_fixture_repo() {
@@ -1329,6 +1338,107 @@ rc=$?
 assert_eq "$rc" 3 "identity mismatch exits 3"
 assert_eq "$([[ -d "$WS/home/.cache/pr-loop" ]] && printf yes || printf no)" "no" "no round dir created"
 
+stale_head_after_push() { # stale views -> gh pr view reports FR_BASE as the head that many times
+  GH_PR_STALE_JSON="$(jq -c --arg h "$FR_BASE" '.headRefOid = $h' <<<"$GH_PR_JSON")"
+  export GH_PR_STALE_JSON GH_PR_STALE_VIEWS="$1"
+  # The wait's pauses are real time; the stub keeps the suite fast.
+  printf '#!/usr/bin/env bash\nprintf x >>"%s"\n' "$WS/sleeps" >"$stub/sleep"
+  chmod +x "$stub/sleep"
+}
+
+echo "pr-round: --expect-head waits until GitHub reports the pushed head"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+stale_head_after_push 2
+out=$(run_prr --repo "$repo" --pr 39 --round 1 --expect-branch loop/x-y-abc12345 --expect-head "$FR_HEAD"); rc=$?
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
+assert_eq "$rc" 0 "the round runs once the head arrives"
+assert_eq "$(jq -r '.range.head' "$rd/round.json")" "$FR_HEAD" "the round reviews the pushed head, not the previous one"
+assert_eq "$(cat "$WS/sleeps")" "xx" "it pauses once per stale view"
+
+echo "pr-round: --expect-head that GitHub never reports exits 8 before any evidence"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+stale_head_after_push 1000
+err=$(run_prr --repo "$repo" --pr 39 --round 1 --expect-head "$FR_HEAD" 2>&1 >/dev/null); rc=$?
+assert_eq "$rc" 8 "a head that never arrives exits 8"
+assert_contains "$err" "$FR_HEAD" "the message names the expected head"
+assert_contains "$err" "$FR_BASE" "the message names the head GitHub reports"
+assert_eq "$([[ -d "$WS/home/.cache/pr-loop" ]] && printf yes || printf no)" "no" "no round dir created"
+
+echo "pr-round: --expect-head on a PR that is not open exits 4 without waiting"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+stale_head_after_push 1000
+GH_PR_STALE_JSON="$(jq -c '.state = "MERGED"' <<<"$GH_PR_STALE_JSON")"
+run_prr --repo "$repo" --pr 39 --round 1 --expect-head "$FR_HEAD" >/dev/null 2>&1; rc=$?
+assert_eq "$rc" 4 "a merged PR exits 4"
+assert_eq "$([[ -e "$WS/sleeps" ]] && printf yes || printf no)" "no" "it does not wait for a head"
+
+echo "pr-round: --expect-head that GitHub already reports runs without a pause"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+stale_head_after_push 0
+out=$(run_prr --repo "$repo" --pr 39 --round 1 --expect-head "$FR_HEAD"); rc=$?
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
+assert_eq "$rc" 0 "the round runs"
+assert_eq "$(jq -r '.range.head' "$rd/round.json")" "$FR_HEAD" "it reviews the pushed head"
+assert_eq "$([[ -e "$WS/sleeps" ]] && printf yes || printf no)" "no" "it does not pause"
+
+echo "pr-round: --expect-head on another branch's PR exits 3 without waiting"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+stale_head_after_push 1000
+run_prr --repo "$repo" --pr 39 --round 1 --expect-branch loop/someone-else --expect-head "$FR_HEAD" >/dev/null 2>&1; rc=$?
+assert_eq "$rc" 3 "a wrong PR is an identity mismatch, not a late head"
+assert_eq "$([[ -e "$WS/sleeps" ]] && printf yes || printf no)" "no" "it does not wait for a head"
+
+echo "pr-round: --expect-head on a fork PR with the loop's branch name exits 3 without waiting"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+stale_head_after_push 1000
+GH_PR_STALE_JSON="$(jq -c '.isCrossRepository = true' <<<"$GH_PR_STALE_JSON")"
+run_prr --repo "$repo" --pr 39 --round 1 --expect-branch loop/x-y-abc12345 --expect-head "$FR_HEAD" >/dev/null 2>&1; rc=$?
+assert_eq "$rc" 3 "a fork head is an identity mismatch, not a late head"
+assert_eq "$([[ -e "$WS/sleeps" ]] && printf yes || printf no)" "no" "it does not wait for a head"
+
+echo "pr-round: --expect-head on a PR whose head does not resolve exits 4 without waiting"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+stale_head_after_push 1000
+GH_PR_STALE_JSON="$(jq -c '.headRefOid = null' <<<"$GH_PR_STALE_JSON")"
+run_prr --repo "$repo" --pr 39 --round 1 --expect-head "$FR_HEAD" >/dev/null 2>&1; rc=$?
+assert_eq "$rc" 4 "an unresolvable PR exits 4"
+assert_eq "$([[ -e "$WS/sleeps" ]] && printf yes || printf no)" "no" "it does not wait for a head"
+
+echo "pr-round: --expect-head that never arrives leaves a finished round's evidence unchanged"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+export STUB_TOKENS=100
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
+before=$(cat "$rd/round.json")
+stale_head_after_push 1000
+run_prr --repo "$repo" --pr 39 --round 1 --rerun --expect-head "$FR_HEAD" >/dev/null 2>&1; rc=$?
+assert_eq "$rc" 8 "a head that never arrives exits 8"
+assert_eq "$(cat "$rd/round.json")" "$before" "round.json is unchanged"
+assert_eq "$(find "$rd" -maxdepth 1 -name 'superseded-*' | wc -l | tr -d ' ')" 0 "nothing is superseded"
+
+echo "pr-round: --expect-head takes only a full commit SHA"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 --expect-head "${FR_HEAD:0:7}" >/dev/null 2>&1; rc=$?
+assert_eq "$rc" 2 "an abbreviated SHA is a usage error"
+
 echo "pr-round: a non-open PR is refused"
 new_sandbox
 make_pr_round_env
@@ -1736,6 +1846,17 @@ assert_json '.reviewer_complete == false' "$rd/round.json" "nothing reviewed is 
 assert_json '.round_tokens == 0' "$rd/round.json" "nothing billed"
 assert_eq "$(jq -r '.range.head' "$rd/round.json")" "$FR_MERGE" "the next round chains from the merged head"
 assert_contains "$(cat "$rd/prior-findings.md")" "the finding still standing" "the prior round's findings carry forward"
+
+echo "pr-round: the per-commit retry skips a base-merge commit (issue #104)"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+merge_base_into_head
+export STUB_RANGE_STATUS=skipped STUB_COMMIT_STATUS=complete
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
+assert_eq "$(jq -r '[.runs[].mode] | join(" ")' "$rd/round.json")" "range commit:$FR_HEAD" "only the PR's own commit is retried, never the merge that brings in the base"
+assert_json '.reviewer_complete == true' "$rd/round.json" "the PR's own commit recovers the round"
 
 echo "pr-round: a base-merge-only round carries the prior round's unfinished files forward"
 new_sandbox

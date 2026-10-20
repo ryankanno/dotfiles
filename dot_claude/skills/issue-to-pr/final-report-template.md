@@ -2,6 +2,7 @@
 
 - **Task:** <source locator> | <title>
 - **PR:** <PR URL>
+- **Draft:** <no | yes (the loop did not end clean or converged) | yes (`gh pr ready` failed: <its error>)>
 - **Verdict:** <clean | converged | capped-unrecovered | blocked (<reason>)>
 
 ## Rounds

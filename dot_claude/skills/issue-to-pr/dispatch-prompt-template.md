@@ -8,7 +8,28 @@ Source: <source locator>
 
 Brief file: `<absolute path of the brief file>`
 
-<Only when the grill is on; omit this section entirely when it is off:>
+<Only when the PR already exists (a resume, or a redispatch after pane
+death); omit this section otherwise:>
+## Resuming PR <n>
+
+PR <n> (<PR URL>) already exists on this branch. Do not file another
+PR, and do not redo work the branch already holds.
+
+- Read the newest round directory under
+  `$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/`. When there is none,
+  start at Round 1 below.
+- A round with a `round.json` and a `comment.md` is finished:
+  continue the "Review rounds" loop below from it, with the next free
+  round number. A round with a `round.json` and no `comment.md` is
+  unfinished: continue it from pr-review §2, and do not run
+  `pr-round.sh` again. Any other round is unfinished: finish that same
+  round with the pr-review skill, by the exit 6 and exit 7 rules below.
+<only when the prior run left a final report:>
+- The prior run's final report is `<path of final-report.md>`: its
+  verdict and remaining findings carry forward.
+
+<Only when the grill is on and no PR exists yet; omit this section
+entirely otherwise:>
 ## Before any code: plan, then grill it here
 
 1. Write the implementation plan (the writing-plans skill).
@@ -47,8 +68,12 @@ Brief file: `<absolute path of the brief file>`
 
   ```
   git push -u origin HEAD
-  gh pr create --title "<title>" --body-file <body file>
+  gh pr create --draft <--assignee @me only when the gh user is an admin of the repository; omit it otherwise> --title "<title>" --body-file <body file>
   ```
+
+  Keep the PR a draft. A repository that auto-merges on green CI
+  merges a ready PR before its review rounds finish. The orchestrator
+  marks it ready when the loop ends clean or converged.
 
   Write the body to a file outside the worktree first (`mktemp`): an
   inline `--body` breaks on the quotes and backticks a multi-line body
@@ -65,7 +90,8 @@ The orchestrator runs no review. It ratifies your rounds when you stop.
 Every round has a unique number, and every round posts its comment.
 
 1. **Round 1:** right after the PR is filed, run the pr-review skill on
-   the PR, with `--expect-branch <branch-name>`.
+   the PR, with `--expect-branch <branch-name>` and
+   `--expect-head <the SHA you pushed>` (`git rev-parse HEAD`).
 2. **Refine rounds:** while the newest round has blocking findings, run
    the pr-refine skill on the PR. Refine round k writes review round
    k+1. Run at most 3 refine rounds.
@@ -87,7 +113,9 @@ A round runs longer than one tool call. Start it in the background as
 pr-review §1 says. When `pr-round.sh` exits 6 and the round dir has no
 `round.json`, your earlier run of that round died: pass `--rerun` once.
 When it exits 7, another process runs that round: wait for it, and
-never `--rerun` over it.
+never `--rerun` over it. When it exits 8, GitHub did not report the
+pushed head in time, and the round left no evidence: run it again
+once, without `--rerun`. A second exit 8 stops the loop as blocked.
 
 After you stop, a refine instruction can arrive by `workmux send`. It
 names a disposition the orchestrator overrules. Run the pr-refine skill
