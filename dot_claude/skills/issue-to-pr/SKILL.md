@@ -198,8 +198,8 @@ newest round directory is
    `round.json` equals `headRefOid` from
    `gh pr view <n> --json headRefOid`.
 2. **The newest round reviewed the whole PR.** `range.review_scope`
-   starts with `full:`. A `delta`, `none:`, partial or unrecovered
-   round declares nothing.
+   starts with `full:`. A `delta`, `none:`, partial, nothing reviewable
+   or unrecovered round declares nothing.
 3. **The round's comment is on the PR** with the same round number and
    verdict as `round.json`.
 4. **The gate is green on the PR's code, not your checkout.** Run it in
@@ -264,7 +264,8 @@ why.
   after 3 rounds), or
   `blocked` (pane death after redispatch, no gate found, scan hit, a
   `pr-round.sh` exit 4, 5, or 127, an exit 6 after the one `--rerun`, or
-  a partial or unrecovered reviewer with nothing from any source)
+  a partial, nothing-reviewable or unrecovered reviewer with nothing
+  from any source)
 - per-round one-liners: round number, short SHA, verdict, who ran it
 - the ratification: each item of step 6 and its result, and every
   disposition you overruled, with the reason

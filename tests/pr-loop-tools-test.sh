@@ -628,6 +628,9 @@ if [[ -n "$STUB_LOCK_SWAP" ]]; then
 fi
 status="$STUB_RANGE_STATUS"
 if [[ "$mode" == "commit" ]]; then status="$STUB_COMMIT_STATUS"; fi
+# ocr never writes a "missing" status: a run with no review text exits
+# non-zero and leaves no review.json.
+if [[ "$status" == missing ]]; then exit 1; fi
 printf '{"status":"%s","session_id":"stub-session","comments":[],"summary":{"total_tokens":%s},"warnings":%s,"manifest":{"coverage":{"failed":%s}}}' "$status" "${STUB_TOKENS:-0}" "${STUB_WARNINGS:-[]}" "${STUB_COVERAGE_FAILED:-[]}" >"$out"
 OCRSTUB
   chmod +x "$stub/gh" "$stub/ocr"
@@ -683,26 +686,40 @@ assert_eq "$(jq -r '.range.exact' "$rd/round.json")" "$FR_BASE..$FR_HEAD" "exact
 assert_eq "$(jq -r '.range.base_branch' "$rd/round.json")" "main" "the base branch name is kept"
 assert_eq "$(jq -r '.identity.head_branch' "$rd/round.json")" "loop/x-y-abc12345" "identity recorded"
 
-echo "pr-round: a skipped range retries per commit and recovers"
+echo "pr-round: a range with no review text retries per commit and recovers"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+export STUB_RANGE_STATUS=missing STUB_COMMIT_STATUS=complete
+out=$(run_prr --repo "$repo" --pr 39 --round 1)
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
+assert_json '.reviewer_complete == true' "$rd/round.json" "reviewer_complete true after the commit retry"
+assert_eq "$(jq '.runs | length' "$rd/round.json")" 2 "range plus one commit run"
+assert_eq "$(jq -r '.runs[0].status' "$rd/round.json")" "missing" "the failed range is recorded verbatim"
+assert_eq "$(jq -r '.runs[0].exit_code' "$rd/round.json")" 1 "the range run failed the way ocr fails: non-zero, no review.json"
+
+echo "pr-round: a range and every commit retry with no review text is unrecovered"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+export STUB_RANGE_STATUS=missing STUB_COMMIT_STATUS=missing
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
+assert_json '.reviewer_complete == false' "$rd/round.json" "no review text anywhere is never a complete review"
+assert_eq "$(jq '.runs | length' "$rd/round.json")" 2 "range plus one commit retry"
+assert_eq "$(jq -r '[.runs[].status] | unique | join(",")' "$rd/round.json")" "missing" "every run is recorded missing, none complete"
+
+echo "pr-round: a skipped range is recorded once and not retried per commit"
 new_sandbox
 make_pr_round_env
 make_fixture_repo
 export STUB_RANGE_STATUS=skipped STUB_COMMIT_STATUS=complete
 out=$(run_prr --repo "$repo" --pr 39 --round 1)
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
-assert_json '.reviewer_complete == true' "$rd/round.json" "reviewer_complete true after the commit retry"
-assert_eq "$(jq '.runs | length' "$rd/round.json")" 2 "range plus one commit run"
+assert_json '.reviewer_complete == false' "$rd/round.json" "nothing reviewable is never a complete review"
+assert_eq "$(jq '.runs | length' "$rd/round.json")" 1 "no per-commit retry of files ocr does not select"
 assert_eq "$(jq -r '.runs[0].status' "$rd/round.json")" "skipped" "the skip is recorded verbatim"
-
-echo "pr-round: an all-skipped round is reviewer_complete false"
-new_sandbox
-make_pr_round_env
-make_fixture_repo
-export STUB_RANGE_STATUS=skipped STUB_COMMIT_STATUS=skipped
-out=$(run_prr --repo "$repo" --pr 39 --round 1)
-rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
-assert_json '.reviewer_complete == false' "$rd/round.json" "reviewer_complete false"
-assert_eq "$(jq '.runs | length' "$rd/round.json")" 2 "both runs recorded"
+assert_eq "$([[ -e "$rd/commit-1" ]] && printf exists || printf absent)" "absent" "no commit run was started"
 
 echo "pr-round: a partial per-commit recovery is reviewer_complete false"
 new_sandbox
@@ -713,7 +730,7 @@ git -C "$repo" commit -qam third
 FR_HEAD3=$(git -C "$repo" rev-parse HEAD)
 git -C "$repo" push -q origin "HEAD:refs/pull/39/head"
 export GH_PR_JSON='{"state":"OPEN","baseRefName":"main","headRefOid":"'"$FR_HEAD3"'","headRefName":"loop/x-y-abc12345","url":"https://example.test/39"}'
-export STUB_RANGE_STATUS=skipped STUB_COMMIT_STATUS=complete STUB_FAIL_ON_COMMIT="$FR_HEAD"
+export STUB_RANGE_STATUS=missing STUB_COMMIT_STATUS=complete STUB_FAIL_ON_COMMIT="$FR_HEAD"
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
 assert_json '.reviewer_complete == false' "$rd/round.json" "one unreviewed commit keeps the round incomplete"
@@ -755,7 +772,7 @@ echo "pr-round: --effort and --timeout reach every review run"
 new_sandbox
 make_pr_round_env
 make_fixture_repo
-export STUB_RANGE_STATUS=skipped STUB_COMMIT_STATUS=complete
+export STUB_RANGE_STATUS=missing STUB_COMMIT_STATUS=complete
 run_prr --repo "$repo" --pr 39 --round 1 --effort high --timeout 40 >/dev/null
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
 assert_contains "$(cat "$rd/cmd.txt")" "--timeout 40 --effort high" "the range run gets them"
@@ -774,7 +791,7 @@ echo "pr-round: --max-tools and --max-tokens-budget reach every review run"
 new_sandbox
 make_pr_round_env
 make_fixture_repo
-export STUB_RANGE_STATUS=skipped STUB_COMMIT_STATUS=complete
+export STUB_RANGE_STATUS=missing STUB_COMMIT_STATUS=complete
 run_prr --repo "$repo" --pr 39 --round 1 --max-tools 150 --max-tokens-budget 9000000 >/dev/null
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
 assert_contains "$(cat "$rd/cmd.txt")" "--max-tools 150 --max-tokens-budget 9000000" "the range run gets them"
@@ -1835,7 +1852,7 @@ new_sandbox
 make_pr_round_env
 make_fixture_repo
 merge_base_into_head
-export STUB_RANGE_STATUS=skipped STUB_COMMIT_STATUS=complete
+export STUB_RANGE_STATUS=missing STUB_COMMIT_STATUS=complete
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
 assert_eq "$(jq -r '[.runs[].mode] | join(" ")' "$rd/round.json")" "range commit:$FR_HEAD" "only the PR's own commit is retried, never the merge that brings in the base"
@@ -1999,7 +2016,7 @@ make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
 advance_head f.txt 'b\nc\n'
 advance_head g.txt 'new\n'
-export STUB_RANGE_STATUS=skipped STUB_COMMIT_STATUS=complete
+export STUB_RANGE_STATUS=missing STUB_COMMIT_STATUS=complete
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
 assert_eq "$(jq '.runs | length' "$rd/round.json")" 3 "the range plus the two delta commits, not the round 1 commit"
