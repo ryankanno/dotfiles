@@ -620,6 +620,9 @@ if [[ -n "$STUB_LOCK_SWAP" ]]; then
 fi
 status="$STUB_RANGE_STATUS"
 if [[ "$mode" == "commit" ]]; then status="$STUB_COMMIT_STATUS"; fi
+# ocr never writes a "missing" status: a run with no review text exits
+# non-zero and leaves no review.json.
+if [[ "$status" == missing ]]; then exit 1; fi
 printf '{"status":"%s","session_id":"stub-session","comments":[],"summary":{"total_tokens":%s},"warnings":%s,"manifest":{"coverage":{"failed":%s}}}' "$status" "${STUB_TOKENS:-0}" "${STUB_WARNINGS:-[]}" "${STUB_COVERAGE_FAILED:-[]}" >"$out"
 OCRSTUB
   chmod +x "$stub/gh" "$stub/ocr"
@@ -684,6 +687,7 @@ rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
 assert_json '.reviewer_complete == true' "$rd/round.json" "reviewer_complete true after the commit retry"
 assert_eq "$(jq '.runs | length' "$rd/round.json")" 2 "range plus one commit run"
 assert_eq "$(jq -r '.runs[0].status' "$rd/round.json")" "missing" "the failed range is recorded verbatim"
+assert_eq "$(jq -r '.runs[0].exit_code' "$rd/round.json")" 1 "the range run failed the way ocr fails: non-zero, no review.json"
 
 echo "pr-round: a skipped range is recorded once and not retried per commit"
 new_sandbox
