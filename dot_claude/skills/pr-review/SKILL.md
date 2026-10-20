@@ -30,7 +30,7 @@ skill's prose:
 $HOME/.claude/skills/issue-to-pr/tools/pr-round.sh \
   --repo <checkout-dir> --pr <n> --round <N> \
   --brief <brief-file> --expect-branch <branch-name> \
-  [--effort low|medium|high] [--timeout <minutes>] \
+  [--expect-head <pushed-sha>] [--effort low|medium|high] [--timeout <minutes>] \
   [--max-tools <n>] [--max-tokens-budget <n>]
 ```
 
@@ -147,7 +147,14 @@ whole-PR diff, where only a high finding blocks.
 `--expect-branch` binds the round to this loop's branch: a PR whose
 head is any other branch is a hallucinated number, and the script exits
 3 before anything reviews or posts. Omit it only when the caller
-cannot know the branch (a human's standalone review). The script
+cannot know the branch (a human's standalone review).
+
+Pass `--expect-head <pushed-sha>` when the round starts right after a
+push (`git rev-parse HEAD` after the push). Right after a push,
+`gh pr view` can still report the previous head. The script waits up to
+about a minute until GitHub reports the pushed head, then reviews only
+that head. When GitHub never reports it, the script exits 8 before it
+creates or changes any round evidence: run the round again once. The script
 resolves the range from the PR (never the checkout's `HEAD`), fetches
 the refs, runs the active reviewer binding over the round's range,
 applies the per-commit

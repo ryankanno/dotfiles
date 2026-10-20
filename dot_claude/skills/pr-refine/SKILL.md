@@ -157,7 +157,8 @@ never force.
 Run the full review round exactly as
 `$HOME/.claude/skills/pr-review/SKILL.md` defines it, over the new head
 SHA — once, at the end, over the final head, never once per
-intermediate head. Pass the `--effort`, `--timeout`, `--max-tools` and
+intermediate head. Pass `--expect-head` with the SHA you pushed
+(`git rev-parse HEAD`). Pass the `--effort`, `--timeout`, `--max-tools` and
 `--max-tokens-budget` the loop's rounds use, when the dispatch prompt or
 the caller names them. Post the
 round's comment per `report-template.md`

@@ -8,6 +8,8 @@
 #
 # Interface in:  --repo <dir> --pr <n> --round <N> [--brief <file>]
 #                [--dispositions <file>] [--expect-branch <branch-name>]
+#                [--expect-head <sha>: wait, bounded, until gh pr view
+#                reports this head, and review only it]
 #                [--effort low|medium|high] [--timeout <minutes>]
 #                [--max-tools <n>] [--max-tokens-budget <n>] (passed
 #                to every review run; the binding owns the defaults)
@@ -50,16 +52,17 @@
 # missing, not open, or not resolvable; 5 the repository, its refs, or
 # the changed-file listing could not be resolved; 6 the round dir already holds
 # evidence and --rerun was not passed; 7 another live process runs this
-# round (its pid is in round-<N>.lock); 127 a dependency is missing. A
+# round (its pid is in round-<N>.lock); 8 GitHub did not report the
+# --expect-head SHA within the wait; 127 a dependency is missing. A
 # review run's own failure is recorded in round.json, not propagated.
 set -euo pipefail
 
 usage() {
-  printf 'usage: pr-round.sh --repo <dir> --pr <n> --round <N> [--brief <file>] [--dispositions <file>] [--expect-branch <branch-name>] [--effort low|medium|high] [--timeout <minutes>] [--max-tools <n>] [--max-tokens-budget <n>] [--rerun] [--convergence]\n' >&2
+  printf 'usage: pr-round.sh --repo <dir> --pr <n> --round <N> [--brief <file>] [--dispositions <file>] [--expect-branch <branch-name>] [--expect-head <sha>] [--effort low|medium|high] [--timeout <minutes>] [--max-tools <n>] [--max-tokens-budget <n>] [--rerun] [--convergence]\n' >&2
   exit 2
 }
 
-repo="" pr="" round="" brief="" dispositions="" expect="" rerun="" effort="" timeout="" max_tools="" token_budget="" convergence=""
+repo="" pr="" round="" brief="" dispositions="" expect="" expect_head="" rerun="" effort="" timeout="" max_tools="" token_budget="" convergence=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --repo) [[ $# -ge 2 ]] || usage; repo="$2"; shift 2 ;;
@@ -68,6 +71,7 @@ while [[ $# -gt 0 ]]; do
     --brief) [[ $# -ge 2 ]] || usage; brief="$2"; shift 2 ;;
     --dispositions) [[ $# -ge 2 ]] || usage; dispositions="$2"; shift 2 ;;
     --expect-branch) [[ $# -ge 2 ]] || usage; expect="$2"; shift 2 ;;
+    --expect-head) [[ $# -ge 2 ]] || usage; expect_head="$2"; shift 2 ;;
     --effort) [[ $# -ge 2 ]] || usage; effort="$2"; shift 2 ;;
     --timeout) [[ $# -ge 2 ]] || usage; timeout="$2"; shift 2 ;;
     --max-tools) [[ $# -ge 2 ]] || usage; max_tools="$2"; shift 2 ;;
@@ -91,6 +95,8 @@ case "$effort" in ""|low|medium|high) ;; *) usage ;; esac
 case "$repo" in /*) ;; *) printf 'repo must be an absolute path\n' >&2; exit 2 ;; esac
 [[ "$pr" =~ ^[0-9]+$ ]] || usage
 [[ "$round" =~ ^[0-9]+$ ]] || usage
+# headRefOid is always the full SHA, so only a full one can ever match.
+[[ -z "$expect_head" || "$expect_head" =~ ^([0-9a-f]{40}|[0-9a-f]{64})$ ]] || usage
 if [[ -n "$brief" ]]; then
   case "$brief" in /*) ;; *) printf 'brief must be an absolute path\n' >&2; exit 2 ;; esac
   [[ -f "$brief" ]] || { printf 'brief not found: %s\n' "$brief" >&2; exit 2; }
@@ -145,10 +151,28 @@ if [[ -n "$brief" && "$limit" -gt 0 ]]; then
   fi
 fi
 
-pr_json=$(cd "$repo" && gh pr view "$pr" --json state,baseRefName,headRefOid,headRefName,isCrossRepository,url) || {
-  printf 'cannot view PR %s\n' "$pr" >&2
-  exit 4
-}
+# Right after a push, gh pr view can report the previous head for a few
+# seconds (issue #88), and a round started then reviews the old head.
+# The wait ends before the round dir exists, so a timeout leaves no evidence.
+tries=0
+while :; do
+  pr_json=$(cd "$repo" && gh pr view "$pr" --json state,baseRefName,headRefOid,headRefName,isCrossRepository,url) || {
+    printf 'cannot view PR %s\n' "$pr" >&2
+    exit 4
+  }
+  [[ -z "$expect_head" ]] && break
+  # A PR that is not open, has no head, or is not this loop's branch never
+  # gets the pushed head: the checks below refuse it with their own code.
+  jq -e --arg h "$expect_head" --arg b "$expect" '
+    .headRefOid == $h or .state != "OPEN" or (.headRefOid // "") == ""
+    or ($b != "" and (.headRefName != $b or .isCrossRepository == true))' <<<"$pr_json" >/dev/null && break
+  tries=$((tries + 1))
+  if [[ "$tries" -ge 30 ]]; then
+    printf 'PR %s head is %s after %s views, expected %s\n' "$pr" "$(jq -r .headRefOid <<<"$pr_json")" "$tries" "$expect_head" >&2
+    exit 8
+  fi
+  sleep 2
+done
 state=$(jq -r .state <<<"$pr_json")
 base=$(jq -r .baseRefName <<<"$pr_json")
 head=$(jq -r .headRefOid <<<"$pr_json")
