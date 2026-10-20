@@ -142,7 +142,8 @@ once per push. The exit code decides whether you push. The review
 round's own read (pr-review §4) still scrutinizes the whole log. If
 none was confirmed, discover
 by: documented command, task runner combined recipe, language tooling
-by manifest. None found: the round reports blocked. Never invent one,
+by manifest, plus the checks the commit hooks run. None found: the
+round reports blocked. Never invent one,
 and never suppress a failure to pass.
 
 ## 5. Commit and push
