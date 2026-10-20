@@ -1414,10 +1414,11 @@ if [[ ! -e "$STUB_LN_FAILED" ]]; then
   printf 'ln: %s: File exists\n' "${*: -1}" >&2
   exit 1
 fi
-exec /bin/ln "$@"
+exec "$REAL_LN" "$@"
 LNSTUB
 chmod +x "$stub/ln"
-export STUB_LN_FAILED="$WS/ln-failed"
+REAL_LN=$(command -v ln)
+export STUB_LN_FAILED="$WS/ln-failed" REAL_LN
 pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null 2>&1; rc=$?
 assert_eq "$rc" 0 "the round takes the released lock"
@@ -1450,6 +1451,25 @@ pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null 2>&1; rc=$?
 assert_eq "$rc" 0 "the takeover's attempt still gets its retry"
 assert_json '.reviewer_complete == true' "$pd/round-1/round.json" "the round ran"
+
+echo "pr-round: the lock retry gives up after one attempt"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+# Every link fails with no lock in place, as on a filesystem without hard links.
+cat >"$stub/ln" <<'LNSTUB'
+#!/usr/bin/env bash
+printf 'x\n' >>"$STUB_LN_CALLS"
+printf 'ln: simulating a filesystem without hard links\n' >&2
+exit 1
+LNSTUB
+chmod +x "$stub/ln"
+export STUB_LN_CALLS="$WS/ln-calls"
+err=$(run_prr --repo "$repo" --pr 39 --round 1 2>&1 >/dev/null); rc=$?
+assert_eq "$rc" 2 "a link that keeps failing exits 2"
+assert_contains "$err" "round lock" "the error names the lock"
+assert_contains "$err" "simulating a filesystem without hard links" "ln's own error is carried"
+assert_eq "$(wc -l <"$STUB_LN_CALLS" | tr -d ' ')" 2 "one attempt and one retry, no more"
 
 echo "pr-round: cumulative tokens span rounds"
 new_sandbox
