@@ -1852,7 +1852,7 @@ new_sandbox
 make_pr_round_env
 make_fixture_repo
 merge_base_into_head
-export STUB_RANGE_STATUS=skipped STUB_COMMIT_STATUS=complete
+export STUB_RANGE_STATUS=missing STUB_COMMIT_STATUS=complete
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
 assert_eq "$(jq -r '[.runs[].mode] | join(" ")' "$rd/round.json")" "range commit:$FR_HEAD" "only the PR's own commit is retried, never the merge that brings in the base"
