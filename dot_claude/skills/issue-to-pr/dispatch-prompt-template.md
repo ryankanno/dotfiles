@@ -8,7 +8,24 @@ Source: <source locator>
 
 Brief file: `<absolute path of the brief file>`
 
-<Only when the grill is on; omit this section entirely when it is off:>
+<Only when the PR already exists (a resume, or a redispatch after pane
+death); omit this section otherwise:>
+## Resuming PR <n>
+
+PR <n> (<PR URL>) already exists on this branch. Do not file another
+PR, and do not redo work the branch already holds.
+
+- Read the newest round directory under
+  `$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/` that has a `round.json`,
+  and its `comment.md`.
+- Continue the "Review rounds" loop below from that round. The next
+  round takes the next free round number; never reuse one.
+<only when the prior run left a final report:>
+- The prior run's final report is `<path of final-report.md>`: its
+  verdict and remaining findings carry forward.
+
+<Only when the grill is on and this is a first dispatch; omit this
+section entirely otherwise:>
 ## Before any code: plan, then grill it here
 
 1. Write the implementation plan (the writing-plans skill).

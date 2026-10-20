@@ -110,8 +110,10 @@ shorter form to substitute.
 
 An existing PR means a previous run: do not create anything. Verify its
 state and resume the loop at step 5. If no pane runs on the worktree,
-reopen it with `workmux open <handle>` and a re-entry prompt that tells
-the implementer to continue its round loop. If the prior run left
+reopen it with `workmux open <handle>` and the dispatch prompt from
+[`dispatch-prompt-template.md`](dispatch-prompt-template.md), with its
+"Resuming" section filled in: never a re-entry text of your own. If the
+prior run left
 `$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/final-report.md`, read it and
 carry its verdict forward into the resume: a capped-unrecovered resume
 inherits the remaining findings instead of rediscovering them, and a
@@ -275,7 +277,9 @@ report; the file is its durable copy, the exact text, no summary layer.
 
 - **Pane death or failed pane check:** redispatch once by reopening the
   surviving worktree (`workmux open <handle>`, worktree and branch
-  persist), with a re-entry prompt. Second failure: blocked.
+  persist), with the dispatch prompt from the template again: its
+  "Resuming" section filled in when the PR exists. Second failure:
+  blocked.
 - **No gate found:** the round reports blocked. Never invent one.
 - **Scan hit on a comment body:** do not post it. Record the finding; it
   surfaces in the final report. Unattended does not mean leaked.
