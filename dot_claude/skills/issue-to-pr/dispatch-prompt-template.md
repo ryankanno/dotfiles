@@ -18,10 +18,12 @@ PR, and do not redo work the branch already holds.
 - Read the newest round directory under
   `$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/`. When there is none,
   start at Round 1 below.
-- A round with a `round.json` and a posted `comment.md` is finished:
+- A round with a `round.json` and a `comment.md` is finished:
   continue the "Review rounds" loop below from it, with the next free
-  round number. Any other round is unfinished: finish that same round
-  with the pr-review skill, by the exit 6 and exit 7 rules below.
+  round number. A round with a `round.json` and no `comment.md` is
+  unfinished: continue it from pr-review §2, and do not run
+  `pr-round.sh` again. Any other round is unfinished: finish that same
+  round with the pr-review skill, by the exit 6 and exit 7 rules below.
 <only when the prior run left a final report:>
 - The prior run's final report is `<path of final-report.md>`: its
   verdict and remaining findings carry forward.
