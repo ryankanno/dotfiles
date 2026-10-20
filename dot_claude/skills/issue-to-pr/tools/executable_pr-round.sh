@@ -649,10 +649,15 @@ if [[ "$range_status" == none ]]; then
   complete=false
 elif [[ "$range_status" == complete ]]; then
   complete=true
-elif [[ "$range_status" == missing || "$range_status" == skipped ]]; then
+elif [[ "$range_status" == skipped ]]; then
+  # ocr selected no file in the range (docs, tests, lockfiles): nothing is
+  # reviewable, and each commit holds the same files, so a per-commit retry
+  # skips again and bills nothing useful (issue #71).
   complete=false
-  # The range produced no review text, or the tool declined it (a
-  # docs-only range): retry once per commit in the range. The round is
+elif [[ "$range_status" == missing ]]; then
+  complete=false
+  # The range produced no review text: retry once per commit in the
+  # range. The round is
   # complete only when every commit run completed; one success among
   # failures is partial coverage, never a clean review.
   # A partial range is NOT retried here: it produced review text, the
