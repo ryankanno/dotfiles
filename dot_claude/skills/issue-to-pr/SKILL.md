@@ -63,7 +63,8 @@ One interactive moment. Collect and confirm, then go silent:
    by: documented command, task runner combined recipe, language tooling
    by manifest. Still nothing: later rounds report blocked rather than
    inventing one. Also read the commit hooks (`.pre-commit-config.yaml`,
-   `git config core.hooksPath`) and name their checks when you confirm
+   `git config core.hooksPath`, or `.git/hooks/` when that is unset)
+   and name their checks when you confirm
    the gate: a formatter the gate skips aborts each commit after a green
    gate.
 5. **The reviewer.** Default from the manifest. Override only if asked.
