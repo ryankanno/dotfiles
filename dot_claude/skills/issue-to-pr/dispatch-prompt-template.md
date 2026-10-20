@@ -16,16 +16,18 @@ PR <n> (<PR URL>) already exists on this branch. Do not file another
 PR, and do not redo work the branch already holds.
 
 - Read the newest round directory under
-  `$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/` that has a `round.json`,
-  and its `comment.md`.
-- Continue the "Review rounds" loop below from that round. The next
-  round takes the next free round number; never reuse one.
+  `$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/`. When there is none,
+  start at Round 1 below.
+- A round with a `round.json` and a posted `comment.md` is finished:
+  continue the "Review rounds" loop below from it, with the next free
+  round number. Any other round is unfinished: finish that same round
+  with the pr-review skill, by the exit 6 and exit 7 rules below.
 <only when the prior run left a final report:>
 - The prior run's final report is `<path of final-report.md>`: its
   verdict and remaining findings carry forward.
 
-<Only when the grill is on and this is a first dispatch; omit this
-section entirely otherwise:>
+<Only when the grill is on and no PR exists yet; omit this section
+entirely otherwise:>
 ## Before any code: plan, then grill it here
 
 1. Write the implementation plan (the writing-plans skill).
