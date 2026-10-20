@@ -204,7 +204,7 @@ take_lock() {
   rm -f "$lock.$$"
   [[ -e "$lock" ]] && return 1
   # A holder can release the lock between the failed link and the check.
-  if [[ -z "${lock_retried:-}" ]]; then lock_retried=1; take_lock; return; fi
+  if [[ -z "${1:-}" ]]; then take_lock retry; return; fi
   lock_error "$err"
 }
 lock_busy() {

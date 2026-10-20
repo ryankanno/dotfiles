@@ -1423,6 +1423,34 @@ run_prr --repo "$repo" --pr 39 --round 1 >/dev/null 2>&1; rc=$?
 assert_eq "$rc" 0 "the round takes the released lock"
 assert_json '.reviewer_complete == true' "$pd/round-1/round.json" "the round ran"
 
+echo "pr-round: each lock attempt gets its own retry"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+# Link 1 fails with no lock in place (the first attempt's retry runs); link 2
+# fails because a dead holder's lock appeared (the caller takes it over);
+# link 3, inside the takeover, fails with no lock in place again; link 4 works.
+cat >"$stub/ln" <<'LNSTUB'
+#!/usr/bin/env bash
+n=$(( $(cat "$STUB_LN_COUNT" 2>/dev/null || echo 0) + 1 ))
+printf '%s\n' "$n" >"$STUB_LN_COUNT"
+case $n in
+  1|3) printf 'ln: %s: File exists\n' "${*: -1}" >&2; exit 1 ;;
+  2) printf '%s\n' "$STUB_DEAD_PID" >"${*: -1}"; printf 'ln: %s: File exists\n' "${*: -1}" >&2; exit 1 ;;
+esac
+exec "$REAL_LN" "$@"
+LNSTUB
+chmod +x "$stub/ln"
+sh -c 'exit 0' &
+STUB_DEAD_PID=$!
+wait "$STUB_DEAD_PID"
+REAL_LN=$(command -v ln)
+export STUB_LN_COUNT="$WS/ln-count" STUB_DEAD_PID REAL_LN
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null 2>&1; rc=$?
+assert_eq "$rc" 0 "the takeover's attempt still gets its retry"
+assert_json '.reviewer_complete == true' "$pd/round-1/round.json" "the round ran"
+
 echo "pr-round: cumulative tokens span rounds"
 new_sandbox
 make_pr_round_env
