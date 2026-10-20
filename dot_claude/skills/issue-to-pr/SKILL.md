@@ -222,7 +222,8 @@ Then decide:
   accepted judgment calls listed in the final report.
 - The loop ends `clean` or `converged`, and
   `gh pr view <n> --json isDraft -q .isDraft` prints `true`: mark the
-  PR ready with `gh pr ready <n>`.
+  PR ready with `gh pr ready <n>`. When it fails, the final report's
+  Draft line carries its error, so the human marks the PR ready.
 - A disposition does not hold, and refine rounds remain: send one
   refine instruction that names the finding and why the reason fails.
   The pane fixes it, then runs the convergence round again.
@@ -252,7 +253,8 @@ The last message of the run, verbatim to the future runner. Fill in
 stays, also after a context compaction, and a field you cannot fill says
 why.
 
-- task ref (source locator and title), PR link
+- task ref (source locator and title), PR link, and whether the PR is
+  still a draft
 - verdict: `clean` (convergence round found nothing and the gate printed
   green), `converged` (blocking findings existed but the convergence
   round found every one low and dispositioned; the accepted judgment
