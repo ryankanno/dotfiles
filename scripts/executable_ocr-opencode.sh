@@ -45,9 +45,9 @@ Assign each issue that you file to me."
     ;;
   fix)
     if [[ $REUSE == 1 ]]; then
-      PROGRESS="If review-progress.md exists, read it first, and skip each bug that it marks as done."
+      PROGRESS="If $OUT/review-progress.md exists, read it first, and skip each bug that it marks as done."
     else
-      PROGRESS="Replace any old review-progress.md, because review.html is new."
+      PROGRESS="Replace any old $OUT/review-progress.md, because review.html is new."
     fi
     PROMPT="Read $REVIEW, the ocr scan output.
 Fix each critical bug and each high bug.

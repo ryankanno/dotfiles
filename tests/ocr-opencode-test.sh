@@ -29,7 +29,8 @@ assert_eq() { [[ "$1" == "$2" ]] && ok "$3" || bad "$3 (got '$1' want '$2')"; }
 SANDBOXES="$(mktemp -d)" || exit 1
 trap 'rm -rf "$SANDBOXES"' EXIT
 
-# Sets globals WS, LOG, OUT; fake ocr fails the scan when OCR_SCAN_FAIL=1.
+# Sets globals WS, LOG, OUT; fake ocr fails the scan when OCR_SCAN_FAIL=1
+# and the export when OCR_EXPORT_FAIL=1.
 new_sandbox() {
   WS="$(mktemp -d "$SANDBOXES/ws.XXXXXX")" || exit 1
   export LOG="$WS/calls.log"
@@ -39,6 +40,7 @@ new_sandbox() {
 #!/usr/bin/env bash
 echo "ocr $*" >>"$LOG"
 [[ "$1" == "scan" && "${OCR_SCAN_FAIL:-0}" == "1" ]] && exit 1
+[[ "$1" == "session" && "${OCR_EXPORT_FAIL:-0}" == "1" ]] && exit 1
 [[ "$1" == "session" ]] && echo "new" >"$4"
 exit 0
 OCR
@@ -66,6 +68,8 @@ assert_eq "$(git status --porcelain)" "" "git does not see the outputs"
 assert_contains "$(sed -n 3p "$LOG")" "opencode --prompt Read " "opens opencode with the explore prompt"
 assert_contains "$calls" "ocr-opencode/review.html." "explore reads review.html from .git/ocr-opencode"
 assert_not_contains "$calls" "/issue-to-pr" "explore does not send the fix prompt"
+assert_contains "$calls" "Verify each issue in the code." "explore verifies each issue"
+assert_contains "$calls" "File a GitHub issue only for an issue that you verify." "explore files only verified issues"
 assert_eq "$(wc -l <"$LOG" | tr -d ' ')" "3" "explore prompt is sent as one line"
 assert_contains "$calls" "Assign each issue that you file to me." "explore assigns filed issues to me"
 assert_contains "$calls" "Before you file an issue, search the open and closed issues. Do not file an issue that already exists." "explore does not file duplicates"
@@ -75,8 +79,11 @@ assert_contains "$calls" "ocr-opencode/review-issues.md instead." "explore draft
 echo "fix: opencode gets the fix prompt"
 new_sandbox
 bash "$SCRIPT" fix src >/dev/null 2>&1
+rc=$?
 calls="$(cat "$LOG")"
+assert_eq "$rc" "0" "fix exits 0"
 assert_eq "$(wc -l <"$LOG" | tr -d ' ')" "3" "fix prompt is sent as one line"
+assert_contains "$calls" "Fix one bug at a time." "fix works one bug at a time"
 assert_contains "$calls" "ocr-opencode/review.html, the ocr scan output." "opens opencode with the fix prompt"
 assert_contains "$calls" "ocr-opencode/review-output.html, then stop." "fix prompt is sent whole, summary in review-output.html"
 assert_not_contains "$calls" "review_output" "has no underscore file name"
@@ -86,7 +93,8 @@ assert_not_contains "$calls" "adversarial" "has no extra adversarial review"
 assert_not_contains "$calls" "worktree" "does not make a shared worktree"
 assert_contains "$calls" "Record the progress of each bug in " "fix records progress"
 assert_contains "$calls" "ocr-opencode/review-progress.md." "progress goes to .git/ocr-opencode"
-assert_contains "$calls" "Replace any old review-progress.md, because review.html is new." "a new scan starts new progress"
+assert_contains "$calls" "ocr-opencode/review-progress.md, because review.html is new." "a new scan starts new progress in .git/ocr-opencode"
+assert_not_contains "$calls" "old review-progress.md" "the reset names the full progress path"
 assert_not_contains "$calls" "skip each bug" "a new scan does not resume"
 
 echo "an existing review.html without --reuse is scanned again"
@@ -94,6 +102,7 @@ new_sandbox
 mkdir -p "$OUT"
 echo "old" >"$OUT/review.html"
 bash "$SCRIPT" fix src >/dev/null 2>&1
+assert_eq "$?" "0" "exits 0"
 assert_eq "$(sed -n 1p "$LOG")" "ocr scan --path src" "scans again"
 assert_eq "$(cat "$OUT/review.html")" "new" "replaces review.html"
 
@@ -107,7 +116,8 @@ calls="$(cat "$LOG")"
 assert_eq "$rc" "0" "exits 0"
 assert_eq "$(wc -l <"$LOG" | tr -d ' ')" "1" "runs only opencode"
 assert_eq "$(cat "$OUT/review.html")" "old" "keeps review.html"
-assert_contains "$calls" "If review-progress.md exists, read it first, and skip each bug that it marks as done." "fix resumes from progress"
+assert_contains "$calls" "ocr-opencode/review-progress.md exists, read it first, and skip each bug that it marks as done." "fix resumes from progress in .git/ocr-opencode"
+assert_not_contains "$calls" "If review-progress.md" "the resume names the full progress path"
 assert_not_contains "$calls" "Replace any old review-progress.md" "does not reset progress"
 
 echo "fix --reuse without review.html fails"
@@ -133,6 +143,23 @@ rc=$?
 assert_eq "$rc" "1" "exits non-zero"
 assert_not_contains "$(cat "$LOG")" "session export" "does not export after a failed scan"
 assert_not_contains "$(cat "$LOG")" "opencode" "does not open opencode after a failed scan"
+
+echo "export failure stops the run"
+new_sandbox
+OCR_EXPORT_FAIL=1 bash "$SCRIPT" explore src >/dev/null 2>&1
+rc=$?
+assert_eq "$rc" "1" "exits non-zero"
+assert_eq "$(grep -c '^opencode ' "$LOG")" "0" "does not open opencode after a failed export"
+
+echo "a linked worktree writes to the shared git dir"
+new_sandbox
+git -c user.name=t -c user.email=t@t commit -q --allow-empty -m init
+git worktree add -q "$WS/wt"
+cd "$WS/wt" || exit 1
+bash "$SCRIPT" explore src >/dev/null 2>&1
+assert_eq "$(cat "$OUT/review.html")" "new" "exports review.html into the main .git/ocr-opencode"
+assert_contains "$(sed -n 3p "$LOG")" "$OUT/review.html." "the prompt names the shared review.html"
+assert_eq "$(git status --porcelain)" "" "git does not see the outputs in the worktree"
 
 echo "bad arguments print usage"
 new_sandbox
