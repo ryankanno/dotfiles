@@ -62,7 +62,10 @@ One interactive moment. Collect and confirm, then go silent:
 4. **The gate.** Ask for the project's gate command. If unknown, discover
    by: documented command, task runner combined recipe, language tooling
    by manifest. Still nothing: later rounds report blocked rather than
-   inventing one.
+   inventing one. Also read the commit hooks (`.pre-commit-config.yaml`,
+   `git config core.hooksPath`) and name their checks when you confirm
+   the gate: a formatter the gate skips aborts each commit after a green
+   gate.
 5. **The reviewer.** Default from the manifest. Override only if asked.
    The same holds for its effort, timeout, tool cap and token budget:
    the binding's defaults (ocr: `medium`, `80` minutes, `200` tool
