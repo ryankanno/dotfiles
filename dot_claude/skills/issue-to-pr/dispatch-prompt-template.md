@@ -47,8 +47,12 @@ Brief file: `<absolute path of the brief file>`
 
   ```
   git push -u origin HEAD
-  gh pr create --title "<title>" --body-file <body file>
+  gh pr create --draft <--assignee @me only when the gh user is an admin of the repository; omit it otherwise> --title "<title>" --body-file <body file>
   ```
+
+  Keep the PR a draft. A repository that auto-merges on green CI
+  merges a ready PR before its review rounds finish. The orchestrator
+  marks it ready when the loop ends clean or converged.
 
   Write the body to a file outside the worktree first (`mktemp`): an
   inline `--body` breaks on the quotes and backticks a multi-line body
