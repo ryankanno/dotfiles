@@ -185,8 +185,17 @@ mkdir -p "$round_dir"
 # a stale lock that the next caller takes over.
 lock="$round_dir.lock"
 tmp_bg=""
-trap '[[ -n "${tmp_bg:-}" ]] && rm -f "$tmp_bg"; rm -f "$lock"' EXIT
-take_lock() { (set -o noclobber; printf '%s\n' "$$" >"$lock") 2>/dev/null; }
+# Only a lock that still holds this pid is ours to remove: after a takeover
+# race the path can name a newer holder's lock.
+trap '[[ -n "${tmp_bg:-}" ]] && rm -f "$tmp_bg"; [[ "$(cat "$lock" 2>/dev/null)" == "$$" ]] && rm -f "$lock"' EXIT
+# The pid is written before the link publishes the lock, so a reader never
+# sees an empty lock from a live caller: an empty one is a crash leftover.
+take_lock() {
+  printf '%s\n' "$$" >"$lock.$$" || return 1
+  if ln "$lock.$$" "$lock" 2>/dev/null; then rm -f "$lock.$$"; return 0; fi
+  rm -f "$lock.$$"
+  return 1
+}
 lock_busy() {
   trap '[[ -n "${tmp_bg:-}" ]] && rm -f "$tmp_bg"' EXIT
   printf 'round %s is already running (%s); wait for its round.json, never --rerun over a live round\n' "$round" "$1" >&2
@@ -201,14 +210,20 @@ if ! take_lock; then
   # one file, and the content check catches a caller that renamed a newer
   # caller's live lock instead of the dead one: it links that lock back.
   claim="$lock.stale-$$"
-  mv "$lock" "$claim" 2>/dev/null || lock_busy "another caller is taking over its lock"
-  if [[ "$(cat "$claim" 2>/dev/null || true)" != "$holder" ]]; then
-    ln "$claim" "$lock" 2>/dev/null || true
+  if ! mv "$lock" "$claim" 2>/dev/null; then
+    # The holder released the lock after the read: it is free, not taken.
+    [[ -e "$lock" ]] && lock_busy "another caller is taking over its lock"
+    take_lock || lock_busy "another caller took over its lock"
+  elif [[ "$(cat "$claim" 2>/dev/null || true)" != "$holder" ]]; then
+    if ln "$claim" "$lock" 2>/dev/null; then
+      rm -f "$claim"
+      lock_busy "another caller took over its lock"
+    fi
+    lock_busy "another caller took over its lock; a third caller's lock blocked restoring it, so it is kept at $claim"
+  else
     rm -f "$claim"
-    lock_busy "another caller took over its lock"
+    take_lock || lock_busy "another caller took over its lock"
   fi
-  rm -f "$claim"
-  take_lock || lock_busy "another caller took over its lock"
 fi
 
 # The refs resolve before any prior evidence is touched: a network or

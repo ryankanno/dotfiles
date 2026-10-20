@@ -614,6 +614,10 @@ if [[ -n "$STUB_GARBAGE" ]]; then
   printf '{"status": "complete", tri' >"$out"
   exit 0
 fi
+if [[ -n "$STUB_LOCK_SWAP" ]]; then
+  # Another caller took the round's lock over while this run reviewed.
+  printf '%s\n' "$STUB_LOCK_PID" >"$STUB_LOCK_SWAP"
+fi
 status="$STUB_RANGE_STATUS"
 if [[ "$mode" == "commit" ]]; then status="$STUB_COMMIT_STATUS"; fi
 printf '{"status":"%s","session_id":"stub-session","comments":[],"summary":{"total_tokens":%s},"warnings":%s,"manifest":{"coverage":{"failed":%s}}}' "$status" "${STUB_TOKENS:-0}" "${STUB_WARNINGS:-[]}" "${STUB_COVERAGE_FAILED:-[]}" >"$out"
@@ -622,6 +626,7 @@ OCRSTUB
   export STUB_RANGE_STATUS=complete STUB_COMMIT_STATUS=complete STUB_FAIL_ON_COMMIT=""
   export GH_COMMENTS_JSON='[]'
   export STUB_GARBAGE="" STUB_WARNINGS="" STUB_COVERAGE_FAILED=""
+  export STUB_LOCK_SWAP="" STUB_LOCK_PID=""
 }
 
 make_fixture_repo() {
@@ -1373,6 +1378,16 @@ run_prr --repo "$repo" --pr 39 --round 1 >/dev/null 2>&1; rc=$?
 assert_eq "$rc" 0 "a stale lock does not block the round"
 assert_json '.reviewer_complete == true' "$pd/round-1/round.json" "the round ran"
 assert_eq "$([[ -e "$pd/round-1.lock" ]] && printf exists || printf absent)" "absent" "the round releases its lock"
+
+echo "pr-round: a round leaves a lock it no longer holds in place"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+export STUB_LOCK_SWAP="$pd/round-1.lock" STUB_LOCK_PID=424242
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null 2>&1; rc=$?
+assert_eq "$rc" 0 "the round ran"
+assert_eq "$(cat "$pd/round-1.lock" 2>/dev/null)" "424242" "the newer holder's lock survives this round's exit"
 
 echo "pr-round: cumulative tokens span rounds"
 new_sandbox
