@@ -118,7 +118,15 @@ the final report rather than orphaning it silently.
 
 Write the dispatch prompt from
 [`dispatch-prompt-template.md`](dispatch-prompt-template.md) and the
-confirmed brief, to a file. Then:
+confirmed brief, to a file. Keep `--assignee @me` in its `gh pr create`
+line only when this prints `ADMIN`, because the human takes PRs only on
+repositories they own:
+
+```bash
+gh repo view --json viewerPermission -q .viewerPermission
+```
+
+Then:
 
 ```bash
 workmux add <branch-name> -b -l <layout> -P <prompt-file>
@@ -207,6 +215,9 @@ Then decide:
 - All five hold and the convergence round is `converged (all blocking
   findings low and dispositioned).`: the loop ends `converged`, with the
   accepted judgment calls listed in the final report.
+- The loop ends `clean` or `converged`, and
+  `gh pr view <n> --json isDraft -q .isDraft` prints `true`: mark the
+  PR ready with `gh pr ready <n>`.
 - A disposition does not hold, and refine rounds remain: send one
   refine instruction that names the finding and why the reason fails.
   The pane fixes it, then runs the convergence round again.

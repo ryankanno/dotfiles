@@ -71,7 +71,7 @@ flowchart TD
     J --> JB{"Convergence round blocking?"}
     JB -- "yes" --> K
     JB -- "no: the pane stops" --> N{"Orchestrator ratifies:<br/>round.json head = headRefOid,<br/>review_scope full, comment posted,<br/>gate green in the worktree,<br/>every Rejected/Accepted holds"}
-    N -- "yes" --> O["Clean or converged: the loop ends"]
+    N -- "yes" --> O["Clean or converged: gh pr ready if a draft,<br/>the loop ends"]
     N -- "a disposition fails" --> K
     X --> Z["Final message: the report"]
     Y --> Z
