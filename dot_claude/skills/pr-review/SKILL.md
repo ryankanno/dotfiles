@@ -43,8 +43,13 @@ call kills the round. Start the round in a detached tmux session, with
 its log beside the round dir, not in it. A tmux session survives the
 end of the tool call; a background `&` job of the call can die with it.
 
+The log's directory does not exist before round 1, and a tmux session
+gets the tmux server's environment, not yours (a PATH without `gh`
+exits 127). Create the directory and pass your PATH:
+
 ```bash
-tmux new-session -d -s pr-round-<n>-<N> sh -c \
+mkdir -p "$HOME/.cache/pr-loop/<owner/repo>/pr-<n>"
+tmux new-session -d -e PATH="$PATH" -s pr-round-<n>-<N> sh -c \
   '$HOME/.claude/skills/issue-to-pr/tools/pr-round.sh <args> >"$0" 2>&1; echo "exit=$?" >>"$0"' \
   "$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/round-<N>.log"
 ```
