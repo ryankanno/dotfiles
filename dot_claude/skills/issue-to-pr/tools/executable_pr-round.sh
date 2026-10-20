@@ -671,7 +671,11 @@ elif [[ "$range_status" == missing || "$range_status" == skipped ]]; then
     record "commit:$sha" "$commit_dir" "$cstatus" "$(cat "$commit_dir/session.txt" 2>/dev/null || true)" "$crc"
     commit_runs=$((commit_runs + 1))
     [[ "$cstatus" == complete ]] || recovered=0
-  done < <(git -C "$repo" log --format=%H "$review_from..$review_to")
+  # A merge commit reviews against its first parent, so it brings in every
+  # base change it merged (issue #104).
+  # shortcut: a conflict resolution in a merge goes unreviewed here; review
+  # it through the merge's own diff if a retry ever needs it.
+  done < <(git -C "$repo" log --no-merges --format=%H "$review_from..$review_to")
   if [[ $commit_runs -gt 0 && $recovered -eq 1 ]]; then complete=true; fi
 else
   # partial or any other non-complete status: review text exists, some
