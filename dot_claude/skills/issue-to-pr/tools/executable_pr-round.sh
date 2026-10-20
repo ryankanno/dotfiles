@@ -48,7 +48,8 @@
 # mismatch; 4 the PR is
 # missing, not open, or not resolvable; 5 the repository, its refs, or
 # the changed-file listing could not be resolved; 6 the round dir already holds
-# evidence and --rerun was not passed; 127 a dependency is missing. A
+# evidence and --rerun was not passed; 7 another live process runs this
+# round (its pid is in round-<N>.lock); 127 a dependency is missing. A
 # review run's own failure is recorded in round.json, not propagated.
 set -euo pipefail
 
@@ -178,6 +179,38 @@ owner_repo=$(cd "$repo" && gh repo view --json nameWithOwner --jq .nameWithOwner
 round_dir="$HOME/.cache/pr-loop/$owner_repo/pr-$pr/round-$round"
 mkdir -p "$round_dir"
 
+# Two callers once ran the same round at once, and one's --rerun moved the
+# other's in-flight evidence (PRs 137, 230). The lock sits beside the round
+# dir so --rerun never moves it; a holder that died (a harness kill) leaves
+# a stale lock that the next caller takes over.
+lock="$round_dir.lock"
+tmp_bg=""
+trap '[[ -n "${tmp_bg:-}" ]] && rm -f "$tmp_bg"; rm -f "$lock"' EXIT
+take_lock() { (set -o noclobber; printf '%s\n' "$$" >"$lock") 2>/dev/null; }
+lock_busy() {
+  trap '[[ -n "${tmp_bg:-}" ]] && rm -f "$tmp_bg"' EXIT
+  printf 'round %s is already running (%s); wait for its round.json, never --rerun over a live round\n' "$round" "$1" >&2
+  exit 7
+}
+if ! take_lock; then
+  holder=$(cat "$lock" 2>/dev/null || true)
+  if [[ "$holder" =~ ^[0-9]+$ ]] && kill -0 "$holder" 2>/dev/null; then
+    lock_busy "pid $holder"
+  fi
+  # Two callers can both read the same dead holder. A rename moves exactly
+  # one file, and the content check catches a caller that renamed a newer
+  # caller's live lock instead of the dead one: it links that lock back.
+  claim="$lock.stale-$$"
+  mv "$lock" "$claim" 2>/dev/null || lock_busy "another caller is taking over its lock"
+  if [[ "$(cat "$claim" 2>/dev/null || true)" != "$holder" ]]; then
+    ln "$claim" "$lock" 2>/dev/null || true
+    rm -f "$claim"
+    lock_busy "another caller took over its lock"
+  fi
+  rm -f "$claim"
+  take_lock || lock_busy "another caller took over its lock"
+fi
+
 # The refs resolve before any prior evidence is touched: a network or
 # resolution failure must leave the round dir exactly as it was, not
 # half-superseded with the old round.json already moved away.
@@ -289,8 +322,6 @@ prior_findings=$(tail -n 1 <<<"$bodies" | jq -r '.' \
 # and before any --rerun superseding: a size refusal must leave the dir
 # exactly as it was, so the documented recovery (condense and rerun) hits
 # no leftover guard, and a refusal of a --rerun displaces no record.
-tmp_bg=""
-trap '[[ -n "${tmp_bg:-}" ]] && rm -f "$tmp_bg"' EXIT
 kept="$settled" omitted=0
 if [[ -n "$settled" ]]; then
   tmp_bg=$(mktemp "${TMPDIR:-/tmp}/pr-round-bg.XXXXXX") || {

@@ -1340,6 +1340,40 @@ assert_eq "$(find "$rd" -maxdepth 2 -name round.json | wc -l | tr -d ' ')" 2 "ol
 assert_json '.cumulative_tokens == 250' "$rd/round.json" "the fresh round.json is the active one"
 assert_json '.summary.total_tokens == 100' "$rd"/superseded-*/review.json "the superseded evidence is retained"
 
+echo "pr-round: a round another live process runs is refused, even with --rerun"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+export STUB_TOKENS=100
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+sleep 30 &
+holder=$!
+printf '%s\n' "$holder" >"$pd/round-1.lock"
+export STUB_TOKENS=250
+err=$(run_prr --repo "$repo" --pr 39 --round 1 --rerun 2>&1 >/dev/null); rc=$?
+kill "$holder" 2>/dev/null; wait "$holder" 2>/dev/null
+assert_eq "$rc" 7 "a live holder exits 7"
+assert_contains "$err" "pid $holder" "the refusal names the holder"
+assert_json '.cumulative_tokens == 100' "$pd/round-1/round.json" "the live round's evidence is intact"
+assert_eq "$(find "$pd/round-1" -maxdepth 1 -name 'superseded-*' | wc -l | tr -d ' ')" 0 "nothing was superseded"
+assert_eq "$(cat "$pd/round-1.lock")" "$holder" "the holder's lock stays"
+
+echo "pr-round: a lock whose holder died is taken over and released"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+mkdir -p "$pd"
+sh -c 'exit 0' &
+dead=$!
+wait "$dead"
+printf '%s\n' "$dead" >"$pd/round-1.lock"
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null 2>&1; rc=$?
+assert_eq "$rc" 0 "a stale lock does not block the round"
+assert_json '.reviewer_complete == true' "$pd/round-1/round.json" "the round ran"
+assert_eq "$([[ -e "$pd/round-1.lock" ]] && printf exists || printf absent)" "absent" "the round releases its lock"
+
 echo "pr-round: cumulative tokens span rounds"
 new_sandbox
 make_pr_round_env
