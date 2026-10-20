@@ -29,11 +29,17 @@ Brief file: `<absolute path of the brief file>`
   entrypoint, then the code that passes it. Minimize mocks; mock only
   external services. Do not suppress failures to pass: no ignore pragmas,
   no skipped tests, no lowered thresholds. Fix the root cause.
-- Run the gate before every push:
+- Run the gate before every push, once per push. Use these words as
+  written, with no added flags. Judge the gate by its exit code, not by
+  a summary line in its output:
 
   ```
-  <gate command>
+  <gate command> >"<log file>" 2>&1; echo "gate exit=$?"
   ```
+
+  Read only the log's tail, and only when the exit is not 0. The exit
+  code decides whether you push. A review round's own read still
+  scrutinizes the whole log (pr-review §4).
 
 - Commit conventionally, `type(scope): description`. Behavioral and
   structural changes land in separate commits. No attribution trailers.
@@ -73,6 +79,12 @@ Every round has a unique number, and every round posts its comment.
 
 Every review round passes `--brief <the brief file above>` to
 `pr-round.sh` and `critic-input.sh`.
+
+A round runs longer than one tool call. Start it detached and poll, as
+pr-review §1 says. When `pr-round.sh` exits 6 and the round dir has no
+`round.json`, your earlier run of that round died: pass `--rerun` once.
+When it exits 7, another process runs that round: wait for it, and
+never `--rerun` over it.
 
 After you stop, a refine instruction can arrive by `workmux send`. It
 names a disposition the orchestrator overrules. Run the pr-refine skill

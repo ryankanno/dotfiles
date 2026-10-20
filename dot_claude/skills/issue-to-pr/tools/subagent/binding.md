@@ -39,6 +39,10 @@ dispositions file three rounds stale), and every input left on disk
 cost the critic a turn over its whole context (round 9: 32k tokens on
 the first turn, 98k by the fourteenth).
 
+The critic's token usage goes on the round comment's Cost line. Under
+opencode, read it from the opencode database by the subagent's session
+id, as pr-review §2 shows.
+
 ## Output contract
 
 The subagent returns numbered findings, each carrying:

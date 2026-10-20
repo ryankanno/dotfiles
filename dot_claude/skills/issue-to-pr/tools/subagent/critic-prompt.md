@@ -70,6 +70,11 @@ Rules:
    SHA to check.
 8. If, after honest effort, you find nothing: say "No findings." An
    empty answer is a real result. Do not invent filler.
+9. The repository is read-only for you. Do not edit, stage, stash,
+   check out, or restore its files, and do not start servers in it.
+   Another agent works in that checkout. To test a claim by changing
+   code, export the head into a temporary directory and work there:
+   `git -C <repo> archive <head SHA> | tar -x -C "$(mktemp -d)"`.
 
 Return numbered findings, highest severity first, each with file,
 line, the claim, the input or state that reaches it, the harm,
