@@ -26,6 +26,11 @@ reads quickly and loses nothing.
     and no source produced a finding. Neither clean nor failed;
     /pr-refine has nothing to fix, and the loop cannot declare the
     branch clean off this round.
+  - `**Verdict:** nothing reviewable (no files in the reviewer's scope).` —
+    the range run was `skipped`: the reviewer selected no file in the
+    range (docs, tests, lockfiles), and no other source produced a
+    finding. Neither clean nor failed; /pr-refine has nothing to fix,
+    and the loop cannot declare the branch clean off this round.
   - `**Verdict:** unrecovered (the reviewer produced no review text).` —
     the reviewer binding ended unrecovered and no other source produced
     a finding. Neither clean nor failed; /pr-refine has nothing to fix,
@@ -49,9 +54,11 @@ reads quickly and loses nothing.
   same SHA that disagree, with nothing reconciling them, corrupt the
   record a human reads.
 - **The reviewer's status is visible when it changes what the verdict
-  means.** If the binding produced no review text, a line
-  `**Reviewer:** unrecovered: <its message, verbatim>` sits above the
-  verdict. If a run ended partial, or a per-commit retry left some
+  means.** If the range run was `skipped`, a line
+  `**Reviewer:** nothing reviewable: <its message, verbatim>` sits above
+  the verdict. If the binding produced no review text, a line
+  `**Reviewer:** unrecovered: <its message, verbatim>` sits there
+  instead. If a run ended partial, or a per-commit retry left some
   commits without review text, a line `**Reviewer:** partial: <the
   failed files, the commits without review text, or the rendered
   warning, verbatim>` sits there instead.
@@ -66,9 +73,9 @@ Visible, in this order:
 
 ## Review round <N>: <short-sha>
 
-**Reviewer:** <unrecovered: <its message, verbatim> | partial: <the failed files, the commits without review text, or the rendered warning, verbatim>>   (this line appears only when the reviewer ended unrecovered or partial; a coverage gap never lives only inside a collapsed block)
+**Reviewer:** <nothing reviewable: <its message, verbatim> | unrecovered: <its message, verbatim> | partial: <the failed files, the commits without review text, or the rendered warning, verbatim>>   (this line appears only when the reviewer reviewed nothing, ended unrecovered, or ended partial; a coverage gap never lives only inside a collapsed block)
 
-**Verdict:** <No issues found. | N finding(s). | partial (the reviewer's coverage has a gap). | unrecovered (the reviewer produced no review text). | nothing to review (only a base merge since the prior round). | converged (all blocking findings low and dispositioned).>
+**Verdict:** <No issues found. | N finding(s). | partial (the reviewer's coverage has a gap). | nothing reviewable (no files in the reviewer's scope). | unrecovered (the reviewer produced no review text). | nothing to review (only a base merge since the prior round). | converged (all blocking findings low and dispositioned).>
 
 **Gate:** <command> printed <its final result>   (refine and convergence rounds only)
 

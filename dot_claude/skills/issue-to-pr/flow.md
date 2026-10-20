@@ -16,6 +16,9 @@ gets fixed.
 - `partial (the reviewer's coverage has a gap).` — review text exists but
   part of the range went unreviewed; neither clean nor failing; the
   loop cannot declare the branch clean off that round.
+- `nothing reviewable (no files in the reviewer's scope).` — the
+  reviewer selected no file in the range; neither clean nor failing;
+  the loop cannot declare the branch clean off that round.
 - `unrecovered (the reviewer produced no review text).` — neither clean
   nor failing; the loop cannot declare the branch clean off that round.
 - `nothing to review (only a base merge since the prior round).` — no

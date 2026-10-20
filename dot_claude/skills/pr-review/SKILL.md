@@ -183,7 +183,7 @@ prior round's blocking findings then stand for /pr-refine and for the
 next round.
 
 **`reviewer_complete: true`** with zero findings is a clean review:
-report it as clean. **`reviewer_complete: false`** takes one of two
+report it as clean. **`reviewer_complete: false`** takes one of three
 shapes, read from `runs[].status`:
 
 - **Partial** (a run is `partial`, or a `commit:` run is `complete`):
@@ -193,16 +193,21 @@ shapes, read from `runs[].status`:
   Its findings count like any other source's.
   With nothing from any source, the verdict is `partial (the
   reviewer's coverage has a gap).`
-- **Unrecovered** (neither): the reviewer produced no
+- **Nothing reviewable** (the range run is `skipped`): the reviewer
+  selected no file in the range (docs, tests, lockfiles), so it had
+  nothing to review, and no per-commit retry runs. With nothing from any
+  source, the verdict is `nothing reviewable (no files in the reviewer's
+  scope).`
+- **Unrecovered** (none of these): the reviewer produced no
   review text, whatever runs it attempted. With nothing from any
   source, the verdict is `unrecovered (the reviewer produced no review
   text).`
 
-Either way, findings from any source make the verdict count them, and
-the visible `**Reviewer:**` line names the gap per report-template.md.
-Neither shape is clean and neither is a failure: /pr-refine reads both
-as nothing to fix, and the loop cannot declare the branch clean off
-that round.
+In every shape, findings from any source make the verdict count them,
+and the visible `**Reviewer:**` line names the gap per
+report-template.md. No shape is clean and none is a failure:
+/pr-refine reads each as nothing to fix, and the loop cannot declare
+the branch clean off that round.
 
 The round's cost is a fact the comment carries: `round.json`'s
 `cumulative_tokens` becomes the template's Cost line, so a reader can
@@ -302,6 +307,8 @@ one of: `**Verdict:** No issues found.` when every source ran and
 produced no blocking finding, `**Verdict:** <n> finding(s).` when <n>
 blocking findings exist, `**Verdict:** partial (the reviewer's coverage has a gap).` when
 the binding ended partial with nothing else to report,
+`**Verdict:** nothing reviewable (no files in the reviewer's scope).`
+when the range run was `skipped` with nothing else to report,
 `**Verdict:** unrecovered (the reviewer produced no review text).` when
 the binding ended unrecovered with nothing else to report,
 `**Verdict:** nothing to review (only a base merge since the prior round).`

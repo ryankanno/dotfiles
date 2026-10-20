@@ -82,10 +82,12 @@ findings is /pr-review's round, not this one.
 The verdict line is one of
 `No issues found.`, `<n> finding(s).`,
 `partial (the reviewer's coverage has a gap).`,
+`nothing reviewable (no files in the reviewer's scope).`,
 `unrecovered (the reviewer produced no review text).`,
 `nothing to review (only a base merge since the prior round).`, or
-`converged (all blocking findings low and dispositioned).` Partial and
-unrecovered mean nothing to fix and no clean claim. Nothing to review
+`converged (all blocking findings low and dispositioned).` Partial,
+nothing reviewable and unrecovered mean nothing to fix and no clean
+claim. Nothing to review
 means no clean claim: its Findings are the prior round's, carried
 verbatim, and you fix them like any round's. A converged verdict
 means the convergence round closed the loop: nothing to fix, no new
