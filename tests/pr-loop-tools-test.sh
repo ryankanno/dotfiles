@@ -1322,8 +1322,8 @@ assert_eq "$rc" 3 "identity mismatch exits 3"
 assert_eq "$([[ -d "$WS/home/.cache/pr-loop" ]] && printf yes || printf no)" "no" "no round dir created"
 
 stale_head_after_push() { # stale views -> gh pr view reports FR_BASE as the head that many times
-  export GH_PR_STALE_JSON="$(jq -c --arg h "$FR_BASE" '.headRefOid = $h' <<<"$GH_PR_JSON")"
-  export GH_PR_STALE_VIEWS="$1"
+  GH_PR_STALE_JSON="$(jq -c --arg h "$FR_BASE" '.headRefOid = $h' <<<"$GH_PR_JSON")"
+  export GH_PR_STALE_JSON GH_PR_STALE_VIEWS="$1"
   # The wait's pauses are real time; the stub keeps the suite fast.
   printf '#!/usr/bin/env bash\nprintf x >>"%s"\n' "$WS/sleeps" >"$stub/sleep"
   chmod +x "$stub/sleep"
@@ -1356,7 +1356,7 @@ new_sandbox
 make_pr_round_env
 make_fixture_repo
 stale_head_after_push 1000
-export GH_PR_STALE_JSON="$(jq -c '.state = "MERGED"' <<<"$GH_PR_STALE_JSON")"
+GH_PR_STALE_JSON="$(jq -c '.state = "MERGED"' <<<"$GH_PR_STALE_JSON")"
 run_prr --repo "$repo" --pr 39 --round 1 --expect-head "$FR_HEAD" >/dev/null 2>&1; rc=$?
 assert_eq "$rc" 4 "a merged PR exits 4"
 assert_eq "$([[ -e "$WS/sleeps" ]] && printf yes || printf no)" "no" "it does not wait for a head"
