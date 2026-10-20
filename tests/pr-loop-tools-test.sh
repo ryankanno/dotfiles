@@ -1389,6 +1389,19 @@ run_prr --repo "$repo" --pr 39 --round 1 >/dev/null 2>&1; rc=$?
 assert_eq "$rc" 0 "the round ran"
 assert_eq "$(cat "$pd/round-1.lock" 2>/dev/null)" "424242" "the newer holder's lock survives this round's exit"
 
+echo "pr-round: a lock that cannot be written is an error, not a live round"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+mkdir -p "$pd/round-1"
+chmod 555 "$pd"
+err=$(run_prr --repo "$repo" --pr 39 --round 1 2>&1 >/dev/null); rc=$?
+chmod 755 "$pd"
+assert_eq "$rc" 2 "an unwritable lock directory exits 2, not 7"
+assert_contains "$err" "round lock" "the error names the lock"
+assert_not_contains "$err" "already running" "the error does not claim a live round"
+
 echo "pr-round: cumulative tokens span rounds"
 new_sandbox
 make_pr_round_env

@@ -43,7 +43,8 @@
 #                within the manifest's reviewer_background_limit), and
 #                the directory path on stdout.
 # Exit codes: 0 the round ran; 2 usage, the environment is unusable
-# (HOME unset), or the brief cannot fit the reviewer's background limit,
+# (HOME unset, or the round lock cannot be created), or the brief cannot
+# fit the reviewer's background limit,
 # alone or once the standing dispositions assemble into it; 3 identity
 # mismatch; 4 the PR is
 # missing, not open, or not resolvable; 5 the repository, its refs, or
@@ -187,14 +188,22 @@ lock="$round_dir.lock"
 tmp_bg=""
 # Only a lock that still holds this pid is ours to remove: after a takeover
 # race the path can name a newer holder's lock.
-trap '[[ -n "${tmp_bg:-}" ]] && rm -f "$tmp_bg"; [[ "$(cat "$lock" 2>/dev/null)" == "$$" ]] && rm -f "$lock"' EXIT
+trap '[[ -n "${tmp_bg:-}" ]] && rm -f "$tmp_bg"; rm -f "$lock.$$"; [[ "$(cat "$lock" 2>/dev/null)" == "$$" ]] && rm -f "$lock"' EXIT
+lock_error() {
+  printf 'cannot create the round lock %s: %s\n' "$lock" "$1" >&2
+  exit 2
+}
 # The pid is written before the link publishes the lock, so a reader never
 # sees an empty lock from a live caller: an empty one is a crash leftover.
+# Only a failed link with a lock in place is contention; any other failure
+# (a full disk, no hard links) would otherwise read as a live round forever.
 take_lock() {
-  printf '%s\n' "$$" >"$lock.$$" || return 1
-  if ln "$lock.$$" "$lock" 2>/dev/null; then rm -f "$lock.$$"; return 0; fi
+  local err
+  err=$({ printf '%s\n' "$$" >"$lock.$$"; } 2>&1) || lock_error "$err"
+  if err=$(ln "$lock.$$" "$lock" 2>&1); then rm -f "$lock.$$"; return 0; fi
   rm -f "$lock.$$"
-  return 1
+  [[ -e "$lock" ]] && return 1
+  lock_error "$err"
 }
 lock_busy() {
   trap '[[ -n "${tmp_bg:-}" ]] && rm -f "$tmp_bg"' EXIT
