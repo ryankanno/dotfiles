@@ -26,7 +26,8 @@ assert_not_contains() {
 }
 assert_eq() { [[ "$1" == "$2" ]] && ok "$3" || bad "$3 (got '$1' want '$2')"; }
 
-SANDBOXES="$(cd "$(mktemp -d)" && pwd -P)" || exit 1
+SANDBOXES="$(mktemp -d)" || exit 1
+SANDBOXES="$(cd "$SANDBOXES" && pwd -P)" || exit 1
 trap 'rm -rf "$SANDBOXES"' EXIT
 
 # Sets globals WS, LOG, OUT; fake ocr fails the scan when OCR_SCAN_FAIL=1
