@@ -66,10 +66,11 @@ Write the final summary to $OUT/review-output.html, then stop."
     ;;
 esac
 
+mkdir -p "$OUT"
+# review.html holds every finding, security ones too; a git add -A must not
+# commit it. --reuse writes it too, for a folder moved from .git/ocr-opencode.
+echo '*' >"$OUT/.gitignore"
 if [[ $REUSE == 0 ]]; then
-  mkdir -p "$OUT"
-  # review.html holds every finding, security ones too; a git add -A must not commit it.
-  echo '*' >"$OUT/.gitignore"
   ocr scan --path "$2"
   ocr session export -o "$REVIEW"
 fi

@@ -121,6 +121,8 @@ assert_eq "$(cat "$OUT/review.html")" "old" "keeps review.html"
 assert_contains "$calls" "ocr-opencode/review-progress.md exists, read it first, and skip each bug that it marks as done." "fix resumes from progress in .ocr-opencode"
 assert_not_contains "$calls" "If review-progress.md" "the resume names the full progress path"
 assert_not_contains "$calls" "Replace any old review-progress.md" "does not reset progress"
+assert_eq "$(cat "$OUT/.gitignore")" "*" "writes the .gitignore into a folder moved from .git/ocr-opencode"
+assert_eq "$(git status --porcelain)" "" "git does not see the reused outputs"
 
 echo "fix --reuse without review.html fails"
 new_sandbox
@@ -163,6 +165,10 @@ assert_eq "$(cat "$WS/wt/.ocr-opencode/review.html")" "new" "exports review.html
 assert_contains "$(sed -n 3p "$LOG")" "$WS/wt/.ocr-opencode/review.html." "the prompt names the worktree review.html"
 assert_eq "$(ls -A "$WS/repo")" ".git" "writes nothing into the main checkout"
 assert_eq "$(git status --porcelain)" "" "git does not see the outputs in the worktree"
+cd "$WS/repo" || exit 1
+out="$(bash "$SCRIPT" fix --reuse 2>&1)"
+assert_eq "$?" "2" "fix --reuse in the main checkout does not reuse the worktree scan"
+assert_contains "$out" "no review.html to reuse" "fix --reuse in the main checkout says why"
 
 echo "a run from a subdirectory writes to the repo root"
 new_sandbox
@@ -177,7 +183,7 @@ echo "a run from outside a repository fails"
 new_sandbox
 mkdir -p "$WS/outside"
 cd "$WS/outside" || exit 1
-out="$(bash "$SCRIPT" explore "$WS/repo" 2>&1)"
+out="$(LC_ALL=C bash "$SCRIPT" explore "$WS/repo" 2>&1)"
 assert_eq "$(($? != 0))" "1" "exits non-zero"
 assert_contains "$out" "not a git repository" "says why"
 assert_eq "$(ls -A "$WS/outside")" "" "writes no .ocr-opencode outside the repository"
