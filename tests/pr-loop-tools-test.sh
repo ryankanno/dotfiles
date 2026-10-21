@@ -2278,6 +2278,8 @@ assert_eq "$(cat "$rd/delta.txt")" "$(printf '%s\n' 'back\slash.txt:1-1' $'new\n
 assert_eq "$("$TOOLS/executable_finding-scope.sh" "$rd" 'q"uote.txt:2')" "new" "a finding on a quoted path's changed line is new"
 assert_eq "$("$TOOLS/executable_finding-scope.sh" "$rd" 'back\slash.txt:1')" "new" "a finding on a backslashed path's changed line is new"
 assert_eq "$("$TOOLS/executable_finding-scope.sh" "$rd" $'t\tab.txt:3')" "new" "a finding on a tabbed path's changed line is new"
+assert_eq "$("$TOOLS/executable_finding-scope.sh" "$rd" $'new\nline.txt:1')" "new" "a finding on a path with a newline is new"
+assert_eq "$("$TOOLS/executable_finding-scope.sh" "$rd" 'line.txt:1')" "reviewed" "the tail of a path with a newline is not a path"
 
 echo "pr-round: a rename of a quoted filename reports edited ranges, not a whole-file add"
 new_sandbox
