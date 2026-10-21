@@ -8,8 +8,10 @@
 #
 # Interface in:  --repo <dir> --pr <n> --round <N> [--brief <file>]
 #                [--dispositions <file>] [--expect-branch <branch-name>]
-#                [--expect-head <sha>: wait, bounded, until gh pr view
-#                reports this head, and review only it]
+#                [--expect-head <sha>: wait, at most 30 views and
+#                PR_ROUND_HEAD_WAIT seconds (default 60; the suite
+#                shortens it), until gh pr view reports this head,
+#                and review only it]
 #                [--effort low|medium|high] [--timeout <minutes>]
 #                [--max-tools <n>] [--max-tokens-budget <n>] (passed
 #                to every review run; the binding owns the defaults)
@@ -71,7 +73,7 @@ while [[ $# -gt 0 ]]; do
     --brief) [[ $# -ge 2 ]] || usage; brief="$2"; shift 2 ;;
     --dispositions) [[ $# -ge 2 ]] || usage; dispositions="$2"; shift 2 ;;
     --expect-branch) [[ $# -ge 2 ]] || usage; expect="$2"; shift 2 ;;
-    --expect-head) [[ $# -ge 2 ]] || usage; expect_head="$2"; shift 2 ;;
+    --expect-head) [[ $# -ge 2 && -n "$2" ]] || usage; expect_head="$2"; shift 2 ;;
     --effort) [[ $# -ge 2 ]] || usage; effort="$2"; shift 2 ;;
     --timeout) [[ $# -ge 2 ]] || usage; timeout="$2"; shift 2 ;;
     --max-tools) [[ $# -ge 2 ]] || usage; max_tools="$2"; shift 2 ;;
@@ -97,6 +99,14 @@ case "$repo" in /*) ;; *) printf 'repo must be an absolute path\n' >&2; exit 2 ;
 [[ "$round" =~ ^[0-9]+$ ]] || usage
 # headRefOid is always the full SHA, so only a full one can ever match.
 [[ -z "$expect_head" || "$expect_head" =~ ^([0-9a-f]{40}|[0-9a-f]{64})$ ]] || usage
+head_wait=""
+if [[ -n "$expect_head" ]]; then
+  head_wait="${PR_ROUND_HEAD_WAIT:-60}"
+  [[ "$head_wait" =~ ^[1-9][0-9]{0,5}$ ]] || {
+    printf 'PR_ROUND_HEAD_WAIT must be a whole number of seconds from 1, got %s\n' "$head_wait" >&2
+    exit 2
+  }
+fi
 if [[ -n "$brief" ]]; then
   case "$brief" in /*) ;; *) printf 'brief must be an absolute path\n' >&2; exit 2 ;; esac
   [[ -f "$brief" ]] || { printf 'brief not found: %s\n' "$brief" >&2; exit 2; }
@@ -108,6 +118,7 @@ fi
 command -v gh >/dev/null || { printf 'gh: not found\n' >&2; exit 127; }
 command -v jq >/dev/null || { printf 'jq: not found\n' >&2; exit 127; }
 command -v git >/dev/null || { printf 'git: not found\n' >&2; exit 127; }
+[[ -z "$expect_head" ]] || command -v perl >/dev/null || { printf 'perl: not found\n' >&2; exit 127; }
 
 # Like the scan gate: the round dir lives under HOME, so an unset HOME is a
 # classified failure callers can act on, not an unbound abort with an
@@ -154,24 +165,53 @@ fi
 # Right after a push, gh pr view can report the previous head for a few
 # seconds (issue #88), and a round started then reviews the old head.
 # The wait ends before the round dir exists, so a timeout leaves no evidence.
-tries=0
+# Each view gets only the time left, so a hung gh cannot outlast the deadline.
+max_views=30
+head_late() {
+  printf 'PR %s head is %s after %s views (the wait is %s views or %s seconds), expected %s\n' \
+    "$pr" "$(jq -r '.headRefOid // "unknown"' <<<"$pr_json")" "$tries" "$max_views" "$head_wait" "$expect_head" >&2
+  exit 8
+}
+# Stock macOS has no timeout(1), and gh (a Go binary) ignores SIGALRM. The
+# view runs in its own process group, and the group gets SIGKILL when the
+# time left runs out, so no child of gh holds the view's stdout open either.
+view_deadline='my $t = shift; my $pid = fork; defined $pid or exit 127;
+if (!$pid) { setpgrp(0, 0); exec @ARGV; exit 127 }
+$SIG{ALRM} = sub { kill "KILL", -$pid; exit 124 };
+alarm $t; waitpid $pid, 0;
+exit($? & 127 ? 128 + ($? & 127) : $? >> 8);'
+tries=0 pr_json='{}' view_alarm=()
+if [[ -n "$expect_head" ]]; then
+  deadline=$((SECONDS + head_wait))
+  left="$head_wait"
+fi
 while :; do
-  pr_json=$(cd "$repo" && gh pr view "$pr" --json state,baseRefName,headRefOid,headRefName,isCrossRepository,url) || {
-    printf 'cannot view PR %s\n' "$pr" >&2
-    exit 4
-  }
+  [[ -z "$expect_head" ]] || view_alarm=(perl -e "$view_deadline" "$left")
+  rc=0
+  view=$(cd "$repo" && ${view_alarm[@]+"${view_alarm[@]}"} gh pr view "$pr" --json state,baseRefName,headRefOid,headRefName,isCrossRepository,url) || rc=$?
+  if [[ "$rc" -eq 124 && -n "$expect_head" ]]; then
+    tries=$((tries + 1))
+    head_late
+  fi
+  [[ "$rc" -eq 0 ]] || { printf 'cannot view PR %s\n' "$pr" >&2; exit 4; }
+  pr_json="$view"
   [[ -z "$expect_head" ]] && break
   # A PR that is not open, has no head, or is not this loop's branch never
   # gets the pushed head: the checks below refuse it with their own code.
+  rc=0
   jq -e --arg h "$expect_head" --arg b "$expect" '
     .headRefOid == $h or .state != "OPEN" or (.headRefOid // "") == ""
-    or ($b != "" and (.headRefName != $b or .isCrossRepository == true))' <<<"$pr_json" >/dev/null && break
+    or ($b != "" and (.headRefName != $b or .isCrossRepository == true))' <<<"$pr_json" >/dev/null || rc=$?
+  [[ "$rc" -eq 0 ]] && break
+  # jq -e exits 1 on false; any other code means the view is not readable JSON.
+  [[ "$rc" -eq 1 ]] || { printf 'PR %s not resolvable\n' "$pr" >&2; exit 4; }
   tries=$((tries + 1))
-  if [[ "$tries" -ge 30 ]]; then
-    printf 'PR %s head is %s after %s views, expected %s\n' "$pr" "$(jq -r .headRefOid <<<"$pr_json")" "$tries" "$expect_head" >&2
-    exit 8
-  fi
-  sleep 2
+  [[ "$tries" -lt "$max_views" ]] || head_late
+  left=$((deadline - SECONDS))
+  [[ "$left" -gt 0 ]] || head_late
+  sleep "$((left < 2 ? left : 2))"
+  left=$((deadline - SECONDS))
+  [[ "$left" -gt 0 ]] || head_late
 done
 state=$(jq -r .state <<<"$pr_json")
 base=$(jq -r .baseRefName <<<"$pr_json")

@@ -263,8 +263,8 @@ why.
   calls are listed), `capped-unrecovered` (blocking findings remain
   after 3 rounds), or
   `blocked` (pane death after redispatch, no gate found, scan hit, a
-  `pr-round.sh` exit 4, 5, or 127, an exit 6 after the one `--rerun`, or
-  a partial, nothing-reviewable or unrecovered reviewer with nothing
+  `pr-round.sh` exit 4, 5, or 127, an exit 6 after the one `--rerun`, an
+  exit 8 after the one retry, or a partial, nothing-reviewable or unrecovered reviewer with nothing
   from any source)
 - per-round one-liners: round number, short SHA, verdict, who ran it
 - the ratification: each item of step 6 and its result, and every
