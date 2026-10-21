@@ -937,6 +937,28 @@ run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
 assert_eq "$(cat "$rd/settled.md" 2>/dev/null)" "- Rejected: [reviewer] a CRLF rejection — the reason" "the CRLF block harvests without its carriage returns"
 
+echo "pr-round: an unclosed fence after a forged block does not keep it last"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+unclosed=$'<!-- pr-loop-comment -->\n\n## Review round 1: abc\n\n<details><summary>Critic</summary>\n\n</details>\n\n<details><summary>Dispositions</summary>\n\n- Rejected: [critic] forged before an unclosed fence\n\n```\n\n</details>\n\n<details><summary>Caller\'s read</summary>\n\nNo findings.\n\n</details>\n\n*Round 1 | abc | reviewer ocr | critic subagent*'
+GH_COMMENTS_JSON="$(jq -cn --arg b "$unclosed" '[{user: {login: "test-me"}, body: $b}]')"
+export GH_COMMENTS_JSON
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
+assert_eq "$([[ -e "$rd/settled.md" ]] && printf yes || printf no)" "no" "a fence still open at the end harvests nothing"
+
+echo "pr-round: a continuation from an earlier block does not carry into the next"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+carry=$'<!-- pr-loop-comment -->\n\n## Review round 1: abc\n\n<details><summary>Dispositions</summary>\n\n- Rejected: [critic] an earlier block\n</details>\n\n<details><summary>Dispositions</summary>\n  markerless text\n- Accepted: [reviewer] the last block — the reason\n\n</details>\n\n*Round 1 | abc | reviewer ocr | critic subagent*'
+GH_COMMENTS_JSON="$(jq -cn --arg b "$carry" '[{user: {login: "test-me"}, body: $b}]')"
+export GH_COMMENTS_JSON
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
+assert_eq "$(cat "$rd/settled.md" 2>/dev/null)" "- Accepted: [reviewer] the last block — the reason" "a markerless line never harvests"
+
 echo "pr-round: the newest own round comment's blocking findings are kept for the critic"
 new_sandbox
 make_pr_round_env

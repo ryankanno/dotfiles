@@ -403,7 +403,7 @@ else
      | awk '{ sub(/\r$/, "") }
            fence { l = $0; sub(/^[[:space:]]*/, "", l); if (index(l, fence) == 1) fence = ""; next }
            /^[[:space:]]*(```|~~~)/ { sub(/^[[:space:]]*/, ""); fence = substr($0, 1, 3); keep = 0; if (!inblock) last = 0; next }
-           /^<details>/ { if (!inblock) { on = ($0 == "<details><summary>Dispositions</summary>"); last = on; buf = "" } inblock = 1; next }
+           /^<details>/ { if (!inblock) { on = ($0 == "<details><summary>Dispositions</summary>"); last = on; buf = ""; keep = 0 } inblock = 1; next }
            /^<\/details>/ { inblock = 0; on = 0; next }
            !inblock && NF && !/^\*Round [0-9]+ \| / { last = 0; next }
            on && /^- (Rejected|Accepted):/ { keep = 1; buf = buf $0 "\n"; next }
@@ -411,7 +411,7 @@ else
            on && NF == 0 { keep = 0; next }
            on && keep && /^[[:space:]]/ { buf = buf $0 "\n"; next }
            on && NF { keep = 0 }
-           END { if (last) printf "%s", buf }'
+           END { if (last && !inblock && fence == "") printf "%s", buf }'
   done <<<"$bodies")
 fi
 # The newest earlier-round comment's blocking findings are what this round's
