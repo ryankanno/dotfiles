@@ -9,8 +9,8 @@
 # Interface in:  --repo <dir> --pr <n> --round <N> [--brief <file>]
 #                [--dispositions <file>] [--expect-branch <branch-name>]
 #                [--expect-head <sha>: wait, at most 30 views and
-#                PR_ROUND_HEAD_WAIT seconds (default 60; the suite
-#                shortens it), until gh pr view reports this head,
+#                PR_ROUND_HEAD_WAIT seconds (1 to 60, default 60; the
+#                suite shortens it), until gh pr view reports this head,
 #                and review only it]
 #                [--effort low|medium|high] [--timeout <minutes>]
 #                [--max-tools <n>] [--max-tokens-budget <n>] (passed
@@ -102,8 +102,9 @@ case "$repo" in /*) ;; *) printf 'repo must be an absolute path\n' >&2; exit 2 ;
 head_wait=""
 if [[ -n "$expect_head" ]]; then
   head_wait="${PR_ROUND_HEAD_WAIT:-60}"
-  [[ "$head_wait" =~ ^[1-9][0-9]{0,5}$ ]] || {
-    printf 'PR_ROUND_HEAD_WAIT must be a whole number of seconds from 1, got %s\n' "$head_wait" >&2
+  # Only the suite sets it, to shorten the wait; a longer one is a typo.
+  [[ "$head_wait" =~ ^[1-9][0-9]?$ ]] && (( head_wait <= 60 )) || {
+    printf 'PR_ROUND_HEAD_WAIT must be a whole number of seconds from 1 to 60, got %s\n' "$head_wait" >&2
     exit 2
   }
 fi

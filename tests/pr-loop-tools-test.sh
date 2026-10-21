@@ -1497,6 +1497,19 @@ assert_contains "$err" "PR_ROUND_HEAD_WAIT" "the message names the variable"
 PR_ROUND_HEAD_WAIT=0 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null 2>&1; rc=$?
 assert_eq "$rc" 0 "without --expect-head the variable is not read"
 
+echo "pr-round: --expect-head with a PR_ROUND_HEAD_WAIT above 60 is a usage error"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+stale_head_after_push 0
+err=$(PR_ROUND_HEAD_WAIT=61 run_prr --repo "$repo" --pr 39 --round 1 --expect-head "$FR_HEAD" 2>&1 >/dev/null); rc=$?
+assert_eq "$rc" 2 "a wait above the default is a usage error"
+assert_contains "$err" "PR_ROUND_HEAD_WAIT" "the message names the variable"
+assert_contains "$err" "60" "the message names the limit"
+assert_eq "$([[ -e "$WS/gh-pr-views" ]] && printf yes || printf no)" "no" "it exits before any view"
+PR_ROUND_HEAD_WAIT=60 run_prr --repo "$repo" --pr 39 --round 1 --expect-head "$FR_HEAD" >/dev/null 2>&1; rc=$?
+assert_eq "$rc" 0 "a wait of 60 still runs the round"
+
 echo "pr-round: --expect-head with an empty value is a usage error"
 new_sandbox
 make_pr_round_env
