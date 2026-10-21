@@ -166,23 +166,33 @@ fi
 # seconds (issue #88), and a round started then reviews the old head.
 # The wait ends before the round dir exists, so a timeout leaves no evidence.
 # Each view gets only the time left, so a hung gh cannot outlast the deadline.
+max_views=30
 head_late() {
-  printf 'PR %s head is %s after %s views (the wait is 30 views or %s seconds), expected %s\n' \
-    "$pr" "$(jq -r '.headRefOid // "unknown"' <<<"$pr_json")" "$tries" "$head_wait" "$expect_head" >&2
+  printf 'PR %s head is %s after %s views (the wait is %s views or %s seconds), expected %s\n' \
+    "$pr" "$(jq -r '.headRefOid // "unknown"' <<<"$pr_json")" "$tries" "$max_views" "$head_wait" "$expect_head" >&2
   exit 8
 }
+# Stock macOS has no timeout(1), and gh (a Go binary) ignores SIGALRM. The
+# view runs in its own process group, and the group gets SIGKILL when the
+# time left runs out, so no child of gh holds the view's stdout open either.
+view_deadline='my $t = shift; my $pid = fork; defined $pid or exit 127;
+if (!$pid) { setpgrp(0, 0); exec @ARGV; exit 127 }
+$SIG{ALRM} = sub { kill "KILL", -$pid; exit 124 };
+alarm $t; waitpid $pid, 0;
+exit($? & 127 ? 128 + ($? & 127) : $? >> 8);'
 tries=0 pr_json='{}' view_alarm=()
 if [[ -n "$expect_head" ]]; then
   deadline=$((SECONDS + head_wait))
   left="$head_wait"
 fi
 while :; do
-  # Stock macOS has no timeout(1). A perl alarm survives the exec, so the
-  # view itself dies by SIGALRM (exit 142) when the time left runs out.
-  [[ -z "$expect_head" ]] || view_alarm=(perl -e 'alarm shift; exec @ARGV or exit 127' "$left")
+  [[ -z "$expect_head" ]] || view_alarm=(perl -e "$view_deadline" "$left")
   rc=0
   view=$(cd "$repo" && ${view_alarm[@]+"${view_alarm[@]}"} gh pr view "$pr" --json state,baseRefName,headRefOid,headRefName,isCrossRepository,url) || rc=$?
-  [[ "$rc" -ne 142 || -z "$expect_head" ]] || head_late
+  if [[ "$rc" -eq 124 && -n "$expect_head" ]]; then
+    tries=$((tries + 1))
+    head_late
+  fi
   [[ "$rc" -eq 0 ]] || { printf 'cannot view PR %s\n' "$pr" >&2; exit 4; }
   pr_json="$view"
   [[ -z "$expect_head" ]] && break
@@ -196,8 +206,10 @@ while :; do
   # jq -e exits 1 on false; any other code means the view is not readable JSON.
   [[ "$rc" -eq 1 ]] || { printf 'PR %s not resolvable\n' "$pr" >&2; exit 4; }
   tries=$((tries + 1))
-  [[ "$tries" -lt 30 ]] || head_late
-  sleep 2
+  [[ "$tries" -lt "$max_views" ]] || head_late
+  left=$((deadline - SECONDS))
+  [[ "$left" -gt 0 ]] || head_late
+  sleep "$((left < 2 ? left : 2))"
   left=$((deadline - SECONDS))
   [[ "$left" -gt 0 ]] || head_late
 done

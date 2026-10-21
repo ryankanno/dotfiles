@@ -580,16 +580,18 @@ make_pr_round_env() {
 #!/usr/bin/env bash
 case "$1 $2" in
   "pr view")
+    # A slow or hung gh. Like the real gh (a Go binary) it outlives SIGALRM,
+    # and its child holds the view's stdout, as a credential helper can. The
+    # sleep stub only counts pauses, so call the real one.
+    if [[ -n "${GH_PR_VIEW_DELAY:-}" ]]; then
+      trap '' ALRM
+      /bin/sleep "$GH_PR_VIEW_DELAY"
+    fi
     # GitHub can report the previous head for a while after a push.
     if [[ -n "${GH_PR_STALE_JSON:-}" ]]; then
       n=$(cat "$GH_PR_VIEWS_FILE" 2>/dev/null || printf 0)
       printf '%s\n' "$((n + 1))" >"$GH_PR_VIEWS_FILE"
-      if [[ "$n" -lt "$GH_PR_STALE_VIEWS" ]]; then
-        # A slow or hung gh: the sleep stub only counts pauses, so call the real one,
-        # detached from the pipe so a killed view does not wait out the sleep.
-        [[ -n "${GH_PR_STALE_DELAY:-}" ]] && /bin/sleep "$GH_PR_STALE_DELAY" >/dev/null 2>&1
-        printf '%s\n' "$GH_PR_STALE_JSON"; exit 0
-      fi
+      if [[ "$n" -lt "$GH_PR_STALE_VIEWS" ]]; then printf '%s\n' "$GH_PR_STALE_JSON"; exit 0; fi
     fi
     printf '%s\n' "$GH_PR_JSON"
     ;;
@@ -643,7 +645,7 @@ OCRSTUB
   export GH_COMMENTS_JSON='[]'
   export STUB_GARBAGE="" STUB_WARNINGS="" STUB_COVERAGE_FAILED=""
   export STUB_LOCK_SWAP="" STUB_LOCK_PID=""
-  export GH_PR_STALE_JSON="" GH_PR_STALE_VIEWS=0 GH_PR_VIEWS_FILE="$WS/gh-pr-views" GH_PR_STALE_DELAY=""
+  export GH_PR_STALE_JSON="" GH_PR_STALE_VIEWS=0 GH_PR_VIEWS_FILE="$WS/gh-pr-views" GH_PR_VIEW_DELAY=""
 }
 
 make_fixture_repo() {
@@ -1453,11 +1455,12 @@ new_sandbox
 make_pr_round_env
 make_fixture_repo
 stale_head_after_push 1000
-export GH_PR_STALE_DELAY=30
+export GH_PR_VIEW_DELAY=30
 started=$SECONDS
-PR_ROUND_HEAD_WAIT=2 run_prr --repo "$repo" --pr 39 --round 1 --expect-head "$FR_HEAD" >/dev/null 2>&1; rc=$?
+err=$(PR_ROUND_HEAD_WAIT=2 run_prr --repo "$repo" --pr 39 --round 1 --expect-head "$FR_HEAD" 2>&1 >/dev/null); rc=$?
 assert_eq "$rc" 8 "a head that never arrives exits 8"
 assert_eq "$(( SECONDS - started < 10 ))" 1 "a hung view does not extend the wait past its deadline"
+assert_contains "$err" "after 1 views" "the cut-off view is counted"
 assert_eq "$([[ -d "$WS/home/.cache/pr-loop" ]] && printf yes || printf no)" "no" "no round dir created"
 
 echo "pr-round: --expect-head with slow stale views exits 8 at the wait's deadline"
@@ -1465,13 +1468,24 @@ new_sandbox
 make_pr_round_env
 make_fixture_repo
 stale_head_after_push 1000
-export GH_PR_STALE_DELAY=1
+export GH_PR_VIEW_DELAY=1
 started=$SECONDS
 err=$(PR_ROUND_HEAD_WAIT=3 run_prr --repo "$repo" --pr 39 --round 1 --expect-head "$FR_HEAD" 2>&1 >/dev/null); rc=$?
 assert_eq "$rc" 8 "a head that never arrives exits 8"
 assert_eq "$(( SECONDS - started < 10 ))" 1 "slow views do not extend the wait past its deadline"
 assert_contains "$err" "3 seconds" "the message names the time bound that ended the wait"
 assert_contains "$err" "$FR_BASE" "the message names the head GitHub reports"
+
+echo "pr-round: --expect-head with slow views that report the pushed head runs the round"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+stale_head_after_push 1
+export GH_PR_VIEW_DELAY=1
+PR_ROUND_HEAD_WAIT=20 run_prr --repo "$repo" --pr 39 --round 1 --expect-head "$FR_HEAD" >/dev/null 2>&1; rc=$?
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
+assert_eq "$rc" 0 "a slow view inside the wait is not cut off"
+assert_eq "$(jq -r '.range.head' "$rd/round.json")" "$FR_HEAD" "the round reviews the pushed head"
 
 echo "pr-round: --expect-head with an invalid PR_ROUND_HEAD_WAIT is a usage error"
 new_sandbox
