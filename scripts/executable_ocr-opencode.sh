@@ -2,9 +2,10 @@
 # ocr scan <path>, export review.html, then hand it to opencode.
 #   explore -> issue-exploration workflow (verify and file GitHub issues)
 #   fix     -> fix the critical/high findings through /issue-to-pr
-# Run inside the repository. The files go to .git/ocr-opencode/, so git
-# never tracks them. fix --reuse skips the scan and resumes a stopped fix
-# run on the existing review.html.
+# Run inside the repository. The files go to .ocr-opencode/ at the root of
+# the current directory's repository (each worktree has its own), and its
+# .gitignore keeps git from tracking them. fix --reuse skips the scan and
+# resumes a stopped fix run on the existing review.html.
 set -euo pipefail
 
 usage() {
@@ -23,7 +24,7 @@ case "$1:$2" in
   *) usage ;;
 esac
 
-OUT="$(git rev-parse --path-format=absolute --git-common-dir)/ocr-opencode"
+OUT="$(git rev-parse --show-toplevel)/.ocr-opencode"
 REVIEW="$OUT/review.html"
 
 if [[ $REUSE == 1 && ! -f $REVIEW ]]; then
@@ -67,6 +68,8 @@ esac
 
 if [[ $REUSE == 0 ]]; then
   mkdir -p "$OUT"
+  # review.html holds every finding, security ones too; a git add -A must not commit it.
+  echo '*' >"$OUT/.gitignore"
   ocr scan --path "$2"
   ocr session export -o "$REVIEW"
 fi
