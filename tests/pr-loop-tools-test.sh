@@ -585,8 +585,9 @@ case "$1 $2" in
       n=$(cat "$GH_PR_VIEWS_FILE" 2>/dev/null || printf 0)
       printf '%s\n' "$((n + 1))" >"$GH_PR_VIEWS_FILE"
       if [[ "$n" -lt "$GH_PR_STALE_VIEWS" ]]; then
-        # A hung gh: the test's sleep stub only counts pauses, so call the real one.
-        [[ -n "${GH_PR_STALE_HANG:-}" ]] && exec /bin/sleep "$GH_PR_STALE_HANG"
+        # A slow or hung gh: the sleep stub only counts pauses, so call the real one,
+        # detached from the pipe so a killed view does not wait out the sleep.
+        [[ -n "${GH_PR_STALE_DELAY:-}" ]] && /bin/sleep "$GH_PR_STALE_DELAY" >/dev/null 2>&1
         printf '%s\n' "$GH_PR_STALE_JSON"; exit 0
       fi
     fi
@@ -642,7 +643,7 @@ OCRSTUB
   export GH_COMMENTS_JSON='[]'
   export STUB_GARBAGE="" STUB_WARNINGS="" STUB_COVERAGE_FAILED=""
   export STUB_LOCK_SWAP="" STUB_LOCK_PID=""
-  export GH_PR_STALE_JSON="" GH_PR_STALE_VIEWS=0 GH_PR_VIEWS_FILE="$WS/gh-pr-views" GH_PR_STALE_HANG=""
+  export GH_PR_STALE_JSON="" GH_PR_STALE_VIEWS=0 GH_PR_VIEWS_FILE="$WS/gh-pr-views" GH_PR_STALE_DELAY=""
 }
 
 make_fixture_repo() {
@@ -1452,12 +1453,35 @@ new_sandbox
 make_pr_round_env
 make_fixture_repo
 stale_head_after_push 1000
-export GH_PR_STALE_HANG=30
+export GH_PR_STALE_DELAY=30
 started=$SECONDS
 PR_ROUND_HEAD_WAIT=2 run_prr --repo "$repo" --pr 39 --round 1 --expect-head "$FR_HEAD" >/dev/null 2>&1; rc=$?
 assert_eq "$rc" 8 "a head that never arrives exits 8"
 assert_eq "$(( SECONDS - started < 10 ))" 1 "a hung view does not extend the wait past its deadline"
 assert_eq "$([[ -d "$WS/home/.cache/pr-loop" ]] && printf yes || printf no)" "no" "no round dir created"
+
+echo "pr-round: --expect-head with slow stale views exits 8 at the wait's deadline"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+stale_head_after_push 1000
+export GH_PR_STALE_DELAY=1
+started=$SECONDS
+err=$(PR_ROUND_HEAD_WAIT=3 run_prr --repo "$repo" --pr 39 --round 1 --expect-head "$FR_HEAD" 2>&1 >/dev/null); rc=$?
+assert_eq "$rc" 8 "a head that never arrives exits 8"
+assert_eq "$(( SECONDS - started < 10 ))" 1 "slow views do not extend the wait past its deadline"
+assert_contains "$err" "3 seconds" "the message names the time bound that ended the wait"
+assert_contains "$err" "$FR_BASE" "the message names the head GitHub reports"
+
+echo "pr-round: --expect-head with an invalid PR_ROUND_HEAD_WAIT is a usage error"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+err=$(PR_ROUND_HEAD_WAIT=0 run_prr --repo "$repo" --pr 39 --round 1 --expect-head "$FR_HEAD" 2>&1 >/dev/null); rc=$?
+assert_eq "$rc" 2 "a zero wait is a usage error"
+assert_contains "$err" "PR_ROUND_HEAD_WAIT" "the message names the variable"
+PR_ROUND_HEAD_WAIT=0 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null 2>&1; rc=$?
+assert_eq "$rc" 0 "without --expect-head the variable is not read"
 
 echo "pr-round: --expect-head with an empty value is a usage error"
 new_sandbox
