@@ -2426,6 +2426,44 @@ assert_contains "$OUT" "gen.js: generated file (its header says do not edit), +2
 assert_not_contains "$OUT" "GENERATED-BODY" "the generated hunks stay out"
 assert_contains "$OUT" "+HAND-LINE" "a hand-written file's hunks stay in"
 
+echo "critic-input: a golden or snapshot file's hunks give way to one line naming it"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+for p in dott/tests/golden/transcripts.json goldens/a.txt web/__snapshots__/b.js.txt snapshots/c.txt d.golden e.snap; do
+  mkdir -p "$repo/$(dirname "$p")"
+  advance_head "$p" "GOLDEN-BODY $p\n"
+done
+mkdir -p "$repo/src"
+advance_head src/golden_ratio.py 'RATIO-LINE\n'
+advance_head f.txt 'b\nHAND-LINE\n'
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
+OUT="$("$CRITIC_INPUT" --repo "$repo" --round-dir "$rd" 2>&1)"; RC=$?
+assert_eq "$RC" 0 "exits 0"
+for p in dott/tests/golden/transcripts.json goldens/a.txt web/__snapshots__/b.js.txt snapshots/c.txt d.golden e.snap; do
+  assert_contains "$OUT" "$p: golden or snapshot file, +1 -0 lines, hunks omitted" "$p is one line"
+  assert_not_contains "$OUT" "GOLDEN-BODY $p" "$p's hunks stay out"
+done
+assert_contains "$OUT" "+RATIO-LINE" "a path that only contains the word keeps its hunks"
+assert_not_contains "$OUT" "golden_ratio.py: golden" "no note for a path that only contains the word"
+assert_contains "$OUT" "+HAND-LINE" "a source file's hunks stay in"
+
+echo "critic-input: a prompt over 200,000 bytes is not printed, and the size goes to stderr"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+advance_head big.txt "$(head -c 200000 /dev/zero | tr '\0' x)\n"
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
+"$CRITIC_INPUT" --repo "$repo" --round-dir "$rd" >"$WS/out" 2>"$WS/err"; RC=$?
+assert_eq "$RC" 4 "exits 4"
+assert_eq "$(wc -c <"$WS/out" | tr -d ' ')" 0 "nothing on stdout"
+assert_contains "$(cat "$WS/err")" "over the 200000-byte limit" "stderr names the limit"
+assert_contains "$(cat "$WS/err")" "the prompt is 2" "stderr names the size"
+
 echo "critic-input: 'do not edit' below the header does not make a file generated"
 new_sandbox
 make_pr_round_env

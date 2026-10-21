@@ -249,6 +249,10 @@ $HOME/.claude/skills/issue-to-pr/tools/subagent/critic-input.sh \
   --repo <checkout-dir> --round-dir <round-dir> --brief <brief-file>
 ```
 
+When the script exits 4, the prompt is over 200,000 bytes and cannot
+pass inline. The script prints no prompt. The round runs with no critic.
+The Critic block records the gap with the script's stderr line.
+
 Its findings arrive numbered with file, line, the claim, the input or
 state that reaches it, the harm, severity, and how it checked. Findings
 that do not reference that diff are dropped, per the binding's
