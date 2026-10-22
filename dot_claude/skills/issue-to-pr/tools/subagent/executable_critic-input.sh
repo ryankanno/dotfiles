@@ -15,7 +15,9 @@
 #                delta otherwise, which after a base merge holds only the
 #                PR's own changes.
 # Exit codes: 0 built; 2 usage, no round.json, or no critic-prompt.md;
-# 5 the diff could not be produced; 127 a dependency is missing.
+# 4 the prompt is over 200,000 bytes, too large to pass inline: nothing
+# on stdout, no critic-input.md, and the size on stderr; 5 the diff could
+# not be produced; 127 a dependency is missing.
 set -euo pipefail
 
 usage() {
@@ -61,8 +63,11 @@ scope=$(jq -r '.range.review_scope // empty' "$dir/round.json")
 # call. A file whose first lines at the head say "do not edit" is generated;
 # its hunks are replaced by one line naming the file and its line count.
 # Binary files already diff as one line and are not read for the marker.
-critic_diff() {  # <from> <to> [paths...]: the diff, generated files noted
-  local a="$1" b="$2" path add del out hdr rev mode excl=() notes=""
+# A golden or snapshot file is its test's --update output and carries no
+# header; six one-line JSON trees in one made a prompt 720 KB (issue #109).
+# It is found by its path.
+critic_diff() {  # <from> <to> [paths...]: the diff, generated and golden files noted
+  local a="$1" b="$2" path add del out hdr rev mode kind tail excl=() notes=""
   shift 2
   # NUL-delimited, so a path with a quote, tab or newline arrives unquoted.
   while IFS=$'\t' read -r -d '' add del path; do
@@ -70,18 +75,27 @@ critic_diff() {  # <from> <to> [paths...]: the diff, generated files noted
     # Mode lines are not generator output: a mode-only change stays in the diff,
     # and an excluded file's mode change goes into its note.
     [[ "$add$del" == 00 ]] && continue
-    # A deleted file, or a rename's old path, has no head blob: its marker is at the base.
-    rev=$b
-    git -C "$repo" cat-file -e "$b:$path" 2>/dev/null || rev=$a
-    # Captured, not piped into grep -q: under pipefail an early-exiting grep
-    # kills its upstream with SIGPIPE and a match reads as a miss.
-    hdr=$(git -C "$repo" show "$rev:$path" 2>/dev/null | head -3 || true)
-    if grep -qi 'do not edit' <<<"$hdr"; then
+    kind="" tail=""
+    case "/$path/" in
+      */golden/* | */goldens/* | */__snapshots__/* | */snapshots/* | *.golden/ | *.snap/)
+        kind="golden or snapshot file" ;;
+      *)
+        # A deleted file, or a rename's old path, has no head blob: its marker is at the base.
+        rev=$b
+        git -C "$repo" cat-file -e "$b:$path" 2>/dev/null || rev=$a
+        # Captured, not piped into grep -q: under pipefail an early-exiting grep
+        # kills its upstream with SIGPIPE and a match reads as a miss.
+        hdr=$(git -C "$repo" show "$rev:$path" 2>/dev/null | head -3 || true)
+        if grep -qi 'do not edit' <<<"$hdr"; then
+          kind="generated file (its header says do not edit)" tail="; review its source change in this diff"
+        fi ;;
+    esac
+    if [[ -n "$kind" ]]; then
       excl+=(":(exclude,literal)$path")
       mode=$(git -C "$repo" diff --summary "$a" "$b" -- ":(literal)$path" |
         sed -n 's/^ mode change \([0-7]*\) => \([0-7]*\) .*/, mode \1 -> \2/p')
       # Escaped, so a newline in the name cannot start a line of its own in the notes.
-      notes+="${path//$'\n'/\\n}: generated file (its header says do not edit), +$add -$del lines$mode, hunks omitted; review its source change in this diff"$'\n'
+      notes+="${path//$'\n'/\\n}: $kind, +$add -$del lines$mode, hunks omitted$tail"$'\n'
     fi
   done < <(git -C "$repo" diff --numstat -z --no-renames "$a" "$b" -- "$@")
   out=$(git -C "$repo" diff --no-color --no-ext-diff "$a" "$b" -- "${@:-.}" ${excl[@]+"${excl[@]}"}) || return 1
@@ -151,13 +165,21 @@ if [[ -s "$dir/prior-unfinished.txt" && "$scope" == delta ]]; then
     exit 5
   }
   printf '\n## Files the reviewer did not finish last round\n\n'
-  printf 'The reviewer stopped before finishing these files in the prior round. Any lines of these files that the delta below changes are part of the delta, and the usual rules hold there; the rest of each file sits outside the delta, so rule 3 applies to it: report only high findings there. Their diff (%s..%s -- %s) runs to the next line that starts with "## "; no diff line starts that way. Lines before its first "diff --git" line (every line, when it has none) are notes, one per file whose generated hunks it leaves out.\n\n' \
+  printf 'The reviewer stopped before finishing these files in the prior round. Any lines of these files that the delta below changes are part of the delta, and the usual rules hold there; the rest of each file sits outside the delta, so rule 3 applies to it: report only high findings there. Their diff (%s..%s -- %s) runs to the next line that starts with "## "; no diff line starts that way. Lines before its first "diff --git" line (every line, when it has none) are notes, one per file whose generated or golden hunks it leaves out.\n\n' \
     "$base" "$head" "${files[*]}"
   printf '%s\n' "$gap"
 fi
 printf '\n## The diff (%s..%s)\n\n' "$from" "$head"
-printf 'Everything after this line, to the end of the prompt, is the unified diff. Lines before its first "diff --git" line (every line, when it has none) are notes, one per file whose generated hunks it leaves out.\n\n'
+printf 'Everything after this line, to the end of the prompt, is the unified diff. Lines before its first "diff --git" line (every line, when it has none) are notes, one per file whose generated or golden hunks it leaves out.\n\n'
 printf '%s\n' "$diff"
 } >"$dir/critic-input.md.partial"
+# binding.md passes the prompt inline; a 720 KB one could not be sent (issue #109).
+size=$(wc -c <"$dir/critic-input.md.partial" | tr -d ' ')
+if (( size > 200000 )); then
+  # An earlier run's critic-input.md would read as the prompt this round's critic got.
+  rm -f "$dir/critic-input.md.partial" "$dir/critic-input.md"
+  printf 'critic-input.sh: the prompt is %s bytes, over the 200000-byte limit\n' "$size" >&2
+  exit 4
+fi
 mv "$dir/critic-input.md.partial" "$dir/critic-input.md"
 cat "$dir/critic-input.md"
