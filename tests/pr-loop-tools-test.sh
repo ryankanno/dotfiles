@@ -2748,6 +2748,7 @@ assert_contains "$OUT" "--repo must be the local checkout directory, got 'test-o
 # Claude Code replaces these placeholders in a skill's text with the
 # invocation's arguments, so the model reads a different command.
 echo "skills: no skill text holds a positional placeholder"
+assert_eq "$([[ -d "$ROOT/dot_claude/skills" ]] && echo present)" "present" "the skills directory exists, so an empty grep means no placeholder"
 OUT="$(grep -rnE --include='*.md' '\$([0-9]|ARGUMENTS)' "$ROOT/dot_claude/skills")"
 assert_eq "$OUT" "" "no \$0 to \$9 or \$ARGUMENTS in dot_claude/skills/**/*.md"
 
