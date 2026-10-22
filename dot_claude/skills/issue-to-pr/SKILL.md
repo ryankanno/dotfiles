@@ -112,7 +112,16 @@ An existing PR means a previous run: do not create anything. Verify its
 state and resume the loop at step 5. If no pane runs on the worktree,
 reopen it with `workmux open <handle>` and the dispatch prompt from
 [`dispatch-prompt-template.md`](dispatch-prompt-template.md), with its
-"Resuming" section filled in: never a re-entry text of your own. If the
+"Resuming" section filled in: never a re-entry text of your own. Fill
+its refine-round count and its convergence flag from
+`$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/rounds.txt`, where the pane
+writes one `<N> <kind>` line per round. Use only the round numbers
+that have a `round-<N>/` folder, and for a number with two lines, the
+last one: a pane that died before its round started leaves a line for
+a round that never ran. The count is the number of `refine` rounds,
+and the flag is the kind of the newest finished round. The round numbers do not give the count, because a
+convergence round takes a number of its own. A PR with no `rounds.txt`
+gets the template's unknown-count bullet. If the
 prior run left
 `$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/final-report.md`, read it and
 carry its verdict forward into the resume: a capped-unrecovered resume
