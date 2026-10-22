@@ -97,7 +97,9 @@ entirely otherwise:>
 ## Review rounds: you run every one
 
 The orchestrator runs no review. It ratifies your rounds when you stop.
-Every round has a unique number, and every round posts its comment.
+Every round has a unique number, and every round posts its comment per
+pr-review §8: on a repository that is not owned, the comment stays a
+draft in the round directory.
 Before you start a round, add one line to `rounds.txt` in the PR's
 round folder, the folder that holds `round-<N>/` (make it as
 pr-review §1 says when it is missing): `<N> review` (round 1), `<N> refine` (a pr-refine run), or

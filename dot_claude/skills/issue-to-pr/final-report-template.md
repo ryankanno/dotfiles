@@ -9,7 +9,7 @@
 
 | Round | SHA | Verdict | Run by | Comment |
 |---|---|---|---|---|
-| <N> | <short SHA> | <round verdict> | <implementer or human> | <comment URL> |
+| <N> | <short SHA> | <round verdict> | <implementer or human> | <comment URL, or the draft path on a repository that is not owned> |
 
 ## Ratification
 
@@ -17,7 +17,7 @@
 |---|---|
 | 1. The reviewed head is the PR's head | <holds, or what failed> |
 | 2. The newest round reviewed the whole PR | <holds, or what failed> |
-| 3. The round's comment is on the PR | <holds, or what failed> |
+| 3. The round's comment is on the PR (or its scanned draft, on a repository that is not owned) | <holds, or what failed> |
 | 4. The gate is green on the PR's code | <holds, or what failed> |
 | 5. Every Rejected and Accepted disposition holds | <holds, or what failed> |
 

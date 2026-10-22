@@ -348,12 +348,30 @@ leaked; the blocked post surfaces in the loop's final report.
 
 ## 8. Post
 
+Post only on a repository the human owns. Read the owner of the PR's
+repository and the gh login:
+
+```bash
+gh repo view <owner/repo> --json owner --jq .owner.login
+gh api user --jq .login
+```
+
+The repository is owned when its owner is the gh login or an org on
+this list. Owned orgs: `i9-io`.
+
+On an owned repository, post the file:
+
 ```bash
 gh pr comment <n> --body-file <round-dir>/comment.md
 ```
 
 Record the comment URL and the round directory: the final report needs
 the session ids and token totals from the round's `review.json`.
+
+On any other repository, do not post. `<round-dir>/comment.md` stays
+as the draft. When the §7 scan exited 0, report to the caller that the
+comment is a draft for the human to post, with its path. Otherwise
+report the scan's hits, as §7 says. Record the round directory.
 
 ## Never
 

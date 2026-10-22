@@ -192,7 +192,8 @@ reused, or the pane's earlier run of that round died before its
 `round.json`.
 
 Watch the pane with `workmux status` / `capture`. Verify each round's
-push with `gh pr view` and each round's comment on the PR. Never run a
+push with `gh pr view` and each round's comment on the PR (on a
+repository that is not owned, its `comment.md`). Never run a
 review round yourself, and never send the pane a round it did not ask
 for.
 
@@ -210,7 +211,9 @@ newest round directory is
    starts with `full:`. A `delta`, `none:`, partial, nothing reviewable
    or unrecovered round declares nothing.
 3. **The round's comment is on the PR** with the same round number and
-   verdict as `round.json`.
+   verdict as `round.json`. On a repository that is not owned
+   (pr-review §8), check `comment.md` in the round directory instead,
+   and `scan.sh <comment.md>` exits 0: the round does not post it.
 4. **The gate is green on the PR's code, not your checkout.** Run it in
    the implementer's worktree (`workmux path <handle>` prints it), after
    verifying the worktree's HEAD equals the PR's headRefOid
@@ -219,7 +222,9 @@ newest round directory is
    decides green; read the log for what pr-review §4 names (skipped,
    deselected, or deleted tests).
 5. **Every Rejected and Accepted disposition holds.** Read the
-   Dispositions blocks of every round comment. Check each reason
+   Dispositions blocks of every round comment. On a repository that is
+   not owned, read them from each round directory's `comment.md`.
+   Check each reason
    against the diff. The author of the code wrote these reasons, so
    this audit is the loop's independent check.
 
@@ -286,10 +291,12 @@ why.
   Cost line: the `cumulative_tokens` its round.json carried when it was
   written; a rerun of an earlier round afterwards does not recompute
   later rounds' round.json, so say so plainly when one happened), the
-  critic's tokens summed from every round comment's Cost line (naming
+  critic's tokens summed from every round comment's Cost line (on a
+  repository that is not owned, each round's `comment.md`) (naming
   any round whose critic tokens were not reported), reviewer and critic
   bindings used, ocr version
-- the PR comment links, one per round
+- the PR comment links, one per round (on a repository that is not
+  owned, the draft paths for the human to post)
 
 Before the final message is spoken, write the report verbatim to
 `$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/final-report.md`, the same

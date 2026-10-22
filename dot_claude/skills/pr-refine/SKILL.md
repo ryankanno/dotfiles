@@ -65,6 +65,9 @@ that then fails `$HOME/.claude/skills/issue-to-pr/tools/scan.sh`. Check
 it the same way, in that order; when it fails, treat that round as
 having no `comment.md`.
 
+On a repository that is not owned (pr-review §8), read the round from
+`comment.md` only: no round comment is on the PR.
+
 When that round has no `comment.md`, select the newest matching comment
 on the PR: its first line is the marker `<!-- pr-loop-comment -->` and
 its author is you. The marker sits on the first line, so a marker
@@ -162,10 +165,11 @@ SHA — once, at the end, over the final head, never once per
 intermediate head. Pass `--expect-head` with the SHA you pushed
 (`git rev-parse HEAD`). Pass the `--effort`, `--timeout`, `--max-tools` and
 `--max-tokens-budget` the loop's rounds use, when the dispatch prompt or
-the caller names them. Post the
+the caller names them. Write the
 round's comment per `report-template.md`
 with the round number incremented, the Dispositions block, and the
-cumulative cost line from round.json.
+cumulative cost line from round.json. Post the round's comment per
+pr-review §8: on a repository that is not owned, it stays a draft.
 
 ## 7. Report back
 

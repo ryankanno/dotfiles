@@ -2903,4 +2903,27 @@ assert_eq "$([[ -d "$ROOT/dot_claude/skills" ]] && echo present)" "present" "the
 OUT="$(grep -rnE --include='*.md' '\$([0-9]|ARGUMENTS)' "$ROOT/dot_claude/skills")"
 assert_eq "$OUT" "" "no \$0 to \$9 or \$ARGUMENTS in dot_claude/skills/**/*.md"
 
+# The human posts to GitHub only on repositories they own; elsewhere a
+# round comment stays a draft on disk (issue #60).
+# The section is joined into one line, so a phrase still matches across a rewrap.
+skill_section() { awk -v h="$2" 'index($0, h) == 1 { on = 1; print; next } on && /^## / { exit } on' "$ROOT/dot_claude/skills/$1" | tr -s ' \n' ' '; }
+echo "skills: pr-review posts a round comment only on an owned repository"
+S="$(skill_section pr-review/SKILL.md '## 8. Post')"
+assert_contains "$S" 'gh repo view <owner/repo> --json owner --jq .owner.login' "the check reads the PR repository's owner"
+assert_contains "$S" 'gh api user --jq .login' "the check reads the gh login"
+assert_contains "$S" 'Owned orgs: `i9-io`.' "the org list holds i9-io"
+assert_contains "$S" 'On an owned repository, post the file: ```bash gh pr comment <n> --body-file <round-dir>/comment.md' "an owned repository still posts"
+assert_contains "$S" 'On any other repository, do not post.' "a repository not owned gets no post"
+assert_contains "$S" 'When the §7 scan exited 0, report to the caller that the comment is a draft for the human to post, with its path.' "the caller gets a scanned draft and its path"
+echo "skills: pr-refine and issue-to-pr follow pr-review on a repository not owned"
+S="$(skill_section pr-refine/SKILL.md '## 1. Read the round')"
+assert_contains "$S" 'On a repository that is not owned (pr-review §8), read the round from `comment.md` only' "pr-refine reads the round from disk"
+S="$(skill_section pr-refine/SKILL.md '## 6. Re-run the round')"
+assert_contains "$S" 'Post the round'"'"'s comment per pr-review §8: on a repository that is not owned, it stays a draft.' "pr-refine leaves a draft where pr-review does"
+S="$(skill_section issue-to-pr/SKILL.md '## 6. Ratification')"
+assert_contains "$S" 'On a repository that is not owned (pr-review §8), check `comment.md` in the round directory instead, and `scan.sh <comment.md>` exits 0' "ratification item 3 checks a scanned draft"
+assert_contains "$S" 'On a repository that is not owned, read them from each round directory'"'"'s `comment.md`.' "ratification item 5 audits the drafts"
+S="$(skill_section issue-to-pr/SKILL.md '## 7. The final report')"
+assert_contains "$S" 'critic'"'"'s tokens summed from every round comment'"'"'s Cost line (on a repository that is not owned, each round'"'"'s `comment.md`)' "the critic-token sum reads the drafts"
+
 report
