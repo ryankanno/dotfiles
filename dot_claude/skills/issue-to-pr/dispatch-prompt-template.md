@@ -98,9 +98,9 @@ entirely otherwise:>
 
 The orchestrator runs no review. It ratifies your rounds when you stop.
 Every round has a unique number, and every round posts its comment.
-Before you start a round, add one line to
-`$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/rounds.txt`:
-`<N> review` (round 1), `<N> refine` (a pr-refine run), or
+Before you start a round, add one line to `rounds.txt` in the PR's
+round folder, the folder that holds `round-<N>/` (make it as
+pr-review §1 says when it is missing): `<N> review` (round 1), `<N> refine` (a pr-refine run), or
 `<N> convergence`. A resume reads the refine count from this file. A
 rerun of a round adds no line.
 

@@ -115,9 +115,11 @@ reopen it with `workmux open <handle>` and the dispatch prompt from
 "Resuming" section filled in: never a re-entry text of your own. Fill
 its refine-round count and its convergence flag from
 `$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/rounds.txt`, where the pane
-writes one `<N> <kind>` line per round: the count is the number of
-`refine` lines, and the flag is the kind on the newest finished
-round's line. The round numbers do not give the count, because a
+writes one `<N> <kind>` line per round. Use only the round numbers
+that have a `round-<N>/` folder, and for a number with two lines, the
+last one: a pane that died before its round started leaves a line for
+a round that never ran. The count is the number of `refine` rounds,
+and the flag is the kind of the newest finished round. The round numbers do not give the count, because a
 convergence round takes a number of its own. A PR with no `rounds.txt`
 gets the template's unknown-count bullet. If the
 prior run left
