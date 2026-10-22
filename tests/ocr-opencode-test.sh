@@ -206,6 +206,18 @@ assert_eq "$?" "2" "fix exits 2"
 assert_eq "$(ls -A "$WS/repo")" ".git" "writes nothing into the current repository"
 assert_eq "$(ls -A "$WS/other")" ".git" "writes nothing into the other repository"
 assert_eq "$(cat "$LOG")" "" "runs nothing"
+: >"$WS/other/f.sh"
+bash "$SCRIPT" explore "$WS/other/f.sh" >/dev/null 2>&1
+assert_eq "$?" "2" "a file in the other repository exits 2"
+assert_eq "$(cat "$LOG")" "" "runs nothing for a file in the other repository"
+
+echo "a src file in the current repository is scanned"
+new_sandbox
+mkdir -p "$WS/repo/src"
+: >"$WS/repo/src/f.sh"
+bash "$SCRIPT" explore src/f.sh >/dev/null 2>&1
+assert_eq "$?" "0" "exits 0"
+assert_eq "$(sed -n 1p "$LOG")" "ocr scan --path src/f.sh" "scans the file"
 
 echo "bad arguments print usage"
 new_sandbox
