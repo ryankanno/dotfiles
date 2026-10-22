@@ -58,9 +58,10 @@ server's environment, not yours (a PATH without `gh` exits 127), so
 pass your PATH:
 
 ```bash
-tmux new-session -d -e PATH="$PATH" -s pr-round-<n>-<N> sh -c \
-  '$HOME/.claude/skills/issue-to-pr/tools/pr-round.sh <args> >"$0" 2>&1; echo "exit=$?" >>"$0"' \
-  "$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/round-<N>.log"
+tmux new-session -d -e PATH="$PATH" \
+  -e LOG="$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/round-<N>.log" \
+  -s pr-round-<n>-<N> sh -c \
+  '$HOME/.claude/skills/issue-to-pr/tools/pr-round.sh <args> >"$LOG" 2>&1; echo "exit=$?" >>"$LOG"'
 ```
 
 Then poll. Each poll is one tool call with a sleep shorter than the
