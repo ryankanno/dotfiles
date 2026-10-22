@@ -113,9 +113,11 @@ state and resume the loop at step 5. If no pane runs on the worktree,
 reopen it with `workmux open <handle>` and the dispatch prompt from
 [`dispatch-prompt-template.md`](dispatch-prompt-template.md), with its
 "Resuming" section filled in: never a re-entry text of your own. Fill
-its refine-round count and its convergence flag from the count of
-refine rounds you keep (step 6's `<k>`, minus 1): the pane cannot get
-either from disk. If the
+its refine-round count and its convergence flag from the round kinds
+you keep (step 5): the pane cannot get either from disk. A new run
+keeps no round kinds: take them from the prior run's final report,
+and when there is none, the loop ends `blocked` (no refine-round count
+for the resume). If the
 prior run left
 `$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/final-report.md`, read it and
 carry its verdict forward into the resume: a capped-unrecovered resume
@@ -186,7 +188,9 @@ reused, or the pane's earlier run of that round died before its
 `round.json`.
 
 Watch the pane with `workmux status` / `capture`. Verify each round's
-push with `gh pr view` and each round's comment on the PR. Never run a
+push with `gh pr view` and each round's comment on the PR. Keep the
+kind of each round as the capture shows it: `review` (round 1),
+`refine` (a pr-refine run), or `convergence` (`--convergence`). Never run a
 review round yourself, and never send the pane a round it did not ask
 for.
 

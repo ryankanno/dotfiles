@@ -7,9 +7,9 @@
 
 ## Rounds
 
-| Round | SHA | Verdict | Run by | Comment |
-|---|---|---|---|---|
-| <N> | <short SHA> | <round verdict> | <implementer or human> | <comment URL> |
+| Round | Kind | SHA | Verdict | Run by | Comment |
+|---|---|---|---|---|---|
+| <N> | <review, refine, or convergence (step 5)> | <short SHA> | <round verdict> | <implementer or human> | <comment URL> |
 
 ## Ratification
 
