@@ -2830,5 +2830,8 @@ S="$(skill_section pr-refine/SKILL.md '## 6. Re-run the round')"
 assert_contains "$S" 'Post the round'"'"'s comment per pr-review §8: on a repository that is not owned, it stays a draft.' "pr-refine leaves a draft where pr-review does"
 S="$(skill_section issue-to-pr/SKILL.md '## 6. Ratification')"
 assert_contains "$S" 'On a repository that is not owned (pr-review §8), check `comment.md` in the round directory instead, and `scan.sh <comment.md>` exits 0' "ratification item 3 checks a scanned draft"
+assert_contains "$S" 'On a repository that is not owned, read them from each round directory'"'"'s `comment.md`.' "ratification item 5 audits the drafts"
+S="$(skill_section issue-to-pr/SKILL.md '## 7. The final report')"
+assert_contains "$S" 'critic'"'"'s tokens summed from every round comment'"'"'s Cost line (on a repository that is not owned, each round'"'"'s `comment.md`)' "the critic-token sum reads the drafts"
 
 report

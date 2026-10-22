@@ -222,7 +222,9 @@ newest round directory is
    decides green; read the log for what pr-review §4 names (skipped,
    deselected, or deleted tests).
 5. **Every Rejected and Accepted disposition holds.** Read the
-   Dispositions blocks of every round comment. Check each reason
+   Dispositions blocks of every round comment. On a repository that is
+   not owned, read them from each round directory's `comment.md`.
+   Check each reason
    against the diff. The author of the code wrote these reasons, so
    this audit is the loop's independent check.
 
@@ -289,7 +291,8 @@ why.
   Cost line: the `cumulative_tokens` its round.json carried when it was
   written; a rerun of an earlier round afterwards does not recompute
   later rounds' round.json, so say so plainly when one happened), the
-  critic's tokens summed from every round comment's Cost line (naming
+  critic's tokens summed from every round comment's Cost line (on a
+  repository that is not owned, each round's `comment.md`) (naming
   any round whose critic tokens were not reported), reviewer and critic
   bindings used, ocr version
 - the PR comment links, one per round (on a repository that is not
