@@ -27,6 +27,10 @@ PR, and do not redo work the branch already holds.
 - The PR has had <refine count> refine rounds. Count them against the
   cap of 3 refine rounds below. Do not get the count from the round
   numbers: a convergence round takes a round number of its own.
+<or, only when the PR has no rounds.txt, in place of the bullet above:>
+- The PR's refine-round count is unknown. Run at most 1 more refine
+  round.
+<omit this bullet when the PR has no rounds.txt:>
 - The newest finished round <was | was not> a convergence round. When
   it was a convergence round with no blocking finding, do not run
   another convergence round: stop, and report its stop state.
@@ -94,6 +98,11 @@ entirely otherwise:>
 
 The orchestrator runs no review. It ratifies your rounds when you stop.
 Every round has a unique number, and every round posts its comment.
+Before you start a round, add one line to
+`$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/rounds.txt`:
+`<N> review` (round 1), `<N> refine` (a pr-refine run), or
+`<N> convergence`. A resume reads the refine count from this file. A
+rerun of a round adds no line.
 
 1. **Round 1:** right after the PR is filed, run the pr-review skill on
    the PR, with `--expect-branch <branch-name>` and
