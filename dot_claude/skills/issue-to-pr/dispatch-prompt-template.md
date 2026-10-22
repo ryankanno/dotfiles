@@ -87,7 +87,9 @@ entirely otherwise:>
 ## Review rounds: you run every one
 
 The orchestrator runs no review. It ratifies your rounds when you stop.
-Every round has a unique number, and every round posts its comment.
+Every round has a unique number, and every round posts its comment per
+pr-review §8: on a repository that is not owned, the comment stays a
+draft in the round directory.
 
 1. **Round 1:** right after the PR is filed, run the pr-review skill on
    the PR, with `--expect-branch <branch-name>` and
