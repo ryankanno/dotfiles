@@ -75,12 +75,12 @@ critic_diff() {  # <from> <to> [paths...]: the diff, generated and golden files 
     # Mode lines are not generator output: a mode-only change stays in the diff,
     # and an excluded file's mode change goes into its note.
     [[ "$add$del" == 00 ]] && continue
-    # A deleted file, or a rename's old path, has no head blob: its marker is at the base.
     kind="" tail=""
     case "/$path/" in
       */golden/* | */goldens/* | */__snapshots__/* | */snapshots/* | *.golden/ | *.snap/)
         kind="golden or snapshot file" ;;
       *)
+        # A deleted file, or a rename's old path, has no head blob: its marker is at the base.
         rev=$b
         git -C "$repo" cat-file -e "$b:$path" 2>/dev/null || rev=$a
         # Captured, not piped into grep -q: under pipefail an early-exiting grep
