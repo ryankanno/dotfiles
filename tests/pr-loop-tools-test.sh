@@ -2468,6 +2468,23 @@ assert_eq "$(( size > 200000 && size < 210000 ))" 1 "stderr names the prompt's s
 assert_eq "$([[ -e "$rd/critic-input.md" ]] && printf yes || printf no)" "no" "an earlier critic-input.md does not stand as this run's record"
 assert_eq "$([[ -e "$rd/critic-input.md.partial" ]] && printf yes || printf no)" "no" "no partial prompt is left"
 
+echo "critic-input: a prompt of exactly 200,000 bytes passes, and one byte more does not"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
+: >"$WS/brief.md"
+"$CRITIC_INPUT" --repo "$repo" --round-dir "$rd" --brief "$WS/brief.md" >"$WS/out"
+head -c "$(( 200000 - $(wc -c <"$WS/out") ))" /dev/zero | tr '\0' x >"$WS/brief.md"
+"$CRITIC_INPUT" --repo "$repo" --round-dir "$rd" --brief "$WS/brief.md" >"$WS/out" 2>"$WS/err"; RC=$?
+assert_eq "$RC" 0 "a prompt at the limit exits 0"
+assert_eq "$(wc -c <"$WS/out" | tr -d ' ')" 200000 "the whole prompt is on stdout"
+printf x >>"$WS/brief.md"
+"$CRITIC_INPUT" --repo "$repo" --round-dir "$rd" --brief "$WS/brief.md" >"$WS/out" 2>"$WS/err"; RC=$?
+assert_eq "$RC" 4 "one byte over the limit exits 4"
+assert_contains "$(cat "$WS/err")" "the prompt is 200001 bytes" "stderr names the size"
+
 echo "critic-input: 'do not edit' below the header does not make a file generated"
 new_sandbox
 make_pr_round_env
