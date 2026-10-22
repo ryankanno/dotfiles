@@ -24,6 +24,12 @@ PR, and do not redo work the branch already holds.
   unfinished: continue it from pr-review §2, and do not run
   `pr-round.sh` again. Any other round is unfinished: finish that same
   round with the pr-review skill, by the exit 6 and exit 7 rules below.
+- The PR has had <refine count> refine rounds. Count them against the
+  cap of 3 refine rounds below. Do not get the count from the round
+  numbers: a convergence round takes a round number of its own.
+- The newest finished round <was | was not> a convergence round. When
+  it was a convergence round with no blocking finding, do not run
+  another convergence round: stop, and report its stop state.
 <only when the prior run left a final report:>
 - The prior run's final report is `<path of final-report.md>`: its
   verdict and remaining findings carry forward.

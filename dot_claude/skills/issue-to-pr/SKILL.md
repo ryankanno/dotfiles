@@ -112,7 +112,10 @@ An existing PR means a previous run: do not create anything. Verify its
 state and resume the loop at step 5. If no pane runs on the worktree,
 reopen it with `workmux open <handle>` and the dispatch prompt from
 [`dispatch-prompt-template.md`](dispatch-prompt-template.md), with its
-"Resuming" section filled in: never a re-entry text of your own. If the
+"Resuming" section filled in: never a re-entry text of your own. Fill
+its refine-round count and its convergence flag from the count of
+refine rounds you keep (step 6's `<k>`, minus 1): the pane cannot get
+either from disk. If the
 prior run left
 `$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/final-report.md`, read it and
 carry its verdict forward into the resume: a capped-unrecovered resume
