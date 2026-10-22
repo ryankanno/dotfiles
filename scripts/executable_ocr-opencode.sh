@@ -2,9 +2,11 @@
 # ocr scan <path>, export review.html, then hand it to opencode.
 #   explore -> issue-exploration workflow (verify and file GitHub issues)
 #   fix     -> fix the critical/high findings through /issue-to-pr
-# Run inside the repository. The files go to .ocr-opencode/ at the root of
-# the current directory's repository (each worktree has its own), and its
-# .gitignore keeps git from tracking them. fix --reuse skips the scan and
+# Run inside the repository, with <src-path> in that same repository; the
+# script refuses any other run before it writes anything. The files go to
+# .ocr-opencode/ at the root of the current directory's repository (each
+# worktree has its own), and its .gitignore keeps git from tracking them.
+# A failed scan leaves no .ocr-opencode/. fix --reuse skips the scan and
 # resumes a stopped fix run on the existing review.html.
 set -euo pipefail
 
@@ -24,7 +26,19 @@ case "$1:$2" in
   *) usage ;;
 esac
 
-OUT="$(git rev-parse --show-toplevel)/.ocr-opencode"
+if ! TOP="$(git rev-parse --show-toplevel 2>/dev/null)"; then
+  echo "$PWD is not inside a git repository; run it inside the repository" >&2
+  exit 2
+fi
+if [[ $REUSE == 0 ]]; then
+  SRC_DIR="$2"
+  [[ -d $SRC_DIR ]] || SRC_DIR="$(dirname "$2")"
+  if [[ "$(git -C "$SRC_DIR" rev-parse --show-toplevel 2>/dev/null)" != "$TOP" ]]; then
+    echo "$2 is not inside $TOP; run it inside the repository of $2" >&2
+    exit 2
+  fi
+fi
+OUT="$TOP/.ocr-opencode"
 REVIEW="$OUT/review.html"
 
 if [[ $REUSE == 1 && ! -f $REVIEW ]]; then
@@ -66,13 +80,11 @@ Write the final summary to $OUT/review-output.html, then stop."
     ;;
 esac
 
+[[ $REUSE == 1 ]] || ocr scan --path "$2"
 mkdir -p "$OUT"
 # review.html holds every finding, security ones too; a git add -A must not
 # commit it. --reuse writes it too, for a folder moved from .git/ocr-opencode.
 echo '*' >"$OUT/.gitignore"
-if [[ $REUSE == 0 ]]; then
-  ocr scan --path "$2"
-  ocr session export -o "$REVIEW"
-fi
+[[ $REUSE == 1 ]] || ocr session export -o "$REVIEW"
 # One line, so the TUI cannot read a newline as Enter and submit early.
 exec opencode --prompt "${PROMPT//$'\n'/ }"
