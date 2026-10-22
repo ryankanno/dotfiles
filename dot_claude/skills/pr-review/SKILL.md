@@ -369,8 +369,9 @@ Record the comment URL and the round directory: the final report needs
 the session ids and token totals from the round's `review.json`.
 
 On any other repository, do not post. `<round-dir>/comment.md` stays
-as the draft. Report to the caller that the comment is a draft for the
-human to post, with its path. Record the round directory.
+as the draft. When the §7 scan exited 0, report to the caller that the
+comment is a draft for the human to post, with its path. Otherwise
+report the scan's hits, as §7 says. Record the round directory.
 
 ## Never
 

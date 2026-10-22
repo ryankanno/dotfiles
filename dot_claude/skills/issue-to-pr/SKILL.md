@@ -203,8 +203,8 @@ newest round directory is
    or unrecovered round declares nothing.
 3. **The round's comment is on the PR** with the same round number and
    verdict as `round.json`. On a repository that is not owned
-   (pr-review §8), check `comment.md` in the round directory instead:
-   the round does not post it.
+   (pr-review §8), check `comment.md` in the round directory instead,
+   and `scan.sh <comment.md>` exits 0: the round does not post it.
 4. **The gate is green on the PR's code, not your checkout.** Run it in
    the implementer's worktree (`workmux path <handle>` prints it), after
    verifying the worktree's HEAD equals the PR's headRefOid
