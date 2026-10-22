@@ -390,14 +390,29 @@ else
   # a blank line, another marker, or column-0 prose ends it. Structural
   # lines inside the block ("Round 2's 10 findings, all fixed:") are
   # column-0 prose and never harvest as settled law.
-  settled=$(jq -r '.' <<<"$bodies" \
-     | awk '/<summary>Dispositions<\/summary>/ { on = 1; next }
-           on && /^<\/details>/ { on = 0 }
-           on && /^- (Rejected|Accepted):/ { keep = 1; print; next }
+  # The other blocks quote reviewed content verbatim, so only the exact
+  # line the report template writes opens the harvest, and only outside
+  # a fence and outside every other block. Each comment is read on its
+  # own, so one comment's unclosed fence or block cannot reach the next.
+  # An opener inside a block is quoted content. The critic's text is not
+  # escaped, so a </details> it quotes can end its block early: only the
+  # comment's last block harvests, with nothing after it but blank lines
+  # and the footer, because the loop writes Dispositions last.
+  settled=$(while IFS= read -r b; do
+    jq -r '.' <<<"$b" \
+     | awk '{ sub(/\r$/, "") }
+           fence { l = $0; sub(/^[[:space:]]*/, "", l); if (index(l, fence) == 1) fence = ""; next }
+           /^[[:space:]]*(```|~~~)/ { sub(/^[[:space:]]*/, ""); fence = substr($0, 1, 3); keep = 0; if (!inblock) last = 0; next }
+           /^<details>/ { if (!inblock) { on = ($0 == "<details><summary>Dispositions</summary>"); last = on; buf = ""; keep = 0 } inblock = 1; next }
+           /^<\/details>/ { inblock = 0; on = 0; next }
+           !inblock && NF && !/^\*Round [0-9]+ \| / { last = 0; next }
+           on && /^- (Rejected|Accepted):/ { keep = 1; buf = buf $0 "\n"; next }
            on && /^- / { keep = 0; next }
            on && NF == 0 { keep = 0; next }
-           on && keep && /^[[:space:]]/ { print; next }
-           on && NF { keep = 0 }')
+           on && keep && /^[[:space:]]/ { buf = buf $0 "\n"; next }
+           on && NF { keep = 0 }
+           END { if (last && !inblock && fence == "") printf "%s", buf }'
+  done <<<"$bodies")
 fi
 # The newest earlier-round comment's blocking findings are what this round's
 # delta answers. critic-input.sh hands them to the critic verbatim, so the
@@ -591,20 +606,26 @@ if [[ "$scope" == delta ]]; then
   # (glob and magic metacharacters in a filename are not pathspec
   # syntax), and a rename's two paths are diffed together so an edit
   # reports as edited ranges, never a whole-file add.
+  # The listing is NUL-delimited: without -z git C-quotes a path that
+  # holds a quote, a backslash, or a control character, and the quoted
+  # form matches no file.
   names="$round_dir/names.txt"
-  git -C "$repo" -c core.quotePath=false diff --name-status -M --no-color \
+  git -C "$repo" diff --name-status -z -M --no-color \
       "$delta_from" "$head" >"$names" || {
     printf 'cannot list the changed files\n' >&2
     exit 5
   }
   : >"$round_dir/delta.txt"
-  while IFS=$'\t' read -r status old new; do
-    [[ -n "$old" ]] || continue
+  while IFS= read -r -d '' status && IFS= read -r -d '' old; do
     # The path reaches awk through the environment, not -v: -v expands
     # escape sequences in the value, and a filename may hold one.
     p="$old"
     paths=("$old")
-    if [[ "$status" == R* ]]; then p="$new"; paths+=("$new"); fi
+    if [[ "$status" == [RC]* ]]; then
+      IFS= read -r -d '' new
+      p="$new"
+      paths+=("$new")
+    fi
     GIT_LITERAL_PATHSPECS=1 \
       git -C "$repo" -c core.quotePath=false diff -U0 -M --no-color --no-ext-diff \
           "$delta_from" "$head" -- "${paths[@]}" \

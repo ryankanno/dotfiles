@@ -32,10 +32,17 @@ if [[ -z "$prior" || ! -f "$dir/delta.txt" || ! "$spec" =~ ^(.+):([0-9]+)(-([0-9
 fi
 path="${BASH_REMATCH[1]}" start="${BASH_REMATCH[2]}" end="${BASH_REMATCH[4]:-${BASH_REMATCH[2]}}"
 
-awk -v p="$path" -v s="$start" -v e="$end" '
+# The path goes through the environment: -v expands escape sequences, and
+# a path may hold a backslash.
+p="$path" awk -v s="$start" -v e="$end" '
   {
+    # A path that holds a newline spans lines: a line with no range
+    # suffix is the head of the next line'\''s path.
     i = match($0, /:[0-9]+-[0-9]+$/)
-    if (!i || substr($0, 1, i - 1) != p) next
+    if (!i) { head = head $0 "\n"; next }
+    f = head substr($0, 1, i - 1)
+    head = ""
+    if (f != ENVIRON["p"]) next
     split(substr($0, i + 1), r, "-")
     if (s + 0 <= r[2] + 0 && e + 0 >= r[1] + 0) { hit = 1; exit }
   }
