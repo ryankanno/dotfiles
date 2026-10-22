@@ -176,7 +176,8 @@ printf '%s\n' "$diff"
 # binding.md passes the prompt inline; a 720 KB one could not be sent (issue #109).
 size=$(wc -c <"$dir/critic-input.md.partial" | tr -d ' ')
 if (( size > 200000 )); then
-  rm -f "$dir/critic-input.md.partial"
+  # An earlier run's critic-input.md would read as the prompt this round's critic got.
+  rm -f "$dir/critic-input.md.partial" "$dir/critic-input.md"
   printf 'critic-input.sh: the prompt is %s bytes, over the 200000-byte limit\n' "$size" >&2
   exit 4
 fi

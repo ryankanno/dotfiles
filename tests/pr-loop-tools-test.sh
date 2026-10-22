@@ -2458,11 +2458,15 @@ run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
 advance_head big.txt "$(head -c 200000 /dev/zero | tr '\0' x)\n"
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
+printf 'an earlier prompt\n' >"$rd/critic-input.md"
 "$CRITIC_INPUT" --repo "$repo" --round-dir "$rd" >"$WS/out" 2>"$WS/err"; RC=$?
 assert_eq "$RC" 4 "exits 4"
 assert_eq "$(wc -c <"$WS/out" | tr -d ' ')" 0 "nothing on stdout"
 assert_contains "$(cat "$WS/err")" "over the 200000-byte limit" "stderr names the limit"
-assert_contains "$(cat "$WS/err")" "the prompt is 2" "stderr names the size"
+size=$(sed -n 's/.* the prompt is \([0-9]*\) bytes.*/\1/p' "$WS/err")
+assert_eq "$(( size > 200000 && size < 210000 ))" 1 "stderr names the prompt's size"
+assert_eq "$([[ -e "$rd/critic-input.md" ]] && printf yes || printf no)" "no" "an earlier critic-input.md does not stand as this run's record"
+assert_eq "$([[ -e "$rd/critic-input.md.partial" ]] && printf yes || printf no)" "no" "no partial prompt is left"
 
 echo "critic-input: 'do not edit' below the header does not make a file generated"
 new_sandbox
