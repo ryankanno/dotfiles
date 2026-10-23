@@ -72,6 +72,10 @@ entirely otherwise:>
   code decides whether you push. A review round's own read still
   scrutinizes the whole log (pr-review §4).
 
+- When the repository has `.pre-commit-config.yaml`, run
+  `uvx pre-commit run --files <staged files>` before each commit. Fix
+  every failure before the commit. For example, a shellcheck warning in
+  a staged `tests/*.sh` file stops that commit.
 - Commit conventionally, `type(scope): description`. Behavioral and
   structural changes land in separate commits. No attribution trailers.
 - Push and file the PR:
