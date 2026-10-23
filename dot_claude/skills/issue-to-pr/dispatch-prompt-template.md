@@ -111,7 +111,10 @@ rerun of a round adds no line.
    `--expect-head <the SHA you pushed>` (`git rev-parse HEAD`).
 2. **Refine rounds:** while the newest round has blocking findings, run
    the pr-refine skill on the PR. Refine round k writes review round
-   k+1. Run at most 3 refine rounds.
+   k+1. Run at most 3 refine rounds. Before you start each refine
+   round, check that the PR is `OPEN`
+   (`gh pr view <n> --json state -q .state`). When it is not, stop with
+   `blocked: PR <n> is <state>`.
 3. **The convergence round:** after a refine round, when the newest
    round is `No issues found.` or a converged candidate, run the
    pr-review skill once more on the same head, and pass `--convergence`

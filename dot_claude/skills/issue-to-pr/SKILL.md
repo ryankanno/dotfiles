@@ -175,10 +175,11 @@ identity, not just the existence:
 
 ```bash
 gh pr list --state open --head <branch-name>
-gh pr view <n> --json state,headRefName
+gh pr view <n> --json state,isDraft,headRefName
 ```
 
-The PR counts as verified only if its head is `<branch-name>`. The
+The PR counts as verified only when it is `OPEN`, a draft, and its head
+is `<branch-name>`. The
 round script re-checks with `--expect-branch` before any review runs.
 
 ## 5. The implementer's round loop
@@ -243,6 +244,10 @@ Then decide:
 - A disposition does not hold, and refine rounds remain: send one
   refine instruction that names the finding and why the reason fails.
   The pane fixes it, then runs the convergence round again.
+  Before you send a refine instruction, check that the PR is `OPEN`
+  (`gh pr view <n> --json state -q .state`). When it is not, send
+  nothing, and the loop ends `blocked` with the reason "PR <n> is
+  <state>".
 
   ```bash
   workmux send <handle> "Refine round <k> on PR <n>: the orchestrator overrules <finding>: <reason>. Run the pr-refine skill on it, then the convergence round."
@@ -271,13 +276,14 @@ why.
 
 - task ref (source locator and title), PR link, and whether the PR is
   still a draft
-- verdict: `clean` (convergence round found nothing and the gate printed
-  green), `converged` (blocking findings existed but the convergence
+- verdict: `clean` (the newest round, a clean round 1 or the
+  convergence round after a refine, found nothing, ratification held,
+  and the gate exited 0), `converged` (blocking findings existed but the convergence
   round found every one low and dispositioned; the accepted judgment
   calls are listed), `capped-unrecovered` (blocking findings remain
   after 3 rounds), or
   `blocked` (pane death after redispatch, no gate found, scan hit, a
-  `pr-round.sh` exit 4, 5, or 127, an exit 6 after the one `--rerun`, an
+  PR that is not `OPEN` before a refine, a `pr-round.sh` exit 4, 5, or 127, an exit 6 after the one `--rerun`, an
   exit 8 after the one retry, or a partial, nothing-reviewable or unrecovered reviewer with nothing
   from any source)
 - per-round one-liners: round number, short SHA, verdict, who ran it
