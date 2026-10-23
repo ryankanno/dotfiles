@@ -10,11 +10,13 @@ WS=""
 SANDBOXES=()
 
 # A recorder stub writes its argv, one [arg] per argument, to $WS/<name>.argv.
+# python3 is stubbed too, so a pyserver that runs python3 fails the test
+# instead of starting a real server that hangs it.
 new_sandbox() {
   WS="$(mktemp -d "${TMPDIR:-/tmp}/shell-helpers-test.XXXXXXXX")"; SANDBOXES+=("$WS")
   mkdir "$WS/bin"
   local name
-  for name in python open xdg-open nvim; do
+  for name in python python3 open xdg-open nvim; do
     cat >"$WS/bin/$name" <<'STUB'
 #!/usr/bin/env bash
 printf '[%s]' "$@" >"$STUB_DIR/${0##*/}.argv"
