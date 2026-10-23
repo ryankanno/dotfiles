@@ -77,8 +77,8 @@ One interactive moment. Collect and confirm, then go silent:
    the loop, all run by the implementer through the dispatch prompt.
    The same holds for a per-run exclude: comma-separated,
    gitignore-style globs the reviewer skips, passed as
-   `--exclude <globs>`. Without it, the reviewer skips only what the
-   binding's rule skips. For example, a docs-only workflow such as
+   `--exclude <globs>`. Without it, the rounds pass no exclude. For
+   example, a docs-only workflow such as
    /doc-cleanup passes `--exclude '**/*.md'`.
 6. **The grill.** On or off. On when the task leaves decisions to the
    human (product calls, open questions in the source): the implementer

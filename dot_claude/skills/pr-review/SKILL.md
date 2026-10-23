@@ -86,8 +86,7 @@ files and Markdown files, which ocr skips by default.
 
 `--exclude <globs>` also goes to every review run: comma-separated,
 gitignore-style globs. For ocr, they merge with the binding rule's
-excludes. Without the flag, the reviewer excludes only what the rule
-excludes. For example, a docs-only workflow such as /doc-cleanup passes
+excludes. Without the flag, the round passes no exclude. For example, a docs-only workflow such as /doc-cleanup passes
 `--exclude '**/*.md'`. When the exclude removes every changed file, the
 round has no clean verdict, and the human marks that PR ready.
 
