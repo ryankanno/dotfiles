@@ -37,7 +37,10 @@ path="${BASH_REMATCH[1]}" start="${BASH_REMATCH[2]}" end="${BASH_REMATCH[4]:-${B
 p="$path" awk -v s="$start" -v e="$end" '
   {
     # A path that holds a newline spans lines: a line with no range
-    # suffix is the head of the next line'\''s path.
+    # suffix is the head of the next line'\''s path. A segment can end in a
+    # range suffix too, and the line format cannot show where such a path
+    # ends, so the path looked for decides.
+    if (index(ENVIRON["p"], head $0 "\n") == 1) { head = head $0 "\n"; next }
     i = match($0, /:[0-9]+-[0-9]+$/)
     if (!i) { head = head $0 "\n"; next }
     f = head substr($0, 1, i - 1)
