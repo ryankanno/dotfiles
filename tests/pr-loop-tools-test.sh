@@ -338,6 +338,7 @@ assert_eq "$?" 0 "exits 0"
 assert_contains "$(cat "$WS/args.txt")" "--exclude **/*.md,docs/**" "the given globs reach ocr"
 : >"$STUB_LOG"
 PATH="$WS/stub:$PATH" "$REVIEW" --repo "$WS/repo" --out "$WS/out" --commit x
+assert_eq "$?" 0 "exits 0 without the flag"
 assert_not_contains "$(cat "$WS/args.txt")" "--exclude" "no flag, no exclude"
 
 echo "wrapper: an unknown effort or a non-numeric timeout is a usage error"
