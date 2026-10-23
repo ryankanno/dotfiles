@@ -48,9 +48,9 @@ assert_contains() {
 # --- pyserver ---
 
 new_sandbox
-PATH="$WS/bin:$PATH" bash -c 'source "$1"; pyserver' _ "$ROOT/dot_bash_functions" >/dev/null 2>&1
-assert_contains "$(cat "$WS/python.argv" 2>/dev/null)" "[--bind][127.0.0.1]" \
-  "pyserver binds http.server to loopback"
+PATH="$WS/bin:$PATH" bash -c 'source "$1"; pyserver 9000' _ "$ROOT/dot_bash_functions" >/dev/null 2>&1
+assert_eq "$(cat "$WS/python.argv" 2>/dev/null)" "[-m][http.server][--bind][127.0.0.1][9000]" \
+  "pyserver serves the requested port on loopback"
 
 # --- fzf key binds ---
 
@@ -58,33 +58,35 @@ assert_contains "$(cat "$WS/python.argv" 2>/dev/null)" "[--bind][127.0.0.1]" \
 # under script(1)'s pty. Prints the command bound to key sequence $1.
 # shortcut: BSD script(1) syntax only, add util-linux's `script -qec` form when this suite runs on Linux.
 bound_command() {
-  local line
+  local line rest
   PATH="$WS/bin:$PATH" script -q /dev/null \
     bash -c 'source "$1"; bind -X >"$2" 2>/dev/null' _ "$ROOT/dot_fzf.bash" "$WS/binds" \
     </dev/null >/dev/null 2>&1
-  # bind -X prints each bind as: "<keyseq>" "<command with \" escapes>"
+  # bind -X prints each bind as "<keyseq>" "<command>" (bash 5.3) or
+  # "<keyseq>": "<command>" (bash 5.2), with \" escapes in the command.
   while IFS= read -r line; do
-    [[ $line == "\"$1\" \""*\" ]] || continue
-    line="${line#"\"$1\" \""}"; line="${line%\"}"
-    printf '%s\n' "${line//\\\"/\"}"
+    rest="${line#"\"$1\""}"; rest="${rest#:}"
+    [[ $rest != "$line" && $rest == ' "'*\" ]] || continue
+    rest="${rest#' "'}"; rest="${rest%\"}"
+    printf '%s\n' "${rest//\\\"/\"}"
   done <"$WS/binds"
 }
 
-# Runs the command bound to $1 with fzf selecting $2; sets ARGV to nvim's argv.
+# Runs command $1 with fzf selecting $2; sets ARGV to nvim's argv.
 run_bind() {
-  local cmd
-  cmd="$(bound_command "$1")"
   rm -f "$WS/nvim.argv"
-  FZF_PICK="$2" PATH="$WS/bin:$PATH" bash -c 'source "$1"; eval "$2"' _ "$ROOT/dot_fzf.bash" "$cmd" \
+  FZF_PICK="$2" PATH="$WS/bin:$PATH" bash -c 'source "$1"; eval "$2"' _ "$ROOT/dot_fzf.bash" "$1" \
     >/dev/null 2>&1
   ARGV="$(cat "$WS/nvim.argv" 2>/dev/null)"
 }
 
 new_sandbox
 for key in '\C-p' '\C-f'; do
-  run_bind "$key" '-S evil.vim'
+  cmd="$(bound_command "$key")"
+  assert_contains "$cmd" "nvim" "bind -X lists the $key bind (it needs bash 4 or later and BSD script(1))"
+  run_bind "$cmd" '-S evil.vim'
   assert_eq "$ARGV" "[--][-S evil.vim]" "$key bind passes a dash-led selection to nvim as one file name"
-  run_bind "$key" '-S'
+  run_bind "$cmd" '-S'
   assert_eq "$ARGV" "[--][-S]" "$key bind passes a bare -S to nvim as a file name"
 done
 
