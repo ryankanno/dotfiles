@@ -31,7 +31,7 @@ $HOME/.claude/skills/issue-to-pr/tools/pr-round.sh \
   --repo <checkout-dir> --pr <n> --round <N> \
   --brief <brief-file> --expect-branch <branch-name> \
   [--expect-head <pushed-sha>] [--effort low|medium|high] [--timeout <minutes>] \
-  [--max-tools <n>] [--max-tokens-budget <n>]
+  [--max-tools <n>] [--max-tokens-budget <n>] [--exclude <globs>]
 ```
 
 `<checkout-dir>` is the absolute path of the local clone or worktree
@@ -82,7 +82,13 @@ For ocr, `--max-tools` is the tool rounds per file group, 50 or more.
 `--max-tokens-budget` caps the tokens of one ocr run, not of one group.
 A group over the budget gets one final round and fails as `budget`,
 and ocr starts no more groups. The binding also makes ocr review test
-files, which ocr skips by default.
+files and Markdown files, which ocr skips by default.
+
+`--exclude <globs>` also goes to every review run: comma-separated,
+gitignore-style globs. For ocr, they merge with the binding rule's
+excludes. Without the flag, the round passes no exclude. For example, a docs-only workflow such as /doc-cleanup passes
+`--exclude '**/*.md'`. When the exclude removes every changed file, the
+round has no clean verdict, and the human marks that PR ready.
 
 The reviewer reads only its background file, never the PR comments, so
 the script joins the brief with every Rejected and Accepted line from

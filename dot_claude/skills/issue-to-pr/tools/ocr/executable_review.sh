@@ -5,8 +5,10 @@
 #
 # Interface in: --repo, --out, optional --brief, optional --effort
 # (low|medium|high, default medium), --timeout (minutes, default 80),
-# --max-tools (tool rounds per group, 50 or more, default 200) and
-# --max-tokens-budget (tokens per ocr run, default 25000000), and either
+# --max-tools (tool rounds per group, 50 or more, default 200),
+# --max-tokens-budget (tokens per ocr run, default 25000000) and --exclude
+# (comma-separated gitignore-style globs, merged with rule.json's
+# excludes), and either
 # --base/--head (range mode) or --commit (per-commit mode, the
 # empty-result retry).
 # Interface out: <out>/review.json (the tool's own output), stdout.txt,
@@ -15,11 +17,11 @@
 set -euo pipefail
 
 usage() {
-  printf 'usage: review.sh --repo <dir> --out <dir> [--brief <file>] [--effort low|medium|high] [--timeout <minutes>] [--max-tools <n>] [--max-tokens-budget <n>] (--base <ref> --head <ref> | --commit <sha>)\n' >&2
+  printf 'usage: review.sh --repo <dir> --out <dir> [--brief <file>] [--effort low|medium|high] [--timeout <minutes>] [--max-tools <n>] [--max-tokens-budget <n>] [--exclude <globs>] (--base <ref> --head <ref> | --commit <sha>)\n' >&2
   exit 2
 }
 
-repo="" out="" brief="" base="" head="" commit="" effort="medium" timeout="80" max_tools="200" budget="25000000"
+repo="" out="" brief="" base="" head="" commit="" effort="medium" timeout="80" max_tools="200" budget="25000000" exclude=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     # The value guards keep a missing option value a usage error (exit 2)
@@ -34,6 +36,7 @@ while [[ $# -gt 0 ]]; do
     --timeout) [[ $# -ge 2 ]] || usage; timeout="$2"; shift 2 ;;
     --max-tools) [[ $# -ge 2 ]] || usage; max_tools="$2"; shift 2 ;;
     --max-tokens-budget) [[ $# -ge 2 ]] || usage; budget="$2"; shift 2 ;;
+    --exclude) [[ $# -ge 2 ]] || usage; exclude="$2"; shift 2 ;;
     *) usage ;;
   esac
 done
@@ -85,8 +88,9 @@ mkdir -p "$out"
 # cutting complete rounds. The default 25M is about twice the largest
 # complete round, room for the higher tool cap and the test files; it would
 # have cut no past round (the highest, a partial one, used 17.9M).
-# rule.json replaces ocr's default path filter for test files only, so
-# the reviewer reads the tests a PR adds. Lockfiles, generated code, build
+# rule.json replaces ocr's default path filter for test files and
+# Markdown only, so the reviewer reads the tests a PR adds and a
+# Markdown-only PR gets a review (issue #108). Lockfiles, generated code, build
 # output and vendored code stay excluded, as a tool or a third party writes
 # them; test data stays excluded too, as it holds no logic to review. Its
 # exclude list repeats ocr's test-data globs, since an include re-admits
@@ -101,6 +105,7 @@ if [[ -n "$brief" ]]; then
   [[ -f "$brief" ]] || { printf 'brief not found: %s\n' "$brief" >&2; exit 2; }
   args+=(--background-file "$brief")
 fi
+if [[ -n "$exclude" ]]; then args+=(--exclude "$exclude"); fi
 if [[ "$mode" == commit ]]; then
   args+=(--commit "$commit")
 else

@@ -13,8 +13,9 @@
 #                suite shortens it), until gh pr view reports this head,
 #                and review only it]
 #                [--effort low|medium|high] [--timeout <minutes>]
-#                [--max-tools <n>] [--max-tokens-budget <n>] (passed
-#                to every review run; the binding owns the defaults)
+#                [--max-tools <n>] [--max-tokens-budget <n>]
+#                [--exclude <globs>] (passed to every review run; the
+#                binding owns the defaults)
 #                [--rerun] [--convergence: a base merge with no PR change
 #                reviews the whole PR instead of nothing]
 # Interface out: the round directory under
@@ -60,11 +61,11 @@
 set -euo pipefail
 
 usage() {
-  printf 'usage: pr-round.sh --repo <dir> --pr <n> --round <N> [--brief <file>] [--dispositions <file>] [--expect-branch <branch-name>] [--expect-head <sha>] [--effort low|medium|high] [--timeout <minutes>] [--max-tools <n>] [--max-tokens-budget <n>] [--rerun] [--convergence]\n' >&2
+  printf 'usage: pr-round.sh --repo <dir> --pr <n> --round <N> [--brief <file>] [--dispositions <file>] [--expect-branch <branch-name>] [--expect-head <sha>] [--effort low|medium|high] [--timeout <minutes>] [--max-tools <n>] [--max-tokens-budget <n>] [--exclude <globs>] [--rerun] [--convergence]\n' >&2
   exit 2
 }
 
-repo="" pr="" round="" brief="" dispositions="" expect="" expect_head="" rerun="" effort="" timeout="" max_tools="" token_budget="" convergence=""
+repo="" pr="" round="" brief="" dispositions="" expect="" expect_head="" rerun="" effort="" timeout="" max_tools="" token_budget="" exclude="" convergence=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --repo) [[ $# -ge 2 ]] || usage; repo="$2"; shift 2 ;;
@@ -78,6 +79,7 @@ while [[ $# -gt 0 ]]; do
     --timeout) [[ $# -ge 2 ]] || usage; timeout="$2"; shift 2 ;;
     --max-tools) [[ $# -ge 2 ]] || usage; max_tools="$2"; shift 2 ;;
     --max-tokens-budget) [[ $# -ge 2 ]] || usage; token_budget="$2"; shift 2 ;;
+    --exclude) [[ $# -ge 2 ]] || usage; exclude="$2"; shift 2 ;;
     --rerun) rerun=1; shift ;;
     --convergence) convergence=1; shift ;;
     *) usage ;;
@@ -619,7 +621,13 @@ if [[ "$scope" == delta ]]; then
     exit 5
   }
   : >"$round_dir/delta.txt"
-  while IFS= read -r -d '' status && IFS= read -r -d '' old; do
+  # A status cut before its NUL fails the read but keeps the fragment: it
+  # runs the body, and the missing path exits 5.
+  while IFS= read -r -d '' status || [[ -n "$status" ]]; do
+    IFS= read -r -d '' old || {
+      printf 'cannot list the changed files\n' >&2
+      exit 5
+    }
     # The path reaches awk through the environment, not -v: -v expands
     # escape sequences in the value, and a filename may hold one.
     p="$old"
@@ -731,7 +739,7 @@ fi
 range_status=none
 if [[ "$scope" != none:* ]]; then
   set +e
-  "$review" --repo "$repo" --out "$round_dir" ${brief:+--brief "$brief"} ${effort:+--effort "$effort"} ${timeout:+--timeout "$timeout"} ${max_tools:+--max-tools "$max_tools"} ${token_budget:+--max-tokens-budget "$token_budget"} --base "$review_from" --head "$review_to"
+  "$review" --repo "$repo" --out "$round_dir" ${brief:+--brief "$brief"} ${effort:+--effort "$effort"} ${timeout:+--timeout "$timeout"} ${max_tools:+--max-tools "$max_tools"} ${token_budget:+--max-tokens-budget "$token_budget"} ${exclude:+--exclude "$exclude"} --base "$review_from" --head "$review_to"
   rc=$?
   set -e
   range_status=$(status_of "$round_dir")
@@ -761,7 +769,7 @@ elif [[ "$range_status" == missing ]]; then
     i=$((i + 1))
     commit_dir="$round_dir/commit-$i"
     set +e
-    "$review" --repo "$repo" --out "$commit_dir" ${brief:+--brief "$brief"} ${effort:+--effort "$effort"} ${timeout:+--timeout "$timeout"} ${max_tools:+--max-tools "$max_tools"} ${token_budget:+--max-tokens-budget "$token_budget"} --commit "$sha"
+    "$review" --repo "$repo" --out "$commit_dir" ${brief:+--brief "$brief"} ${effort:+--effort "$effort"} ${timeout:+--timeout "$timeout"} ${max_tools:+--max-tools "$max_tools"} ${token_budget:+--max-tokens-budget "$token_budget"} ${exclude:+--exclude "$exclude"} --commit "$sha"
     crc=$?
     set -e
     cstatus=$(status_of "$commit_dir")

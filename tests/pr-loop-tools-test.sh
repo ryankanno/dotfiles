@@ -272,6 +272,7 @@ rule="$(sed -n 's/.*--rule \([^ ]*\).*/\1/p' "$WS/args.txt")"
 assert_contains "$(cat "$WS/args.txt")" "--rule /" "passes an absolute rule path, since the wrapper cds into the repo"
 assert_json '.include | index("**/*_test.go")' "$rule" "the rule includes go test files"
 assert_json '.include | index("**/test_*.py")' "$rule" "the rule includes python test files"
+assert_json '.include | index("**/*.md")' "$rule" "the rule includes Markdown files, so a Markdown-only PR gets a review"
 assert_json '[.include[] | select(endswith("/**") or test("\\.(json|ya?ml|lock|snap|csv)$"))] | length == 0' "$rule" "no include re-admits a whole directory, lockfiles or data files"
 assert_json '.exclude | index("**/fixtures/**") and index("**/testdata/**") and index("**/__snapshots__/**")' "$rule" "test data stays excluded, since exclude wins over include"
 
@@ -327,6 +328,18 @@ assert_eq "$?" 0 "exits 0"
 assert_contains "$(cat "$WS/args.txt")" "--timeout 40 --effort high" "the given effort and timeout reach ocr"
 assert_not_contains "$(cat "$WS/args.txt")" "--effort medium" "the default effort is gone"
 assert_not_contains "$(cat "$WS/args.txt")" "--timeout 80" "the default timeout is gone"
+
+echo "wrapper: --exclude reaches ocr; without it ocr gets no exclude"
+new_sandbox
+make_stub
+mkdir -p "$WS/repo" "$WS/out"
+PATH="$WS/stub:$PATH" "$REVIEW" --repo "$WS/repo" --out "$WS/out" --exclude '**/*.md,docs/**' --commit x
+assert_eq "$?" 0 "exits 0"
+assert_contains "$(cat "$WS/args.txt")" "--exclude **/*.md,docs/**" "the given globs reach ocr"
+: >"$STUB_LOG"
+PATH="$WS/stub:$PATH" "$REVIEW" --repo "$WS/repo" --out "$WS/out" --commit x
+assert_eq "$?" 0 "exits 0 without the flag"
+assert_not_contains "$(cat "$WS/args.txt")" "--exclude" "no flag, no exclude"
 
 echo "wrapper: an unknown effort or a non-numeric timeout is a usage error"
 new_sandbox
@@ -793,6 +806,18 @@ run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
 assert_contains "$(cat "$rd/cmd.txt")" "--timeout 80 --effort medium" "medium effort, 80 minutes"
 assert_contains "$(cat "$rd/cmd.txt")" "--max-tools 200 --max-tokens-budget 25000000" "200 tool rounds, 25M tokens"
+assert_not_contains "$(cat "$rd/cmd.txt")" "--exclude" "without --exclude ocr gets no exclude"
+
+echo "pr-round: --exclude reaches every review run"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+export STUB_RANGE_STATUS=missing STUB_COMMIT_STATUS=complete
+run_prr --repo "$repo" --pr 39 --round 1 --exclude '**/*.md' >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
+# cmd.txt quotes each argument with %q.
+assert_contains "$(cat "$rd/cmd.txt")" '--exclude \*\*/\*.md' "the range run gets it"
+assert_contains "$(cat "$rd/commit-1/cmd.txt")" '--exclude \*\*/\*.md' "the per-commit retry gets it"
 
 echo "pr-round: --max-tools and --max-tokens-budget reach every review run"
 new_sandbox
@@ -2451,6 +2476,50 @@ rc=$?
 rm -f "$stub/git"
 assert_eq "$rc" 5 "a cut rename record exits 5"
 assert_contains "$err" "cannot list the changed files" "the cut record names the listing failure"
+
+echo "pr-round: a listing cut right after a status exits 5"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+advance_head f.txt 'changed\n'
+real_git="$(command -v git)"
+cat >"$stub/git" <<GITSTUB
+#!/usr/bin/env bash
+# Cut the changed-file listing after a status; everything else is real git.
+for a in "\$@"; do
+  if [[ "\$a" == "--name-status" ]]; then printf 'R100\0'; exit 0; fi
+done
+exec "$real_git" "\$@"
+GITSTUB
+chmod +x "$stub/git"
+err=$(run_prr --repo "$repo" --pr 39 --round 2 2>&1 >/dev/null)
+rc=$?
+rm -f "$stub/git"
+assert_eq "$rc" 5 "a status with no path exits 5"
+assert_contains "$err" "cannot list the changed files" "the cut status names the listing failure"
+
+echo "pr-round: a listing cut inside a status exits 5"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+advance_head f.txt 'changed\n'
+real_git="$(command -v git)"
+cat >"$stub/git" <<GITSTUB
+#!/usr/bin/env bash
+# Cut the changed-file listing inside a status, before its NUL; everything else is real git.
+for a in "\$@"; do
+  if [[ "\$a" == "--name-status" ]]; then printf 'R10'; exit 0; fi
+done
+exec "$real_git" "\$@"
+GITSTUB
+chmod +x "$stub/git"
+err=$(run_prr --repo "$repo" --pr 39 --round 2 2>&1 >/dev/null)
+rc=$?
+rm -f "$stub/git"
+assert_eq "$rc" 5 "a status cut before its NUL exits 5"
+assert_contains "$err" "cannot list the changed files" "the cut status names the listing failure"
 
 SCOPE="$TOOLS/executable_finding-scope.sh"
 
