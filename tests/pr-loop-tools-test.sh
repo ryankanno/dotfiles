@@ -1210,7 +1210,8 @@ make_pr_round_env
 make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
 pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
-{ round_comment 1 "big finding" "big rejection" | sed -n '1,3p'; head -c 1100000 /dev/zero | tr '\0' x; printf '\n'; round_comment 1 "big finding" "big rejection" | sed '1,3d'; } >"$pd/round-1/comment.md"
+{ head -c 1100000 /dev/zero | tr '\0' x; printf '\n'; } >"$WS/filler.txt"
+round_comment 1 "big finding" "big rejection" | sed "/^## Review round /r $WS/filler.txt" >"$pd/round-1/comment.md"
 GH_COMMENTS_JSON='[]'
 export GH_COMMENTS_JSON
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null; RC=$?
@@ -2985,7 +2986,8 @@ assert_contains "$OUT" "--repo must be the local checkout directory, got 'test-o
 # invocation's arguments, so the model reads a different command.
 echo "skills: no skill text holds a positional placeholder"
 assert_eq "$([[ -d "$ROOT/dot_claude/skills" ]] && echo present)" "present" "the skills directory exists, so an empty grep means no placeholder"
-OUT="$(grep -rnE --include='*.md' '\$([0-9]|ARGUMENTS)' "$ROOT/dot_claude/skills")"
+OUT="$(grep -rnE --include='*.md' '\$([0-9]|ARGUMENTS)' "$ROOT/dot_claude/skills")"; RC=$?
+assert_eq "$RC" 1 "grep read every skill file and matched none (exit 2 is a read error)"
 assert_eq "$OUT" "" "no \$0 to \$9 or \$ARGUMENTS in dot_claude/skills/**/*.md"
 
 # The human posts to GitHub only on repositories they own; elsewhere a
@@ -2996,20 +2998,26 @@ echo "skills: pr-review posts a round comment only on an owned repository"
 S="$(skill_section pr-review/SKILL.md '## 8. Post')"
 assert_contains "$S" 'gh repo view <owner/repo> --json owner --jq .owner.login' "the check reads the PR repository's owner"
 assert_contains "$S" 'gh api user --jq .login' "the check reads the gh login"
+assert_contains "$S" 'The repository is owned when its owner is the gh login or an org on this list.' "the gh login and the org list both make a repository owned"
 assert_contains "$S" 'Owned orgs: `i9-io`.' "the org list holds i9-io"
 assert_contains "$S" 'On an owned repository, post the file: ```bash gh pr comment <n> --body-file <round-dir>/comment.md' "an owned repository still posts"
 assert_contains "$S" 'On any other repository, do not post.' "a repository not owned gets no post"
+assert_contains "$S" '`<round-dir>/comment.md` stays as the draft.' "a repository not owned keeps the comment as a draft"
 assert_contains "$S" 'When the §7 scan exited 0, report to the caller that the comment is a draft for the human to post, with its path.' "the caller gets a scanned draft and its path"
+assert_contains "$S" 'Otherwise report the scan'"'"'s hits, as §7 says.' "a draft the scan flagged reports the hits"
 echo "skills: pr-refine and issue-to-pr follow pr-review on a repository not owned"
 S="$(skill_section pr-refine/SKILL.md '## 1. Read the round')"
 assert_contains "$S" 'On a repository that is not owned (pr-review §8), read the round from `comment.md` only' "pr-refine reads the round from disk"
 S="$(skill_section pr-refine/SKILL.md '## 6. Re-run the round')"
 assert_contains "$S" 'Post the round'"'"'s comment per pr-review §8: on a repository that is not owned, it stays a draft.' "pr-refine leaves a draft where pr-review does"
+S="$(skill_section issue-to-pr/SKILL.md '## 5. The implementer')"
+assert_contains "$S" 'each round'"'"'s comment on the PR (on a repository that is not owned, its `comment.md`)' "the round loop checks the drafts"
 S="$(skill_section issue-to-pr/SKILL.md '## 6. Ratification')"
 assert_contains "$S" 'On a repository that is not owned (pr-review §8), check `comment.md` in the round directory instead, and `scan.sh <comment.md>` exits 0' "ratification item 3 checks a scanned draft"
 assert_contains "$S" 'On a repository that is not owned, read them from each round directory'"'"'s `comment.md`.' "ratification item 5 audits the drafts"
 S="$(skill_section issue-to-pr/SKILL.md '## 7. The final report')"
 assert_contains "$S" 'critic'"'"'s tokens summed from every round comment'"'"'s Cost line (on a repository that is not owned, each round'"'"'s `comment.md`)' "the critic-token sum reads the drafts"
+assert_contains "$S" 'the PR comment links, one per round (on a repository that is not owned, the draft paths for the human to post)' "the report lists the draft paths"
 
 # A clean round 1 is final, and the gate is judged by its exit code (issue #102).
 echo "skills: issue-to-pr's clean verdict covers a clean round 1 and the gate's exit code"
