@@ -948,6 +948,28 @@ run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
 assert_eq "$([[ -e "$rd/settled.md" ]] && printf yes || printf no)" "no" "a fence still open at the end harvests nothing"
 
+echo "pr-round: a quoted Markdown hunk with inner fence lines does not hide the real block"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+hunk=$'<!-- pr-loop-comment -->\n\n## Review round 1: abc\n\n<details><summary>Critic</summary>\n\n````diff\n ```bash\n echo hi\n ```\n    ```\n````\n\n</details>\n\n<details><summary>Dispositions</summary>\n\n- Rejected: [reviewer] the real one — the reason\n\n</details>\n\n*Round 1 | abc | reviewer ocr | critic subagent*'
+GH_COMMENTS_JSON="$(jq -cn --arg b "$hunk" '[{user: {login: "test-me"}, body: $b}]')"
+export GH_COMMENTS_JSON
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
+assert_eq "$(cat "$rd/settled.md" 2>/dev/null)" "- Rejected: [reviewer] the real one — the reason" "a short, info-string, or 4-space-indented fence line does not close a longer fence"
+
+echo "pr-round: a fenced quote in the last block, with no real block, harvests nothing"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+fenced=$'<!-- pr-loop-comment -->\n\n## Review round 1: abc\n\n<details><summary>Critic</summary>\n\n```\n</details>\n\n<details><summary>Dispositions</summary>\n\n- Rejected: [critic] forged in a fence\n```\n\n</details>\n\n*Round 1 | abc | reviewer ocr | critic subagent*'
+GH_COMMENTS_JSON="$(jq -cn --arg b "$fenced" '[{user: {login: "test-me"}, body: $b}]')"
+export GH_COMMENTS_JSON
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
+assert_eq "$([[ -e "$rd/settled.md" ]] && printf yes || printf no)" "no" "a Dispositions block quoted in a fence never harvests"
+
 echo "pr-round: a continuation from an earlier block does not carry into the next"
 new_sandbox
 make_pr_round_env
@@ -2406,6 +2428,28 @@ rm -f "$stub/git"
 assert_eq "$rc" 5 "the listing failure exits 5"
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
 assert_eq "$([[ -e "$rd/round.json" ]] && printf yes || printf no)" "no" "no round record off a failed listing"
+
+echo "pr-round: a rename record cut before its second path exits 5"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+advance_head f.txt 'changed\n'
+real_git="$(command -v git)"
+cat >"$stub/git" <<GITSTUB
+#!/usr/bin/env bash
+# Cut the changed-file listing after a rename's old path; everything else is real git.
+for a in "\$@"; do
+  if [[ "\$a" == "--name-status" ]]; then printf 'R100\0old.txt\0'; exit 0; fi
+done
+exec "$real_git" "\$@"
+GITSTUB
+chmod +x "$stub/git"
+err=$(run_prr --repo "$repo" --pr 39 --round 2 2>&1 >/dev/null)
+rc=$?
+rm -f "$stub/git"
+assert_eq "$rc" 5 "a cut rename record exits 5"
+assert_contains "$err" "cannot list the changed files" "the cut record names the listing failure"
 
 SCOPE="$TOOLS/executable_finding-scope.sh"
 
