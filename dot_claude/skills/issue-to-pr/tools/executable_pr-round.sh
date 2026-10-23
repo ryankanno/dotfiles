@@ -621,7 +621,9 @@ if [[ "$scope" == delta ]]; then
     exit 5
   }
   : >"$round_dir/delta.txt"
-  while IFS= read -r -d '' status; do
+  # A status cut before its NUL fails the read but keeps the fragment: it
+  # runs the body, and the missing path exits 5.
+  while IFS= read -r -d '' status || [[ -n "$status" ]]; do
     IFS= read -r -d '' old || {
       printf 'cannot list the changed files\n' >&2
       exit 5
