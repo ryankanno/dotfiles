@@ -952,12 +952,12 @@ echo "pr-round: a quoted Markdown hunk with inner fence lines does not hide the 
 new_sandbox
 make_pr_round_env
 make_fixture_repo
-hunk=$'<!-- pr-loop-comment -->\n\n## Review round 1: abc\n\n<details><summary>Critic</summary>\n\n````diff\n ```bash\n echo hi\n ```\n    ```\n````\n\n</details>\n\n<details><summary>Dispositions</summary>\n\n- Rejected: [reviewer] the real one — the reason\n\n</details>\n\n*Round 1 | abc | reviewer ocr | critic subagent*'
+hunk=$'<!-- pr-loop-comment -->\n\n## Review round 1: abc\n\n<details><summary>Critic</summary>\n\n````diff\n ```bash\n echo hi\n ```\n    ```\n    ````\n````\n\n</details>\n\n    ```\n\n<details><summary>Dispositions</summary>\n\n- Rejected: [reviewer] the real one — the reason\n\n</details>\n\n*Round 1 | abc | reviewer ocr | critic subagent*'
 GH_COMMENTS_JSON="$(jq -cn --arg b "$hunk" '[{user: {login: "test-me"}, body: $b}]')"
 export GH_COMMENTS_JSON
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
-assert_eq "$(cat "$rd/settled.md" 2>/dev/null)" "- Rejected: [reviewer] the real one — the reason" "a short, info-string, or 4-space-indented fence line does not close a longer fence"
+assert_eq "$(cat "$rd/settled.md" 2>/dev/null)" "- Rejected: [reviewer] the real one — the reason" "a short, info-string, or 4-space-indented run neither closes a fence nor opens one"
 
 echo "pr-round: a fenced quote in the last block, with no real block, harvests nothing"
 new_sandbox
