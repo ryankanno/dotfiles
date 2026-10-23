@@ -75,6 +75,11 @@ One interactive moment. Collect and confirm, then go silent:
    goes to `pr-round.sh` as `--effort` / `--timeout` / `--max-tools` /
    `--max-tokens-budget` in every round of
    the loop, all run by the implementer through the dispatch prompt.
+   The same holds for a per-run exclude: comma-separated,
+   gitignore-style globs the reviewer skips, passed as
+   `--exclude <globs>`. Without it, the reviewer skips only what the
+   binding's rule skips. For example, a docs-only workflow such as
+   /doc-cleanup passes `--exclude '**/*.md'`.
 6. **The grill.** On or off. On when the task leaves decisions to the
    human (product calls, open questions in the source): the implementer
    writes its plan, then grills it with the human in the workmux window,

@@ -37,7 +37,8 @@
     "**/test/**/*.sol",
     "**/tests/**/*.sol",
     "**/test/**/*.vy",
-    "**/tests/**/*.vy"
+    "**/tests/**/*.vy",
+    "**/*.md"
   ],
   "exclude": [
     "**/fixtures/**",
