@@ -2967,4 +2967,22 @@ assert_contains "$S" 'On a repository that is not owned, read them from each rou
 S="$(skill_section issue-to-pr/SKILL.md '## 7. The final report')"
 assert_contains "$S" 'critic'"'"'s tokens summed from every round comment'"'"'s Cost line (on a repository that is not owned, each round'"'"'s `comment.md`)' "the critic-token sum reads the drafts"
 
+# A clean round 1 is final, and the gate is judged by its exit code (issue #102).
+echo "skills: issue-to-pr's clean verdict covers a clean round 1 and the gate's exit code"
+S="$(skill_section issue-to-pr/SKILL.md '## 7. The final report')"
+assert_contains "$S" '`clean` (the newest round, a clean round 1 or the convergence round after a refine, found nothing, ratification held, and the gate exited 0)' "clean names round 1, ratification and the exit code"
+assert_not_contains "$S" 'printed green' "the gate is not judged by its output"
+
+# The PR stays an open draft while the loop runs (issue #76).
+echo "skills: issue-to-pr verifies an open draft PR and checks it is open before refine work"
+S="$(skill_section issue-to-pr/SKILL.md '## 4. The PR')"
+assert_contains "$S" 'gh pr view <n> --json state,isDraft,headRefName' "step 4 reads the state and the draft flag"
+assert_contains "$S" 'The PR counts as verified only when it is `OPEN`, a draft, and its head is `<branch-name>`.' "step 4 binds an open draft on the branch"
+S="$(skill_section issue-to-pr/SKILL.md '## 6. Ratification')"
+assert_contains "$S" 'Before you send a refine instruction, check that the PR is `OPEN`' "the orchestrator checks the state before a refine"
+assert_contains "$S" 'send nothing, and the loop ends `blocked` with the reason "PR <n> is <state>"' "a PR that is not open ends the loop blocked"
+S="$(skill_section issue-to-pr/dispatch-prompt-template.md '## Review rounds')"
+assert_contains "$S" 'Before you start each refine round, check that the PR is `OPEN`' "the pane checks the state before each refine round"
+assert_contains "$S" 'stop with `blocked: PR <n> is <state>`' "the pane stops blocked on a PR that is not open"
+
 report
