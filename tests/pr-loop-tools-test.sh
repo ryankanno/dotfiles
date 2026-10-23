@@ -2452,6 +2452,28 @@ rm -f "$stub/git"
 assert_eq "$rc" 5 "a cut rename record exits 5"
 assert_contains "$err" "cannot list the changed files" "the cut record names the listing failure"
 
+echo "pr-round: a listing cut right after a status exits 5"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+advance_head f.txt 'changed\n'
+real_git="$(command -v git)"
+cat >"$stub/git" <<GITSTUB
+#!/usr/bin/env bash
+# Cut the changed-file listing after a status; everything else is real git.
+for a in "\$@"; do
+  if [[ "\$a" == "--name-status" ]]; then printf 'R100\0'; exit 0; fi
+done
+exec "$real_git" "\$@"
+GITSTUB
+chmod +x "$stub/git"
+err=$(run_prr --repo "$repo" --pr 39 --round 2 2>&1 >/dev/null)
+rc=$?
+rm -f "$stub/git"
+assert_eq "$rc" 5 "a status with no path exits 5"
+assert_contains "$err" "cannot list the changed files" "the cut status names the listing failure"
+
 SCOPE="$TOOLS/executable_finding-scope.sh"
 
 echo "finding-scope: a finding on a changed line is new, elsewhere reviewed"

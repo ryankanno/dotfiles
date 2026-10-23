@@ -619,7 +619,11 @@ if [[ "$scope" == delta ]]; then
     exit 5
   }
   : >"$round_dir/delta.txt"
-  while IFS= read -r -d '' status && IFS= read -r -d '' old; do
+  while IFS= read -r -d '' status; do
+    IFS= read -r -d '' old || {
+      printf 'cannot list the changed files\n' >&2
+      exit 5
+    }
     # The path reaches awk through the environment, not -v: -v expands
     # escape sequences in the value, and a filename may hold one.
     p="$old"
