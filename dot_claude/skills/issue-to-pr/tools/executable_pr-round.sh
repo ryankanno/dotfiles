@@ -394,6 +394,8 @@ else
   # line the report template writes opens the harvest, and only outside
   # a fence and outside every other block. Each comment is read on its
   # own, so one comment's unclosed fence or block cannot reach the next.
+  # Fences follow CommonMark: a quoted hunk's "```bash" context line, a
+  # shorter run, or a 4-space-indented run is content, not a closer.
   # An opener inside a block is quoted content. The critic's text is not
   # escaped, so a </details> it quotes can end its block early: only the
   # comment's last block harvests, with nothing after it but blank lines
@@ -401,8 +403,9 @@ else
   settled=$(while IFS= read -r b; do
     jq -r '.' <<<"$b" \
      | awk '{ sub(/\r$/, "") }
-           fence { l = $0; sub(/^[[:space:]]*/, "", l); if (index(l, fence) == 1) fence = ""; next }
-           /^[[:space:]]*(```|~~~)/ { sub(/^[[:space:]]*/, ""); fence = substr($0, 1, 3); keep = 0; if (!inblock) last = 0; next }
+           fence { l = $0; sub(/^ ? ? ?/, "", l); sub(/[[:space:]]+$/, "", l); t = l; gsub(substr(fence, 1, 1), "", t)
+                   if (l != "" && t == "" && length(l) >= length(fence)) fence = ""; next }
+           /^ ? ? ?(```|~~~)/ { sub(/^ */, ""); match($0, "^" substr($0, 1, 1) "+"); fence = substr($0, 1, RLENGTH); keep = 0; if (!inblock) last = 0; next }
            /^<details>/ { if (!inblock) { on = ($0 == "<details><summary>Dispositions</summary>"); last = on; buf = ""; keep = 0 } inblock = 1; next }
            /^<\/details>/ { inblock = 0; on = 0; next }
            !inblock && NF && !/^\*Round [0-9]+ \| / { last = 0; next }
@@ -622,7 +625,10 @@ if [[ "$scope" == delta ]]; then
     p="$old"
     paths=("$old")
     if [[ "$status" == [RC]* ]]; then
-      IFS= read -r -d '' new
+      IFS= read -r -d '' new || {
+        printf 'cannot list the changed files\n' >&2
+        exit 5
+      }
       p="$new"
       paths+=("$new")
     fi
