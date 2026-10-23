@@ -22,6 +22,6 @@ rga-fzf() {
 
 if [ -t 1 ]
 then
-    bind -x '"\C-p": nvim $(fzf);'
-    bind -x '"\C-f": nvim $(rga-fzf);'
+    bind -x '"\C-p": nvim -- "$(fzf)";'
+    bind -x '"\C-f": nvim -- "$(rga-fzf)";'
 fi

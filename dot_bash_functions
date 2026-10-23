@@ -191,7 +191,7 @@ function pyjson() {
 function pyserver() {
     local port="${1:-8000}"
     [[ "$OSTYPE" == darwin* ]] && open "http://localhost:${port}/"
-    python -m http.server "$port"
+    python -m http.server --bind 127.0.0.1 "$port"
 }
 
 function rglogs() { rg --sortr created "$@" ~/.logs/; }
