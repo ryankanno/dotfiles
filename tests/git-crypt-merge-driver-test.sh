@@ -34,8 +34,10 @@ assert_contains() {
   fi
 }
 
-# GIT_CRYPT_STUB picks the case: fail-smudge and fail-clean exit 1 with no
-# output, and hold parks a clean until the test creates the release file.
+# GIT_CRYPT_STUB picks the case: fail-smudge exits 1 with no output on the
+# input that matches the file STUB_FAIL_ON, so each decrypt is checked on its
+# own; fail-clean exits 1 with no output; and hold parks a clean until the
+# test creates the release file.
 new_repo() {
   WS="$(mktemp -d "${TMPDIR:-/tmp}/git-crypt-merge-test.XXXXXXXX")"
   SANDBOXES+=("$WS")
@@ -45,7 +47,12 @@ new_repo() {
   cat >"$WS/bin/git-crypt" <<'STUB'
 #!/usr/bin/env bash
 case "${GIT_CRYPT_STUB:-}:$1" in
-  fail-smudge:smudge | fail-clean:clean) exit 1 ;;
+  fail-smudge:smudge)
+    cat >"$STUB_HOLD/stdin"
+    cmp -s "$STUB_HOLD/stdin" "$STUB_FAIL_ON" && exit 1
+    exec cat "$STUB_HOLD/stdin"
+    ;;
+  fail-clean:clean) exit 1 ;;
   hold:clean)
     : >"$STUB_HOLD/held"
     while [[ ! -e "$STUB_HOLD/release" ]]; do sleep 0.1; done
@@ -69,6 +76,8 @@ drive() {
   RC=$?
 }
 result() { cat "$REPO/.merge_file_current"; }
+# Byte for byte: a command substitution would hide a lost trailing newline.
+result_unchanged() { cmp -s "$WS/orig" "$REPO/.merge_file_current" && echo unchanged; }
 
 echo "driver: a clean merge exits 0 with the merged text in the result"
 new_repo
@@ -90,23 +99,27 @@ assert_eq "$merge_file_rc" 2 "the fixture has two conflicts, unlike a failure's 
 assert_eq "$RC" "$merge_file_rc" "exits with merge-file's conflict count"
 assert_eq "$(result)" "$(cat "$WS/expected")" "the result holds the conflict markers"
 
-echo "driver: a failed decrypt exits non-zero and leaves the result alone"
-new_repo
-temps 'one\ntwo\nthree\n' 'ONE\ntwo\nthree\n' 'one\ntwo\nTHREE\n'
-before="$(listing)"
-GIT_CRYPT_STUB=fail-smudge drive
-assert_ne "$RC" 0 "exits non-zero, so git marks the path conflicted"
-assert_eq "$(result)" "$(printf 'ONE\ntwo\nthree')" "the result temp is unchanged"
-assert_contains "$(cat "$WS/err.txt")" "git-crypt smudge failed" "stderr names what failed"
-assert_eq "$(listing)" "$before" "no plaintext stays in the worktree or the git dir"
+for side in ancestor current other; do
+  echo "driver: a failed decrypt of the $side file exits non-zero and leaves the result alone"
+  new_repo
+  temps 'one\ntwo\nthree\n' 'ONE\ntwo\nthree\n' 'one\ntwo\nTHREE\n'
+  cp "$REPO/.merge_file_current" "$WS/orig"
+  before="$(listing)"
+  GIT_CRYPT_STUB=fail-smudge STUB_FAIL_ON="$REPO/.merge_file_$side" drive
+  assert_ne "$RC" 0 "exits non-zero, so git marks the path conflicted"
+  assert_eq "$(result_unchanged)" "unchanged" "the result temp is unchanged"
+  assert_contains "$(cat "$WS/err.txt")" "git-crypt smudge failed on the $side file" "stderr names what failed"
+  assert_eq "$(listing)" "$before" "no plaintext stays in the worktree or the git dir"
+done
 
 echo "driver: a failed clean exits non-zero and leaves the result alone"
 new_repo
 temps 'one\ntwo\nthree\n' 'ONE\ntwo\nthree\n' 'one\ntwo\nTHREE\n'
+cp "$REPO/.merge_file_current" "$WS/orig"
 before="$(listing)"
 GIT_CRYPT_STUB=fail-clean drive
 assert_ne "$RC" 0 "exits non-zero, so git marks the path conflicted"
-assert_eq "$(result)" "$(printf 'ONE\ntwo\nthree')" "the result temp is unchanged"
+assert_eq "$(result_unchanged)" "unchanged" "the result temp is unchanged"
 assert_contains "$(cat "$WS/err.txt")" "git-crypt clean failed" "stderr names what failed"
 assert_eq "$(listing)" "$before" "no plaintext stays in the worktree or the git dir"
 
@@ -120,7 +133,7 @@ for _ in $(seq 100); do [[ -e "$WS/held" ]] && break; sleep 0.1; done
 assert_eq "$([[ -e "$WS/held" ]] && echo held)" "held" "the driver reached the clean"
 during="$(listing)"
 new="$(comm -13 <(printf '%s\n' "$before") <(printf '%s\n' "$during"))"
-assert_eq "$(grep -cv '^\./\.git/' <<<"$new")" 0 "mid-merge, no plaintext is in the worktree"
+assert_eq "$(grep -v '^\./\.git/' <<<"$new" | grep -c .)" 0 "mid-merge, no plaintext is in the worktree"
 private="$(grep -E '^\./\.git/[^/]+$' <<<"$new")"
 assert_ne "$private" "" "mid-merge, the plaintext is in a new dir under the git dir"
 assert_eq "$(cd "$REPO" && find "$private" -maxdepth 0 -type d -perm 700)" "$private" "that dir is mode 0700"
