@@ -35,19 +35,23 @@ path="${BASH_REMATCH[1]}" start="${BASH_REMATCH[2]}" end="${BASH_REMATCH[4]:-${B
 # The path goes through the environment: -v expands escape sequences, and
 # a path may hold a backslash.
 p="$path" awk -v s="$start" -v e="$end" '
-  {
-    # A path that holds a newline spans lines: a line with no range
-    # suffix is the head of the next line'\''s path. A segment can end in a
-    # range suffix too, and the line format cannot show where such a path
-    # ends, so the path looked for decides.
-    if (index(ENVIRON["p"], head $0 "\n") == 1) { head = head $0 "\n"; next }
-    i = match($0, /:[0-9]+-[0-9]+$/)
-    if (!i) { head = head $0 "\n"; next }
-    f = head substr($0, 1, i - 1)
-    head = ""
-    if (f != ENVIRON["p"]) next
-    split(substr($0, i + 1), r, "-")
-    if (s + 0 <= r[2] + 0 && e + 0 >= r[1] + 0) { hit = 1; exit }
+  { line[NR] = $0 }
+  END {
+    # A path that holds a newline spans lines, and a segment of it can end
+    # in a range suffix too: the line format cannot show where such a path
+    # ends. An entry starts on the first line or after a line with a range
+    # suffix, so the path looked for is tried from each such start.
+    n = split(ENVIRON["p"], seg, "\n")
+    for (k = 1; k + n - 1 <= NR; k++) {
+      if (k > 1 && !match(line[k - 1], /:[0-9]+-[0-9]+$/)) continue
+      for (j = 1; j < n && line[k + j - 1] == seg[j]; j++) ;
+      if (j < n) continue
+      last = line[k + n - 1]
+      i = match(last, /:[0-9]+-[0-9]+$/)
+      if (!i || substr(last, 1, i - 1) != seg[n]) continue
+      split(substr(last, i + 1), r, "-")
+      if (s + 0 <= r[2] + 0 && e + 0 >= r[1] + 0) { hit = 1; break }
+    }
+    print (hit ? "new" : "reviewed")
   }
-  END { print (hit ? "new" : "reviewed") }
 ' "$dir/delta.txt" 2>/dev/null || printf 'new\n'

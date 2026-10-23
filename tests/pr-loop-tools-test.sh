@@ -2337,6 +2337,22 @@ run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
 assert_eq "$(cat "$rd/delta.txt")" $'x:1-1\ny.txt:5-5' "the delta holds the path's changed line"
 assert_eq "$("$TOOLS/executable_finding-scope.sh" "$rd" $'x:1-1\ny.txt:5')" "new" "a finding on the path's changed line is new"
+assert_eq "$("$TOOLS/executable_finding-scope.sh" "$rd" $'x:1-1\ny.txt:2')" "reviewed" "a finding on the path's unchanged line is reviewed"
+
+echo "finding-scope: a newline path stays whole after another file's entry that matches its first segment"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+advance_head x 'a\n'
+advance_head $'x:1-1\ny.txt' 'a\nb\nc\nd\n'
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+advance_head x 'b\n'
+advance_head $'x:1-1\ny.txt' 'a\nb\nc\nd\ne\n'
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
+assert_eq "$(cat "$rd/delta.txt")" $'x:1-1\nx:1-1\ny.txt:5-5' "the delta holds both files' changed lines"
+assert_eq "$("$TOOLS/executable_finding-scope.sh" "$rd" $'x:1-1\ny.txt:5')" "new" "a finding on the path's changed line is new"
+assert_eq "$("$TOOLS/executable_finding-scope.sh" "$rd" 'x:1')" "new" "a finding on the other file's changed line is new"
 
 echo "pr-round: a rename of a quoted filename reports edited ranges, not a whole-file add"
 new_sandbox
