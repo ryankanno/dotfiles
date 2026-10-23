@@ -2981,6 +2981,8 @@ assert_contains "$S" 'The PR counts as verified only when it is `OPEN`, a draft,
 S="$(skill_section issue-to-pr/SKILL.md '## 6. Ratification')"
 assert_contains "$S" 'Before you send a refine instruction, check that the PR is `OPEN`' "the orchestrator checks the state before a refine"
 assert_contains "$S" 'send nothing, and the loop ends `blocked` with the reason "PR <n> is <state>"' "a PR that is not open ends the loop blocked"
+S="$(skill_section issue-to-pr/SKILL.md '## 7. The final report')"
+assert_contains "$S" 'a PR that is not `OPEN` before a refine' "step 7's blocked causes name a PR that is not open"
 S="$(skill_section issue-to-pr/dispatch-prompt-template.md '## Review rounds')"
 assert_contains "$S" 'Before you start each refine round, check that the PR is `OPEN`' "the pane checks the state before each refine round"
 assert_contains "$S" 'stop with `blocked: PR <n> is <state>`' "the pane stops blocked on a PR that is not open"
