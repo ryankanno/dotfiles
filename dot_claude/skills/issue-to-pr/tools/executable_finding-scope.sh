@@ -44,7 +44,8 @@ p="$path" awk -v s="$start" -v e="$end" '
     n = split(ENVIRON["p"], seg, "\n")
     for (k = 1; k + n - 1 <= NR; k++) {
       if (k > 1 && !match(line[k - 1], /:[0-9]+-[0-9]+$/)) continue
-      for (j = 1; j < n && line[k + j - 1] == seg[j]; j++) ;
+      # The empty string forces a text comparison: "01" == "1" as numbers.
+      for (j = 1; j < n && line[k + j - 1] "" == seg[j]; j++) ;
       if (j < n) continue
       last = line[k + n - 1]
       i = match(last, /:[0-9]+-[0-9]+$/)
