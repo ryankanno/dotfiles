@@ -138,7 +138,8 @@ changes since the prior round, conflict resolutions included, and none
 of the base's. A finding on the base's lines reads `reviewed`.
 
 When the base merge is the only change since the prior round (the
-head's tree equals the baseline's), the round reviews nothing:
+head's tree equals the baseline's), a round other than the convergence
+round (below) reviews nothing:
 `range.review_scope` starts with `none:`, `runs` is empty,
 `reviewer_complete` is `false`, and nothing is billed. A PR change
 with no added lines (a deletion) is still a change and reviews the
@@ -188,8 +189,10 @@ listing cannot be resolved, and 127 when `gh`, `jq`, or `git` is
 missing. It exits 6 when the round directory already holds evidence:
 `--rerun` moves that evidence into a `superseded-*/` subdirectory, then
 runs the round. Pass `--rerun` only when the earlier run of this round
-died and left no `round.json` (a harness timeout kills it). A round dir
-with a `round.json` and a `comment.md` is a finished round: use it. The
+died and left no `round.json` (a harness timeout kills it), or when a
+convergence round's critic cannot run (§2). A round dir with a
+`round.json` and a usable `comment.md` (whole and scan-clean, below) is
+a finished round: use it. The
 script exits 7 when another live process runs the same round. Wait for
 that round. Never pass `--rerun` over it: two callers on one round
 overwrote each other's evidence on PRs 137 and 230.
@@ -215,8 +218,12 @@ next round.
 
 **`reviewer_skipped: "convergence"`** is a convergence round: no
 reviewer ran, by design. Steps 3 to 5 run as usual. The round is clean
-when the critic and your read have no blocking finding. It is not
-partial and not unrecovered: the shapes below do not apply to it.
+when the critic ran and neither the critic nor your read has a blocking
+finding. It is not partial and not unrecovered: the shapes below do not
+apply to it. When `critic-input.sh` exits 4 (§3), no critic can run
+either: post nothing, and run the round again with `--rerun` and
+without `--convergence`. On the same head, the reviewer then reviews
+the whole PR.
 
 **`reviewer_complete: true`** with zero findings is a clean review:
 report it as clean. **`reviewer_complete: false`** takes one of three
@@ -280,7 +287,8 @@ $HOME/.claude/skills/issue-to-pr/tools/subagent/critic-input.sh \
 
 When the script exits 4, the prompt is over 200,000 bytes and cannot
 pass inline. The script prints no prompt. The round runs with no critic.
-The Critic block records the gap with the script's stderr line.
+The Critic block records the gap with the script's stderr line. A
+convergence round instead runs again with the reviewer (§2).
 
 Its findings arrive numbered with file, line, the claim, the input or
 state that reaches it, the harm, severity, and how it checked. Findings

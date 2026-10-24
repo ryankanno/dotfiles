@@ -133,6 +133,11 @@ GitHub renders the content as literal text):
 *Round <N> | <short-sha> | reviewer <binding> | critic <binding>*
 ```
 
+A convergence round runs no reviewer, so no renderer output exists. Its
+Reviewer details block holds the one line
+`No reviewer ran: the convergence round runs none by design.`, and its
+footer reads `reviewer none`.
+
 The renderer escapes `</details>` in its output; the critic's and the
 read's text pass through the same scan, so quote them inside fenced
 blocks when they contain markup.
