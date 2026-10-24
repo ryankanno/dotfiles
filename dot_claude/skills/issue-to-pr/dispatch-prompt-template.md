@@ -129,7 +129,8 @@ rerun of a round adds no line.
    finding in it sends you back to step 2 while refine rounds remain.
    A clean round 1 needs no convergence round: it already reviewed the
    whole PR at this head. When pr-review §2 leaves the round with no
-   critic, stop with
+   critic and does not send it back to the reviewer with `--rerun`,
+   stop with
    `blocked: the convergence round has no critic: <the script's stderr line>`.
 4. **Stop** and report one stop state: `clean` (after a clean round 1
    or the convergence round), `converged candidate` (after the

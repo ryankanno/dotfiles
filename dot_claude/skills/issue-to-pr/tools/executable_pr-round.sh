@@ -56,7 +56,8 @@
 # Exit codes: 0 the round ran; 2 usage, the environment is unusable
 # (HOME unset, or the round lock cannot be created), or, outside a
 # convergence round, the brief cannot fit the reviewer's background limit,
-# alone or once the standing dispositions assemble into it; 3 identity
+# alone or once the standing dispositions assemble into it, or the round
+# dir's refine-dispositions.md fails the scan; 3 identity
 # mismatch; 4 the PR is
 # missing, not open, or not resolvable; 5 the repository, its refs, or
 # the changed-file listing could not be resolved; 6 the round dir already holds
@@ -453,12 +454,14 @@ fi
 # after the round runs; without this file the critic and the reviewer saw
 # the findings the refine had just settled as open (issue #169: 4 of them
 # on PR #163 round 2). Scanned like a disk comment: it leaves the machine
-# through the reviewer.
+# through the reviewer. A hit stops the round: dropping the lines would
+# bring back the very re-raise this file exists to stop.
 refine_disp="$round_dir/refine-dispositions.md"
 if [[ -f "$refine_disp" ]]; then
-  rc=0; "$scan" "$refine_disp" >/dev/null 2>&1 || rc=$?
+  rc=0; "$scan" "$refine_disp" >&2 || rc=$?
   if [[ $rc -ne 0 ]]; then
-    printf 'scan exit %s on %s; its dispositions stay out of this round\n' "$rc" "$refine_disp" >&2
+    printf 'scan exit %s on %s; fix the file and run the round again\n' "$rc" "$refine_disp" >&2
+    exit 2
   else
     own=$(awk '{ sub(/\r$/, "") }
                /^- (Rejected|Accepted):/ { keep = 1; print; next }

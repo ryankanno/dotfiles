@@ -693,6 +693,9 @@ if [[ "$mode" == "commit" ]]; then status="$STUB_COMMIT_STATUS"; fi
 # non-zero and leaves no review.json.
 if [[ "$status" == missing ]]; then exit 1; fi
 printf '{"status":"%s","session_id":"stub-session","comments":[],"summary":{"total_tokens":%s},"warnings":%s,"manifest":{"coverage":{"failed":%s}}}' "$status" "${STUB_TOKENS:-0}" "${STUB_WARNINGS:-[]}" "${STUB_COVERAGE_FAILED:-[]}" >"$out"
+# A directory in session.txt's place makes the wrapper's write fail, as a
+# full disk does.
+if [[ -n "${STUB_BLOCK_SESSION:-}" ]]; then mkdir -p "$(dirname "$out")/session.txt"; fi
 if [[ -n "${STUB_EXIT_AFTER_WRITE:-}" ]]; then exit "$STUB_EXIT_AFTER_WRITE"; fi
 OCRSTUB
   chmod +x "$stub/gh" "$stub/ocr"
@@ -700,6 +703,7 @@ OCRSTUB
   export GH_COMMENTS_JSON='[]'
   export STUB_GARBAGE="" STUB_WARNINGS="" STUB_COVERAGE_FAILED=""
   export STUB_LOCK_SWAP="" STUB_LOCK_PID=""
+  export STUB_EXIT_AFTER_WRITE="" STUB_BLOCK_SESSION=""
   export GH_PR_STALE_JSON="" GH_PR_STALE_VIEWS=0 GH_PR_VIEWS_FILE="$WS/gh-pr-views" GH_PR_VIEW_DELAY=""
 }
 
@@ -759,6 +763,17 @@ rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
 assert_eq "$(jq -r '.runs[0].session_id' "$rd/round.json")" "stub-session" "the run records the session id from review.json"
 assert_eq "$(jq -r '.runs[0].exit_code' "$rd/round.json")" 1 "the run keeps ocr's exit code"
 assert_eq "$(cat "$rd/exit.txt")" 1 "exit.txt keeps ocr's exit code"
+
+echo "pr-round: a failed session.txt write after an ocr failure keeps ocr's exit code"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+export STUB_EXIT_AFTER_WRITE=3 STUB_BLOCK_SESSION=1
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+export STUB_EXIT_AFTER_WRITE="" STUB_BLOCK_SESSION=""
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
+assert_eq "$(cat "$rd/exit.txt" 2>/dev/null)" 3 "exit.txt holds ocr's exit code"
+assert_eq "$(jq -r '.runs[0].exit_code' "$rd/round.json")" 3 "the run keeps ocr's exit code"
 
 echo "pr-round: a range with no review text retries per commit and recovers"
 new_sandbox
@@ -3373,6 +3388,44 @@ run_prr --repo "$repo" --pr 39 --round 2 --brief "$WS/brief.md" --rerun >/dev/nu
 assert_eq "$([[ -f "$rd/refine-dispositions.md" ]] && printf yes || printf no)" "yes" "a rerun keeps the refine's file in place"
 assert_contains "$(cat "$rd/settled.md" 2>/dev/null)" "the refine rejected this one" "a rerun still reads the refine's file"
 
+echo "pr-round: a refine dispositions file joins a --dispositions file too"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+printf 'make add safe\n' >"$WS/brief.md"
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+round_comment 1 "the finding" "the earlier rejection" >"$pd/round-1/comment.md"
+advance_head g.txt 'refined\n'
+mkdir -p "$pd/round-2"
+printf -- '- Rejected: [critic] the refine rejected this one — the code guards it\n' >"$pd/round-2/refine-dispositions.md"
+printf -- '- Accepted: [critic] the file accepted this one — a judgment call\n' >"$WS/dispositions.md"
+run_prr --repo "$repo" --pr 39 --round 2 --brief "$WS/brief.md" --dispositions "$WS/dispositions.md" >/dev/null; RC=$?
+rd="$pd/round-2"
+assert_eq "$RC" 0 "the round runs"
+S="$(cat "$rd/settled.md" 2>/dev/null)"
+assert_contains "$S" "the file accepted this one" "the --dispositions line stays"
+assert_contains "$S" "the refine rejected this one" "the refine's line joins it"
+assert_contains "$(cat "$rd/background.md" 2>/dev/null)" "the refine rejected this one" "the background has the refine's line"
+
+echo "pr-round: a refine dispositions file that fails the scan stops the round before any review"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+printf 'make add safe\n' >"$WS/brief.md"
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+round_comment 1 "the finding" "the earlier rejection" >"$pd/round-1/comment.md"
+advance_head g.txt 'refined\n'
+mkdir -p "$pd/round-2"
+printf -- '- Rejected: [critic] the refine rejected this one — see /tmp/evidence.log\n' >"$pd/round-2/refine-dispositions.md"
+OUT="$(run_prr --repo "$repo" --pr 39 --round 2 --brief "$WS/brief.md" 2>&1)"; RC=$?
+rd="$pd/round-2"
+assert_eq "$RC" 2 "the round exits 2"
+assert_contains "$OUT" "refine-dispositions.md" "stderr names the file"
+assert_contains "$OUT" "/tmp/evidence.log" "stderr shows the scan's hit"
+assert_eq "$(ls "$rd")" "refine-dispositions.md" "the round dir holds only the refine's file: nothing reviewed"
+
 # Claude Code replaces these placeholders in a skill's text with the
 # invocation's arguments, so the model reads a different command.
 echo "skills: no skill text holds a positional placeholder"
@@ -3445,14 +3498,20 @@ S="$(skill_section issue-to-pr/SKILL.md '## 7. The final report')"
 assert_contains "$S" 'a convergence round with no critic' "the final report's blocked causes name it"
 S="$(skill_section issue-to-pr/dispatch-prompt-template.md '## Review rounds')"
 assert_contains "$S" "$NOCRITIC" "the dispatch template's convergence step names it"
+assert_contains "$S" 'does not send it back to the reviewer with `--rerun`' "the convergence step leaves out the exit 4 that pr-review §2 reruns"
+S="$(skill_section issue-to-pr/SKILL.md '## Failure policies')"
+assert_contains "$S" 'does not send it back to the reviewer with `--rerun`' "the failure policy leaves out the exit 4 that pr-review §2 reruns"
 
 # A refine round's own dispositions reach its critic and reviewer (issue #169).
 echo "skills: pr-refine writes refine-dispositions.md before the round, and pr-review says the round reads it"
 S="$(skill_section pr-refine/SKILL.md '## 6. Re-run the round')"
 assert_contains "$S" 'refine-dispositions.md' "pr-refine §6 names the file"
 assert_contains "$S" 'before you run the round' "pr-refine §6 writes it first"
+assert_contains "$S" 'as `report-template.md`'"'"'s Dispositions block writes them' "pr-refine §6 pins the line format"
+assert_contains "$S" 'a hit stops the round with exit 2' "pr-refine §6 says the file must pass the scan"
 S="$(skill_section pr-review/SKILL.md '## 1. Run the round')"
 assert_contains "$S" 'refine-dispositions.md' "pr-review §1 names the file"
 assert_contains "$S" 'adds its Rejected and Accepted lines' "pr-review §1 says the round reads it"
+assert_contains "$S" 'A file that fails the scan stops the round with exit 2' "pr-review §1 says a scan hit stops the round"
 
 report

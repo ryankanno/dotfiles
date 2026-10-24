@@ -129,11 +129,12 @@ ocr "${args[@]}" >"$out/stdout.txt" 2>"$out/stderr.txt"
 rc=$?
 set -e
 if [[ $rc -ne 0 ]]; then
+  printf '%s\n' "$rc" >"$out/exit.txt"
   # ocr can fail after it wrote a whole review.json (PR #162: "no space
   # left on device" on its session_end write); the run is still that session.
+  # The disk can still be full, so a failed write must not replace ocr's code.
   sid=$(jq -r '.session_id // empty' "$out/review.json" 2>/dev/null || true)
-  if [[ -n "$sid" ]]; then printf '%s\n' "$sid" >"$out/session.txt"; fi
-  printf '%s\n' "$rc" >"$out/exit.txt"
+  if [[ -n "$sid" ]]; then printf '%s\n' "$sid" >"$out/session.txt" 2>/dev/null || true; fi
   exit "$rc"
 fi
 

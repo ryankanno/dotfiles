@@ -102,8 +102,10 @@ A refine round writes its own Dispositions lines to
 `refine-dispositions.md` in the round directory before the round runs
 (pr-refine §6). The script adds its Rejected and Accepted lines to the
 lines from the comments or from `--dispositions`, for `background.md`
-and for the critic's `settled.md`. The file is not evidence of an
-earlier run, and `--rerun` does not move it.
+and for the critic's `settled.md`.
+A file that fails the scan stops the round with exit 2 before any
+review runs. The file is not evidence of an earlier run, and `--rerun`
+does not move it.
 
 The background has a size limit: the manifest's
 `reviewer_background_limit` (8000 characters for ocr, which aborts on
