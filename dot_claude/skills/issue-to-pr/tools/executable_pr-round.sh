@@ -46,12 +46,16 @@
 #                when there are prior
 #                dispositions (read from this loop's own round comments,
 #                each earlier round's comment.md on disk before its PR
-#                copy, unless --dispositions names a file; newest first
-#                within the manifest's reviewer_background_limit), and
-#                the directory path on stdout.
+#                copy, unless --dispositions names a file, plus the
+#                Rejected and Accepted lines of refine-dispositions.md in
+#                the round dir, which a refine writes before the round
+#                and which no --rerun moves; newest first within the
+#                manifest's reviewer_background_limit; a convergence
+#                round runs no reviewer, so it assembles none and
+#                checks no limit), and the directory path on stdout.
 # Exit codes: 0 the round ran; 2 usage, the environment is unusable
-# (HOME unset, or the round lock cannot be created), or the brief cannot
-# fit the reviewer's background limit,
+# (HOME unset, or the round lock cannot be created), or, outside a
+# convergence round, the brief cannot fit the reviewer's background limit,
 # alone or once the standing dispositions assemble into it; 3 identity
 # mismatch; 4 the PR is
 # missing, not open, or not resolvable; 5 the repository, its refs, or
@@ -166,7 +170,7 @@ scan="$here/scan.sh"
 # brief assembled to limit+264).
 dispositions_header=$'## Findings already dispositioned in earlier rounds\n\nEach line was rejected or accepted with recorded evidence. Do not report it again unless the code it cites changed.\n\n'
 limit=$(jq -r '.reviewer_background_limit // 0' "$manifest")
-if [[ -n "$brief" && "$limit" -gt 0 ]]; then
+if [[ -n "$brief" && "$limit" -gt 0 && -z "$convergence" ]]; then
   brief_size=$(wc -c <"$brief" | tr -d ' ')
   if [[ "$brief_size" -gt "$limit" ]]; then
     printf 'brief is %s bytes; the %s reviewer accepts at most %s characters of background. Condense the brief to the task: its asks, the settled decisions, and the constraints.\n' \
@@ -445,6 +449,25 @@ else
            END { if (last && !inblock && fence == "") printf "%s", buf }'
   done <<<"$bodies")
 fi
+# A refine writes this round's comment, with its Dispositions block, only
+# after the round runs; without this file the critic and the reviewer saw
+# the findings the refine had just settled as open (issue #169: 4 of them
+# on PR #163 round 2). Scanned like a disk comment: it leaves the machine
+# through the reviewer.
+refine_disp="$round_dir/refine-dispositions.md"
+if [[ -f "$refine_disp" ]]; then
+  rc=0; "$scan" "$refine_disp" >/dev/null 2>&1 || rc=$?
+  if [[ $rc -ne 0 ]]; then
+    printf 'scan exit %s on %s; its dispositions stay out of this round\n' "$rc" "$refine_disp" >&2
+  else
+    own=$(awk '{ sub(/\r$/, "") }
+               /^- (Rejected|Accepted):/ { keep = 1; print; next }
+               /^- / || NF == 0 { keep = 0; next }
+               keep && /^[[:space:]]/ { print; next }
+               { keep = 0 }' "$refine_disp")
+    if [[ -n "$own" ]]; then settled="${settled:+$settled$'\n'}$own"; fi
+  fi
+fi
 # The newest earlier-round comment's blocking findings are what this round's
 # delta answers. critic-input.sh hands them to the critic verbatim, so the
 # critic checks the fixes against the claims, not against a paraphrase.
@@ -460,7 +483,7 @@ prior_findings=$(tail -n 1 <<<"$bodies" | jq -r '.' \
 # exactly as it was, so the documented recovery (condense and rerun) hits
 # no leftover guard, and a refusal of a --rerun displaces no record.
 kept="$settled" omitted=0
-if [[ -n "$settled" ]]; then
+if [[ -n "$settled" && -z "$convergence" ]]; then
   tmp_bg=$(mktemp "${TMPDIR:-/tmp}/pr-round-bg.XXXXXX") || {
     printf 'cannot create a temp file for the background\n' >&2
     exit 2
@@ -530,10 +553,11 @@ fi
 # Evidence is never silently overwritten or reused: a re-invocation into a
 # round that already holds anything besides superseded runs, including the
 # leftovers of an interrupted run with no round.json, is refused unless
-# --rerun moves it into a superseded-*/ subdirectory first.
+# --rerun moves it into a superseded-*/ subdirectory first. The refine's
+# dispositions file is the round's input, not evidence of an earlier run.
 leftovers=()
 for f in "$round_dir"/*; do
-  if [[ -e "$f" && "$(basename "$f")" != superseded-* ]]; then leftovers+=("$f"); fi
+  if [[ -e "$f" && "$(basename "$f")" != superseded-* && "$f" != "$refine_disp" ]]; then leftovers+=("$f"); fi
 done
 if [[ ${#leftovers[@]} -gt 0 ]]; then
   if [[ -z "$rerun" ]]; then
@@ -685,7 +709,7 @@ if [[ -n "$prior_findings" ]]; then printf '%s\n' "$prior_findings" >"$round_dir
 
 # The background was assembled and size-checked in the temp file above,
 # before the round dir was touched; committing it here is safe.
-if [[ -n "$settled" ]]; then
+if [[ -n "$settled" && -z "$convergence" ]]; then
   cat "$tmp_bg" >"$round_dir/background.md"
   rm -f "$tmp_bg"
   tmp_bg=""

@@ -13,7 +13,8 @@
 # empty-result retry).
 # Interface out: <out>/review.json (the tool's own output), stdout.txt,
 # stderr.txt, cmd.txt (the exact invocation, for the report), session.txt
-# (session id, for resume and round-over-round compare), exit.txt on failure.
+# (session id, for resume and round-over-round compare; also on a failure
+# when review.json holds one), exit.txt on failure.
 set -euo pipefail
 
 usage() {
@@ -128,6 +129,10 @@ ocr "${args[@]}" >"$out/stdout.txt" 2>"$out/stderr.txt"
 rc=$?
 set -e
 if [[ $rc -ne 0 ]]; then
+  # ocr can fail after it wrote a whole review.json (PR #162: "no space
+  # left on device" on its session_end write); the run is still that session.
+  sid=$(jq -r '.session_id // empty' "$out/review.json" 2>/dev/null || true)
+  if [[ -n "$sid" ]]; then printf '%s\n' "$sid" >"$out/session.txt"; fi
   printf '%s\n' "$rc" >"$out/exit.txt"
   exit "$rc"
 fi
