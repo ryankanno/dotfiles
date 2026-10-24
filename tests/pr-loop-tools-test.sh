@@ -1747,8 +1747,9 @@ echo "pr-round: --expect-head takes only a full commit SHA"
 new_sandbox
 make_pr_round_env
 make_fixture_repo
-run_prr --repo "$repo" --pr 39 --round 1 --expect-head "${FR_HEAD:0:7}" >/dev/null 2>&1; rc=$?
+err=$(run_prr --repo "$repo" --pr 39 --round 1 --expect-head "${FR_HEAD:0:7}" 2>&1 >/dev/null); rc=$?
 assert_eq "$rc" 2 "an abbreviated SHA is a usage error"
+assert_contains "$err" "pr-round.sh: --expect-head must be the full commit SHA (git rev-parse HEAD), got '${FR_HEAD:0:7}'" "the message names the flag, the wanted form, and the value"
 
 echo "pr-round: a non-open PR is refused"
 new_sandbox
