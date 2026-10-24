@@ -291,7 +291,7 @@ why.
   calls are listed), `capped-unrecovered` (blocking findings remain
   after 3 rounds), or
   `blocked` (pane death after redispatch, no gate found, scan hit, a
-  PR that is not `OPEN` before a refine, a `pr-round.sh` exit 4, 5, or 127, an exit 6 after the one `--rerun`, an
+  PR that is not `OPEN` before a refine, a `pr-round.sh` exit 4, 5, 9, or 127, an exit 6 after the one `--rerun`, an
   exit 8 after the one retry, or a partial, nothing-reviewable or unrecovered reviewer with nothing
   from any source)
 - per-round one-liners: round number, short SHA, verdict, who ran it
@@ -330,9 +330,11 @@ report; the file is its durable copy, the exact text, no summary layer.
 - **Empty reviewer result:** handled inside the review round (retry once
   per-commit). Two empties: the round is unrecovered, never clean and
   never failing.
-- **`pr-round.sh` exit 4, 5, or 127, an exit 6 after the pane's one
+- **`pr-round.sh` exit 4, 5, 9, or 127, an exit 6 after the pane's one
   `--rerun`, or an exit 8 after the pane's one retry:** the round reports blocked, with the script's stderr line
-  in the final report. The `--rerun` is the pane's, once, after a dead
+  in the final report. On exit 9 the pane stops with
+  `blocked: round <N> has no comment`: an earlier round has a
+  `round.json` and no usable comment on disk or on the PR. The `--rerun` is the pane's, once, after a dead
   run (the dispatch template's "Review rounds" section). An exit 7 is a
   live round, not a failure.
 - **PR creation failed:** capture the pane's error, report blocked. Do

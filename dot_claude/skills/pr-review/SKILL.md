@@ -194,6 +194,15 @@ script exits 7 when another live process runs the same round. Wait for
 that round. Never pass `--rerun` over it: two callers on one round
 overwrote each other's evidence on PRs 137 and 230.
 
+The script exits 9 before any review when an earlier round in the PR's
+round folder has a `round.json` and no usable comment. A usable comment
+is a whole, scan-clean `comment.md` in that round's directory, or a
+round comment of yours on the PR with that round's heading. A round
+whose `round.json` is under `superseded-*/` does not count. The stderr
+line names the round, and the round dir holds no evidence. In the
+issue-to-pr loop, the pane stops with
+`blocked: round <N> has no comment`.
+
 ## 2. Read round.json
 
 **`range.review_scope` starting with `none:`** is a base merge with no

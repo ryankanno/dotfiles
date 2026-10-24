@@ -142,6 +142,9 @@ When it exits 7, another process runs that round: wait for it, and
 never `--rerun` over it. When it exits 8, GitHub did not report the
 pushed head in time, and the round left no evidence: run it again
 once, without `--rerun`. A second exit 8 stops the loop as blocked.
+When it exits 9, an earlier round has no comment on disk or on the PR:
+stop with `blocked: round <N> has no comment`, with the round its
+stderr line names.
 
 After you stop, a refine instruction can arrive by `workmux send`. It
 names a disposition the orchestrator overrules. Run the pr-refine skill

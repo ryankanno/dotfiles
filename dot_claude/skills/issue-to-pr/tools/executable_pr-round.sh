@@ -58,8 +58,12 @@
 # the changed-file listing could not be resolved; 6 the round dir already holds
 # evidence and --rerun was not passed; 7 another live process runs this
 # round (its pid is in round-<N>.lock); 8 GitHub did not report the
-# --expect-head SHA within the wait; 127 a dependency is missing. A
-# review run's own failure is recorded in round.json, not propagated.
+# --expect-head SHA within the wait; 9 an earlier round in the PR's round
+# folder has a round.json and no usable comment (no whole, scan-clean
+# comment.md and no round comment of ours with its heading on the PR),
+# before any review and with the round dir left empty; 127 a dependency
+# is missing. A review run's own failure is recorded in round.json, not
+# propagated.
 set -euo pipefail
 
 usage() {
@@ -382,6 +386,22 @@ for f in "$HOME/.cache/pr-loop/$owner_repo/pr-$pr"/round-*/comment.md; do
     continue
   }
   disk=$next
+done
+# An earlier round on record with no usable comment would drop out of the
+# background, prior-findings.md and the critic input in silence (issue
+# #166): a pane that died before comment.md, a cut-off file, or a file the
+# scan blocked, which the PR then never got either.
+have=$({ jq -r 'keys[]' <<<"$disk"
+         jq -r '(capture("(?m)^## Review round (?<n>[0-9]+):") | .n | tonumber) // empty' <<<"$bodies"; })
+for f in "$HOME/.cache/pr-loop/$owner_repo/pr-$pr"/round-*/round.json; do
+  [[ -f "$f" ]] || continue
+  n="${f%/round.json}"; n="${n##*/round-}"
+  [[ "$n" =~ ^[0-9]+$ && $((10#$n)) -lt $((10#$round)) ]] || continue
+  grep -qx "$((10#$n))" <<<"$have" || {
+    printf 'round %s has no comment: no whole, scan-clean %s and no round %s comment by %s on PR %s\n' \
+      "$((10#$n))" "${f%/round.json}/comment.md" "$((10#$n))" "$me" "$pr" >&2
+    exit 9
+  }
 done
 # The disk bodies ride on stdin ahead of the PR's, never in an argument:
 # every earlier round's body together outgrows the exec argument limit.

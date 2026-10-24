@@ -1025,12 +1025,13 @@ new_sandbox
 make_pr_round_env
 make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
-run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
 r1=$'<!-- pr-loop-comment -->\n\n## Review round 1: abc\n\n**Findings:**\n1. **[critic] bug/medium** `a.sh:1`: round one finding\n\n<details><summary>Dispositions</summary>\n\n- Rejected: [critic] round one rejection\n\n</details>'
 r2=$'<!-- pr-loop-comment -->\n\n## Review round 2: def\n\n**Findings:**\n1. **[reviewer] bug/medium** `b.sh:2`: round two finding\n\n<details><summary>Dispositions</summary>\n\n- Rejected: [reviewer] round two rejection\n\n</details>'
 GH_COMMENTS_JSON="$(jq -cn --arg r1 "$r1" --arg r2 "$r2" \
   '[{user: {login: "test-me"}, body: $r1}, {user: {login: "test-me"}, body: $r2}]')"
 export GH_COMMENTS_JSON
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+assert_json '.round == 2' "$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2/round.json" "round 2 ran once before its rerun"
 run_prr --repo "$repo" --pr 39 --round 2 --rerun >/dev/null
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
 assert_eq "$(cat "$rd/prior-findings.md" 2>/dev/null)" '1. **[critic] bug/medium** `a.sh:1`: round one finding' "the rerun answers round 1's findings"
@@ -1038,6 +1039,13 @@ assert_eq "$(cat "$rd/settled.md" 2>/dev/null)" '- Rejected: [critic] round one 
 
 round_comment() { # round, finding, rejection -> a round comment body
   printf '<!-- pr-loop-comment -->\n\n## Review round %s: abc\n\n**Verdict:** 1 finding(s).\n\n**Findings:**\n1. **[critic] bug/medium** `a.sh:1`: %s\n\n<details><summary>Dispositions</summary>\n\n- Rejected: [critic] %s\n\n</details>\n\n*Round %s | abc | reviewer ocr | critic subagent*\n' "$1" "$2" "$3" "$1"
+}
+
+# A round's caller writes its comment.md before the next round starts
+# (pr-review §7); without one the next round exits 9 (issue #166).
+finish_round() { # round dir number -> a whole, scan-clean comment.md that settles nothing
+  printf '<!-- pr-loop-comment -->\n\n## Review round %s: abc\n\n**Verdict:** No issues found.\n\n*Round %s | abc | reviewer ocr | critic subagent*\n' \
+    "$((10#$1))" "$((10#$1))" >"$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-$1/comment.md"
 }
 
 echo "pr-round: a prior round's comment on disk wins over the PR's copy"
@@ -1087,6 +1095,8 @@ run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
 pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
 printf '<!-- pr-loop-comment -->\n\n## Review round 1: abc\n\nwritten under %s/x\n' "$WS/home" >"$pd/round-1/comment.md"
 cp "$pd/round-1/comment.md" "$WS/before.md"
+GH_COMMENTS_JSON="$(jq -cn --arg b "$(round_comment 1 "pr finding" "pr rejection")" '[{user: {login: "test-me"}, body: $b}]')"
+export GH_COMMENTS_JSON
 RC=0; run_prr --repo "$repo" --pr 39 --round 2 >/dev/null || RC=$?
 assert_eq "$RC" 0 "the round runs"
 assert_eq "$(cmp -s "$pd/round-1/comment.md" "$WS/before.md" && printf same || printf differs)" same "the unfinished file is left as it was, byte for byte"
@@ -1095,13 +1105,13 @@ echo "pr-round: a truncated or misnumbered comment on disk is not read"
 new_sandbox
 make_pr_round_env
 make_fixture_repo
+GH_COMMENTS_JSON="$(jq -cn --arg a "$(round_comment 1 "pr one" "pr one rejection")" --arg b "$(round_comment 2 "pr two" "pr two rejection")" '[{user: {login: "test-me"}, body: $a}, {user: {login: "test-me"}, body: $b}]')"
+export GH_COMMENTS_JSON
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
 pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
 printf -- '- Rejected: [critic] truncated rejection\n' >"$pd/round-1/comment.md"
 round_comment 1 "misnumbered finding" "misnumbered rejection" >"$pd/round-2/comment.md"
-GH_COMMENTS_JSON="$(jq -cn --arg a "$(round_comment 1 "pr one" "pr one rejection")" --arg b "$(round_comment 2 "pr two" "pr two rejection")" '[{user: {login: "test-me"}, body: $a}, {user: {login: "test-me"}, body: $b}]')"
-export GH_COMMENTS_JSON
 run_prr --repo "$repo" --pr 39 --round 3 >/dev/null
 assert_eq "$(cat "$pd/round-3/settled.md" 2>/dev/null)" $'- Rejected: [critic] pr one rejection\n- Rejected: [critic] pr two rejection' "both rounds fall back to the PR's copy"
 
@@ -1218,10 +1228,10 @@ echo "pr-round: two rounds on disk both settle, oldest first"
 new_sandbox
 make_pr_round_env
 make_fixture_repo
-run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
-run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
 pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
 round_comment 1 "disk one" "disk one rejection" >"$pd/round-1/comment.md"
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
 round_comment 2 "disk two" "disk two rejection" >"$pd/round-2/comment.md"
 GH_COMMENTS_JSON='[]'
 export GH_COMMENTS_JSON
@@ -1247,12 +1257,12 @@ echo "pr-round: a round with no comment on disk falls back to the PR's copy"
 new_sandbox
 make_pr_round_env
 make_fixture_repo
+GH_COMMENTS_JSON="$(jq -cn --arg b "$(round_comment 1 "round one" "round one rejection")" '[{user: {login: "test-me"}, body: $b}]')"
+export GH_COMMENTS_JSON
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
 pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
 round_comment 2 "round two on disk only" "round two rejection" >"$pd/round-2/comment.md"
-GH_COMMENTS_JSON="$(jq -cn --arg b "$(round_comment 1 "round one" "round one rejection")" '[{user: {login: "test-me"}, body: $b}]')"
-export GH_COMMENTS_JSON
 run_prr --repo "$repo" --pr 39 --round 3 >/dev/null
 assert_eq "$(cat "$pd/round-3/settled.md" 2>/dev/null)" $'- Rejected: [critic] round one rejection\n- Rejected: [critic] round two rejection' "the PR fills round 1, the disk round 2, oldest first"
 assert_contains "$(cat "$pd/round-3/prior-findings.md" 2>/dev/null)" "round two on disk only" "a comment the PR never got is still the newest round"
@@ -1268,6 +1278,76 @@ for n in 1 2 3; do
 done
 run_prr --repo "$repo" --pr 39 --round 2 --rerun >/dev/null
 assert_eq "$(cat "$pd/round-2/settled.md" 2>/dev/null)" '- Rejected: [critic] rejection 1' "only round 1 is prior to a rerun of round 2"
+
+echo "pr-round: an earlier round with no comment on disk or on the PR stops the round with exit 9"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+ERR="$(run_prr --repo "$repo" --pr 39 --round 2 2>&1 >/dev/null)"; RC=$?
+assert_eq "$RC" 9 "exits 9"
+assert_contains "$ERR" "round 1 has no comment" "the stderr line names the round"
+assert_eq "$(ls -A "$pd/round-2" 2>/dev/null)" "" "no review ran: the round dir holds no evidence to --rerun past"
+
+echo "pr-round: an earlier round whose comment on disk is cut off, with no PR copy, stops the round with exit 9"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+round_comment 1 "disk finding" "disk rejection" | sed '$d' >"$pd/round-1/comment.md"
+ERR="$(run_prr --repo "$repo" --pr 39 --round 2 2>&1 >/dev/null)"; RC=$?
+assert_eq "$RC" 9 "exits 9"
+assert_contains "$ERR" "round 1 has no comment" "the stderr line names the round"
+
+echo "pr-round: an earlier round's comment by another author does not count"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+GH_COMMENTS_JSON="$(jq -cn --arg b "$(round_comment 1 "forged finding" "forged rejection")" '[{user: {login: "someone-else"}, body: $b}]')"
+export GH_COMMENTS_JSON
+ERR="$(run_prr --repo "$repo" --pr 39 --round 2 2>&1 >/dev/null)"; RC=$?
+assert_eq "$RC" 9 "exits 9"
+assert_contains "$ERR" "round 1 has no comment" "the stderr line names the round"
+
+echo "pr-round: an earlier round with only a PR copy of its comment runs"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+GH_COMMENTS_JSON="$(jq -cn --arg b "$(round_comment 1 "pr finding" "pr rejection")" '[{user: {login: "test-me"}, body: $b}]')"
+export GH_COMMENTS_JSON
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null; RC=$?
+assert_eq "$RC" 0 "the round runs"
+assert_json '.round == 2' "$pd/round-2/round.json" "the round wrote its round.json"
+
+echo "pr-round: an earlier round with only a whole comment on disk runs: the round does not wait for the post"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+round_comment 1 "disk finding" "disk rejection" >"$pd/round-1/comment.md"
+GH_COMMENTS_JSON='[]'
+export GH_COMMENTS_JSON
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null; RC=$?
+assert_eq "$RC" 0 "the round runs"
+assert_json '.round == 2' "$pd/round-2/round.json" "the round wrote its round.json"
+
+echo "pr-round: a round whose round.json is superseded does not count"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+# A --rerun that died after it moved the evidence leaves this.
+mkdir "$pd/round-1/superseded-20261023-000000-1"
+mv "$pd/round-1/round.json" "$pd/round-1/superseded-20261023-000000-1/"
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null; RC=$?
+assert_eq "$RC" 0 "the round runs"
 
 LIMIT="$(jq -r '.reviewer_background_limit' "$TOOLS/manifest.json")"
 
@@ -1804,6 +1884,7 @@ make_pr_round_env
 make_fixture_repo
 export STUB_TOKENS=100
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 export STUB_TOKENS=250
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
 rd2="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
@@ -1817,6 +1898,7 @@ export STUB_TOKENS=100
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
 rj="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1/round.json"
 jq 'del(.round_tokens)' "$rj" >"$rj.tmp" && mv "$rj.tmp" "$rj"
+finish_round 1
 export STUB_TOKENS=250
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
 assert_json '.cumulative_tokens == 350' "$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2/round.json" "the fallback sums the runs"
@@ -1828,6 +1910,7 @@ make_fixture_repo
 rdp="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-08"
 mkdir -p "$rdp"
 printf '{"round_tokens":50}' >"$rdp/round.json"
+finish_round 08
 export STUB_TOKENS=100
 run_prr --repo "$repo" --pr 39 --round 9 >/dev/null
 assert_json '.cumulative_tokens == 150' "$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-9/round.json" "round 08 is counted"
@@ -1847,6 +1930,7 @@ new_sandbox
 make_pr_round_env
 make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 prev_branch=$(git -C "$repo" rev-parse --abbrev-ref HEAD)
 git -C "$repo" checkout -q "$FR_BASE"
 printf 'm\n' >"$repo/g.txt"
@@ -1894,8 +1978,10 @@ make_pr_round_env
 make_fixture_repo
 export STUB_TOKENS=100
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 export STUB_TOKENS=250
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+assert_json '.cumulative_tokens == 350' "$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2/round.json" "round 2 ran and counted round 1"
 export STUB_TOKENS=50
 run_prr --repo "$repo" --pr 39 --round 1 --rerun >/dev/null
 assert_json '.cumulative_tokens == 50' "$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1/round.json" "round 2 is not to date for round 1"
@@ -1950,6 +2036,7 @@ new_sandbox
 make_pr_round_env
 make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 advance_head f.txt 'b\nc\nd\n'
 advance_head g.txt 'new\n'
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
@@ -1977,6 +2064,7 @@ new_sandbox
 make_pr_round_env
 make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 rebase_head
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
@@ -2007,6 +2095,7 @@ new_sandbox
 make_pr_round_env
 make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 merge_base_into_head
 advance_head g.txt 'new\n'
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
@@ -2031,7 +2120,7 @@ make_pr_round_env
 make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
 merge_base_into_head
-r1=$'<!-- pr-loop-comment -->\n\n**Findings:**\n1. **[critic] bug/medium** `f.txt:1`: the finding still standing\n'
+r1=$'<!-- pr-loop-comment -->\n\n## Review round 1: abc\n\n**Findings:**\n1. **[critic] bug/medium** `f.txt:1`: the finding still standing\n'
 GH_COMMENTS_JSON="$(jq -cn --arg r1 "$r1" '[{user: {login: "test-me"}, body: $r1}]')"
 export GH_COMMENTS_JSON
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
@@ -2064,9 +2153,11 @@ make_pr_round_env
 make_fixture_repo
 export STUB_COVERAGE_FAILED='[{"path":"f.txt"}]'
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 export STUB_COVERAGE_FAILED=""
 merge_base_into_head
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+finish_round 2
 advance_head g.txt 'new\n'
 run_prr --repo "$repo" --pr 39 --round 3 >/dev/null
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-3"
@@ -2078,6 +2169,7 @@ make_pr_round_env
 make_fixture_repo
 advance_head f.txt 'b\nbug\n'
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 merge_base_into_head
 advance_head f.txt 'b\n'
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
@@ -2134,6 +2226,7 @@ new_sandbox
 make_pr_round_env
 make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 pr_branch=$(git -C "$repo" rev-parse --abbrev-ref HEAD)
 git -C "$repo" checkout -q -B mainline "$FR_BASE"
 printf 'main\n' >"$repo/f.txt"
@@ -2161,6 +2254,7 @@ new_sandbox
 make_pr_round_env
 make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 pr_branch=$(git -C "$repo" rev-parse --abbrev-ref HEAD)
 git -C "$repo" checkout -q --orphan unrelated
 git -C "$repo" rm -rqf .
@@ -2185,6 +2279,7 @@ new_sandbox
 make_pr_round_env
 make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 merge_base_into_head
 # A git that fails only the tree comparison: the failure the round must
 # surface, not fold into "the trees differ".
@@ -2208,6 +2303,7 @@ new_sandbox
 make_pr_round_env
 make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 rj="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1/round.json"
 jq 'del(.range.base)' "$rj" >"$rj.tmp"
 mv "$rj.tmp" "$rj"
@@ -2224,6 +2320,7 @@ make_pr_round_env
 make_fixture_repo
 export STUB_COVERAGE_FAILED='[{"path":"big.ts"},{"path":"f.txt"}]'
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 export STUB_COVERAGE_FAILED=""
 advance_head g.txt 'new\n'
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
@@ -2237,6 +2334,7 @@ new_sandbox
 make_pr_round_env
 make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 advance_head g.txt 'new\n'
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
@@ -2247,6 +2345,7 @@ new_sandbox
 make_pr_round_env
 make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 advance_head f.txt 'b\nc\n'
 advance_head g.txt 'new\n'
 export STUB_RANGE_STATUS=missing STUB_COMMIT_STATUS=complete
@@ -2260,6 +2359,7 @@ new_sandbox
 make_pr_round_env
 make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
 assert_eq "$(jq -r '.range.prior_head' "$rd/round.json")" "$FR_HEAD" "the prior head is recorded"
@@ -2275,6 +2375,7 @@ make_pr_round_env
 make_fixture_repo
 advance_head f.txt 'b\nbug\n'
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 advance_head f.txt 'b\n'
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
@@ -2291,6 +2392,7 @@ new_sandbox
 make_pr_round_env
 make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 rj="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1/round.json"
 jq '.range.head = "0000000000000000000000000000000000000000"' "$rj" >"$rj.tmp" && mv "$rj.tmp" "$rj"
 advance_head g.txt 'new\n'
@@ -2314,6 +2416,7 @@ new_sandbox
 make_pr_round_env
 make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 printf '{"range": tru' >"$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1/round.json"
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null 2>&1
 rc=$?
@@ -2326,10 +2429,12 @@ new_sandbox
 make_pr_round_env
 make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 advance_head f.txt 'keep1
 keep2
 keep3'
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+finish_round 2
 advance_head f.txt 'keep1
 ++ b/bogus.txt
 keep2
@@ -2344,6 +2449,7 @@ new_sandbox
 make_pr_round_env
 make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 mkdir -p "$repo/dir b"
 advance_head 'dir b/name.txt' 'x\ny\n'
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
@@ -2355,6 +2461,7 @@ new_sandbox
 make_pr_round_env
 make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 advance_head 'input [x].txt' 'x\ny\n'
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
@@ -2365,6 +2472,7 @@ new_sandbox
 make_pr_round_env
 make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 advance_head third.txt 'z\n'
 advance_head ':!plain.txt' 'x\ny\n'
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
@@ -2376,8 +2484,10 @@ new_sandbox
 make_pr_round_env
 make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 advance_head keep.txt 'one\ntwo\nthree\n'
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+finish_round 2
 git -C "$repo" mv keep.txt kept.txt
 printf 'one\nTWO\nthree\n' >"$repo/kept.txt"
 git -C "$repo" commit -qam "rename and edit"
@@ -2393,6 +2503,7 @@ new_sandbox
 make_pr_round_env
 make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 advance_head plain.txt 'p\n'
 advance_head 'q"uote.txt' 'x\ny\n'
 advance_head 'back\slash.txt' 'x\n'
@@ -2413,6 +2524,7 @@ make_pr_round_env
 make_fixture_repo
 advance_head $'x:1-1\ny.txt' 'a\nb\nc\nd\n'
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 advance_head $'x:1-1\ny.txt' 'a\nb\nc\nd\ne\n'
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
@@ -2427,6 +2539,7 @@ make_fixture_repo
 advance_head x 'a\n'
 advance_head $'x:1-1\ny.txt' 'a\nb\nc\nd\n'
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 advance_head x 'b\n'
 advance_head $'x:1-1\ny.txt' 'a\nb\nc\nd\ne\n'
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
@@ -2441,6 +2554,7 @@ make_pr_round_env
 make_fixture_repo
 advance_head $'1\nfoo' 'a\nb\nc\nd\n'
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 advance_head $'1\nfoo' 'a\nb\nc\nd\ne\n'
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
@@ -2453,8 +2567,10 @@ new_sandbox
 make_pr_round_env
 make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 advance_head 'q"a\b.txt' 'one\ntwo\nthree\n'
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+finish_round 2
 git -C "$repo" mv 'q"a\b.txt' $'q"c\\d\te.txt'
 printf 'one\nTWO\nthree\n' >"$repo/"$'q"c\\d\te.txt'
 git -C "$repo" commit -qam "rename and edit"
@@ -2470,6 +2586,7 @@ new_sandbox
 make_pr_round_env
 make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 advance_head f.txt 'changed\n'
 real_git="$(command -v git)"
 cat >"$stub/git" <<GITSTUB
@@ -2493,6 +2610,7 @@ new_sandbox
 make_pr_round_env
 make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 advance_head f.txt 'changed\n'
 real_git="$(command -v git)"
 cat >"$stub/git" <<GITSTUB
@@ -2515,6 +2633,7 @@ new_sandbox
 make_pr_round_env
 make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 advance_head f.txt 'changed\n'
 real_git="$(command -v git)"
 cat >"$stub/git" <<GITSTUB
@@ -2537,6 +2656,7 @@ new_sandbox
 make_pr_round_env
 make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 advance_head f.txt 'changed\n'
 real_git="$(command -v git)"
 cat >"$stub/git" <<GITSTUB
@@ -2595,7 +2715,7 @@ make_pr_round_env
 make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
 advance_head f.txt 'b\nDELTA-LINE\n'
-r1=$'<!-- pr-loop-comment -->\n\n**Findings:**\n1. **[critic] bug/medium** `f.txt:2`: the finding to answer\n\n**Follow-ups:**\n2. **[critic] bug/low** `g.txt:1`: a follow-up\n\n<details><summary>Dispositions</summary>\n\n- Rejected: [reviewer] a settled one — evidence\n\n</details>'
+r1=$'<!-- pr-loop-comment -->\n\n## Review round 1: abc\n\n**Findings:**\n1. **[critic] bug/medium** `f.txt:2`: the finding to answer\n\n**Follow-ups:**\n2. **[critic] bug/low** `g.txt:1`: a follow-up\n\n<details><summary>Dispositions</summary>\n\n- Rejected: [reviewer] a settled one — evidence\n\n</details>'
 GH_COMMENTS_JSON="$(jq -cn --arg r1 "$r1" '[{user: {login: "test-me"}, body: $r1}]')"
 export GH_COMMENTS_JSON
 printf 'make add safe\n' >"$WS/brief.md"
@@ -2664,6 +2784,7 @@ make_pr_round_env
 make_fixture_repo
 export STUB_COVERAGE_FAILED='[{"path":"f.txt"}]'
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 export STUB_COVERAGE_FAILED=""
 advance_head g.txt 'new\n'
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
@@ -2681,6 +2802,7 @@ make_pr_round_env
 make_fixture_repo
 export STUB_COVERAGE_FAILED='[{"path":"f.txt"}]'
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 export STUB_COVERAGE_FAILED=""
 advance_head g.txt 'new\n'
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
@@ -2696,6 +2818,7 @@ new_sandbox
 make_pr_round_env
 make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 advance_head gen.js '// Code generated by a tool. DO NOT EDIT.\nGENERATED-BODY\n'
 advance_head f.txt 'b\nHAND-LINE\n'
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
@@ -2711,6 +2834,7 @@ new_sandbox
 make_pr_round_env
 make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 for p in dott/tests/golden/transcripts.json goldens/a.txt web/__snapshots__/b.js.txt snapshots/c.txt d.golden e.snap; do
   mkdir -p "$repo/$(dirname "$p")"
   advance_head "$p" "GOLDEN-BODY $p\n"
@@ -2735,6 +2859,7 @@ new_sandbox
 make_pr_round_env
 make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 advance_head big.txt "$(head -c 200000 /dev/zero | tr '\0' x)\n"
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
@@ -2770,6 +2895,7 @@ new_sandbox
 make_pr_round_env
 make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 advance_head notes.txt 'one\ntwo\nthree\nfour\nplease do not edit this line by hand\n'
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
@@ -2784,6 +2910,7 @@ make_fixture_repo
 advance_head gen.js '// Code generated by a tool. DO NOT EDIT.\nGENERATED-BODY\n'
 export STUB_COVERAGE_FAILED='[{"path":"gen.js"}]'
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 export STUB_COVERAGE_FAILED=""
 advance_head g.txt 'new\n'
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
@@ -2809,6 +2936,7 @@ make_pr_round_env
 make_fixture_repo
 advance_head gen.js '// Code generated by a tool. DO NOT EDIT.\nGENERATED-BODY\n'
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 move_head gen.js
 advance_head f.txt 'b\nHAND-LINE\n'
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
@@ -2824,6 +2952,7 @@ make_pr_round_env
 make_fixture_repo
 advance_head gen.js '// Code generated by a tool. DO NOT EDIT.\nGENERATED-BODY\n'
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 move_head gen.js gen2.js
 # An edit, so the rename carries hunks that would show the body if the exclusion failed.
 advance_head gen2.js '// Code generated by a tool. DO NOT EDIT.\nGENERATED-BODY\nGENERATED-EXTRA\n'
@@ -2840,6 +2969,7 @@ make_pr_round_env
 make_fixture_repo
 advance_head gen.js '// Code generated by a tool. DO NOT EDIT.\nGENERATED-BODY\n'
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 move_head gen.js out.js
 advance_head out.js '// now by hand\nGENERATED-BODY\nHAND-EXTRA\n'
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
@@ -2855,6 +2985,7 @@ new_sandbox
 make_pr_round_env
 make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 advance_head $'nl\nx.js' '// Code generated by a tool. DO NOT EDIT.\nGENERATED-BODY\n'
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
@@ -2869,6 +3000,7 @@ make_pr_round_env
 make_fixture_repo
 advance_head gen.js '// Code generated by a tool. DO NOT EDIT.\nGENERATED-BODY\n'
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 git -C "$repo" update-index --chmod=+x gen.js
 git -C "$repo" commit -qm "mode gen.js"
 advance_head f.txt 'b\nHAND-LINE\n'
@@ -2884,6 +3016,7 @@ make_pr_round_env
 make_fixture_repo
 advance_head gen.js '// Code generated by a tool. DO NOT EDIT.\nGENERATED-BODY\n'
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 git -C "$repo" config core.fileMode true
 chmod +x "$repo/gen.js"
 advance_head gen.js '// Code generated by a tool. DO NOT EDIT.\nGENERATED-BODY-2\n'
@@ -2898,6 +3031,7 @@ new_sandbox
 make_pr_round_env
 make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 advance_head line3.js 'one\ntwo\nDO NOT EDIT\nBODY-THREE\n'
 advance_head line4.js 'one\ntwo\nthree\nDO NOT EDIT\nBODY-FOUR\n'
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
@@ -2913,6 +3047,7 @@ new_sandbox
 make_pr_round_env
 make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 advance_head bin.dat 'DO NOT EDIT\n\0\1\2\n'
 advance_head f.txt 'b\nHAND-LINE\n'
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
@@ -2926,6 +3061,7 @@ new_sandbox
 make_pr_round_env
 make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 advance_head 'gén.js' '// Code generated by a tool. DO NOT EDIT.\nGENERATED-BODY\n'
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
@@ -2938,6 +3074,7 @@ new_sandbox
 make_pr_round_env
 make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 advance_head 'a"b.js' '// Code generated by a tool. DO NOT EDIT.\nGENERATED-BODY\n'
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
@@ -2950,6 +3087,7 @@ new_sandbox
 make_pr_round_env
 make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 advance_head g.txt 'new\n'
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
@@ -2962,8 +3100,10 @@ make_pr_round_env
 make_fixture_repo
 export STUB_COVERAGE_FAILED='[{"path":"f.txt"}]'
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 export STUB_COVERAGE_FAILED=""
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+finish_round 2
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
 OUT="$("$CRITIC_INPUT" --repo "$repo" --round-dir "$rd" 2>&1)"
 assert_not_contains "$OUT" "did not finish" "no high-only gap section on an unchanged-head round"
@@ -2972,6 +3112,7 @@ make_pr_round_env
 make_fixture_repo
 export STUB_COVERAGE_FAILED='[{"path":"f.txt"}]'
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 export STUB_COVERAGE_FAILED=""
 rebase_head
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
@@ -2985,6 +3126,7 @@ make_pr_round_env
 make_fixture_repo
 export STUB_COVERAGE_FAILED='[{"path":"f.txt"}]'
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 export STUB_COVERAGE_FAILED=""
 advance_head f.txt 'b\nc\n'
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
@@ -2999,6 +3141,7 @@ new_sandbox
 make_pr_round_env
 make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
 rebase_head
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
@@ -3013,7 +3156,7 @@ run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
 rj="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1/round.json"
 jq '.range.head = "0000000000000000000000000000000000000000"' "$rj" >"$rj.tmp" && mv "$rj.tmp" "$rj"
 advance_head g.txt 'new\n'
-r1=$'<!-- pr-loop-comment -->\n\n**Findings:**\n1. **[critic] bug/medium** `f.txt:1`: the finding to answer\n'
+r1=$'<!-- pr-loop-comment -->\n\n## Review round 1: abc\n\n**Findings:**\n1. **[critic] bug/medium** `f.txt:1`: the finding to answer\n'
 GH_COMMENTS_JSON="$(jq -cn --arg r1 "$r1" '[{user: {login: "test-me"}, body: $r1}]')"
 export GH_COMMENTS_JSON
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
@@ -3028,7 +3171,7 @@ make_pr_round_env
 make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
 rebase_head
-r1=$'<!-- pr-loop-comment -->\n\n**Findings:**\n1. **[critic] bug/medium** `f.txt:1`: the finding to answer\n'
+r1=$'<!-- pr-loop-comment -->\n\n## Review round 1: abc\n\n**Findings:**\n1. **[critic] bug/medium** `f.txt:1`: the finding to answer\n'
 GH_COMMENTS_JSON="$(jq -cn --arg r1 "$r1" '[{user: {login: "test-me"}, body: $r1}]')"
 export GH_COMMENTS_JSON
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
@@ -3044,7 +3187,7 @@ new_sandbox
 make_pr_round_env
 make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
-r1=$'<!-- pr-loop-comment -->\n\n**Findings:**\n1. **[critic] bug/medium** `f.txt:1`: the finding to re-check\n'
+r1=$'<!-- pr-loop-comment -->\n\n## Review round 1: abc\n\n**Findings:**\n1. **[critic] bug/medium** `f.txt:1`: the finding to re-check\n'
 GH_COMMENTS_JSON="$(jq -cn --arg r1 "$r1" '[{user: {login: "test-me"}, body: $r1}]')"
 export GH_COMMENTS_JSON
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
