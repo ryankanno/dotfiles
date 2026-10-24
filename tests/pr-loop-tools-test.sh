@@ -2194,6 +2194,21 @@ run_prr --repo "$repo" --pr 39 --round 3 >/dev/null
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-3"
 assert_eq "$(cat "$rd/prior-unfinished.txt" 2>/dev/null)" "f.txt" "the files round 1 left unfinished still reach round 3's critic"
 
+echo "pr-round: a convergence round carries the prior round's unfinished files forward"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+export STUB_COVERAGE_FAILED='[{"path":"f.txt"}]'
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
+export STUB_COVERAGE_FAILED=""
+run_prr --repo "$repo" --pr 39 --round 2 --convergence >/dev/null
+finish_round 2
+advance_head g.txt 'new\n'
+run_prr --repo "$repo" --pr 39 --round 3 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-3"
+assert_eq "$(cat "$rd/prior-unfinished.txt" 2>/dev/null)" "f.txt" "the files round 1 left unfinished still reach round 3's critic"
+
 echo "pr-round: a deletion-only PR change after a base merge is still reviewed"
 new_sandbox
 make_pr_round_env
@@ -3251,6 +3266,20 @@ assert_contains "$OUT" "diff --git a/f.txt b/f.txt" "round 1's change is in the 
 assert_contains "$OUT" "diff --git a/g.txt b/g.txt" "the refine's change is in the diff"
 assert_contains "$OUT" "the whole PR, re-reviewed from the merge base because this is the convergence round" "the critic is told why the diff is the whole PR"
 assert_contains "$OUT" "the finding to re-check" "the prior round's blocking findings are inline"
+
+echo "critic-input: a convergence round after a base merge says no refine followed"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+round_comment 1 "the finding to re-check" "the rejection" >"$pd/round-1/comment.md"
+merge_base_into_head
+run_prr --repo "$repo" --pr 39 --round 2 --convergence >/dev/null
+OUT="$("$CRITIC_INPUT" --repo "$repo" --round-dir "$pd/round-2" 2>&1)"
+assert_contains "$OUT" "the finding to re-check" "the prior round's blocking findings are inline"
+assert_contains "$OUT" "no refine followed" "the moved head is a base merge, not a refine's answer"
+assert_not_contains "$OUT" "refine's answer" "the refine preamble never appears on a convergence round"
 
 echo "critic-input: a legacy round.json with an unchanged head is a re-review, not a refine"
 new_sandbox

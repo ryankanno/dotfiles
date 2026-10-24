@@ -568,9 +568,11 @@ for sibling in "$HOME/.cache/pr-loop/$owner_repo/pr-$pr"/round-*/round.json; do
     | while IFS= read -r d; do
         jq -r '.manifest.coverage.failed[]?.path // empty' "$d/review.json" 2>/dev/null || true
       done | sort -u || true)
-  # A base-merge-only round ran no reviewer, so it has no runs to read:
-  # the list it carried passes on, or a base merge would drop it for good.
-  if [[ "$(jq -r '.range.review_scope // empty' "$sibling" 2>/dev/null || true)" == none:* ]]; then
+  # A base-merge-only round and a convergence round ran no reviewer, so
+  # they have no runs to read: the list they carried passes on, or the
+  # round would drop it for good.
+  if [[ "$(jq -r '.range.review_scope // empty' "$sibling" 2>/dev/null || true)" == none:* \
+        || "$(jq -r '.reviewer_skipped // empty' "$sibling" 2>/dev/null || true)" == convergence ]]; then
     prior_unfinished=$(cat "${sibling%/round.json}/prior-unfinished.txt" 2>/dev/null || true)
   fi
 done
