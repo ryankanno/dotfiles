@@ -2085,16 +2085,49 @@ rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
 assert_not_contains "$(jq -r '.range.review_scope' "$rd/round.json")" "none:" "a deleted line is a PR change, not nothing to review"
 assert_contains "$(cat "$rd/cmd.txt" 2>/dev/null)" "--from origin/main --to $FR_NEXT" "the reviewer reviews the whole PR, as for any change with no added lines"
 
-echo "pr-round: --convergence reviews the whole PR after a base merge with no PR change"
+echo "pr-round: a convergence round runs no reviewer and records the whole PR"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+export STUB_TOKENS=100
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+round_comment 1 "the finding" "the rejection" >"$pd/round-1/comment.md"
+run_prr --repo "$repo" --pr 39 --round 2 --convergence >/dev/null
+rc=$?
+rd="$pd/round-2"
+assert_eq "$rc" 0 "the round exits 0"
+assert_eq "$([[ -e "$rd/cmd.txt" ]] && printf yes || printf no)" "no" "the reviewer binding is never invoked"
+assert_eq "$(jq '.runs | length' "$rd/round.json")" 0 "no review run and no per-commit retry"
+assert_eq "$(jq -r '.range.review_scope' "$rd/round.json")" "full: this is the convergence round" "round.json records a whole-PR scope"
+assert_eq "$(jq -r '.range.reviewed_from' "$rd/round.json")" "$FR_BASE" "the scope starts at the merge base"
+assert_eq "$(jq -r '.range.head' "$rd/round.json")" "$FR_HEAD" "the scope ends at the head"
+assert_json '.reviewer_skipped == "convergence"' "$rd/round.json" "round.json says the reviewer was skipped by design"
+assert_json '.round_tokens == 0 and .cumulative_tokens == 100' "$rd/round.json" "nothing is billed for the reviewer"
+
+echo "pr-round: --convergence on round 1 is a usage error: round 1 keeps the reviewer"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+ERR="$(run_prr --repo "$repo" --pr 39 --round 1 --convergence 2>&1 >/dev/null)"; RC=$?
+assert_eq "$RC" 2 "exits 2"
+assert_contains "$ERR" "round 1 runs the reviewer; a convergence round follows a refine round" "the message says why"
+assert_eq "$([[ -e "$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1" ]] && printf exists || printf absent)" "absent" "no round dir to --rerun past"
+
+echo "pr-round: a convergence round after a base merge runs no reviewer and records the whole merged PR"
 new_sandbox
 make_pr_round_env
 make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+round_comment 1 "the finding" "the rejection" >"$pd/round-1/comment.md"
 merge_base_into_head
 run_prr --repo "$repo" --pr 39 --round 2 --convergence >/dev/null
-rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
-assert_contains "$(cat "$rd/cmd.txt")" "--from origin/main --to $FR_MERGE" "the convergence round reviews the whole merged PR"
-assert_eq "$(jq -r '.range.review_scope' "$rd/round.json")" "full: only a base merge since the prior round" "round.json says why: the head moved"
+rd="$pd/round-2"
+assert_eq "$([[ -e "$rd/cmd.txt" ]] && printf yes || printf no)" "no" "the reviewer binding is never invoked"
+assert_eq "$(jq -r '.range.review_scope' "$rd/round.json")" "full: this is the convergence round" "a base merge does not make the round reviewed nothing"
+assert_eq "$(jq -r '.range.reviewed_from' "$rd/round.json")" "$(git -C "$repo" rev-parse mainline)" "the scope starts at the new merge base"
+assert_eq "$(jq -r '.range.head' "$rd/round.json")" "$FR_MERGE" "the scope ends at the merged head"
 
 echo "pr-round: a conflicted base merge keeps its resolution in the delta"
 new_sandbox
@@ -3024,6 +3057,26 @@ assert_contains "$OUT" "$FR_BASE..$FR_HEAD" "the convergence round's diff is the
 assert_contains "$OUT" "the finding to re-check" "the prior round's blocking findings are inline"
 assert_contains "$OUT" "no refine followed" "the prompt says the diff is a re-review, not a refine's answer"
 assert_not_contains "$OUT" "refine's answer" "the refine preamble never appears on a convergence round"
+
+echo "critic-input: a convergence round with no reviewer hands the critic the whole-PR diff"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+round_comment 1 "the finding to fix" "the first rejection" >"$pd/round-1/comment.md"
+advance_head g.txt 'refined\n'
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+round_comment 2 "the finding to re-check" "the second rejection" >"$pd/round-2/comment.md"
+run_prr --repo "$repo" --pr 39 --round 3 --convergence >/dev/null
+rd="$pd/round-3"
+OUT="$("$CRITIC_INPUT" --repo "$repo" --round-dir "$rd" 2>&1)"; RC=$?
+assert_eq "$RC" 0 "exits 0"
+assert_contains "$OUT" "## The diff ($FR_BASE..$FR_NEXT)" "the diff runs from the merge base to the head"
+assert_contains "$OUT" "diff --git a/f.txt b/f.txt" "round 1's change is in the diff"
+assert_contains "$OUT" "diff --git a/g.txt b/g.txt" "the refine's change is in the diff"
+assert_contains "$OUT" "the whole PR, re-reviewed from the merge base because this is the convergence round" "the critic is told why the diff is the whole PR"
+assert_contains "$OUT" "the finding to re-check" "the prior round's blocking findings are inline"
 
 echo "critic-input: a legacy round.json with an unchanged head is a re-review, not a refine"
 new_sandbox

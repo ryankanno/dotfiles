@@ -9,11 +9,12 @@
 #
 # Interface in:  --repo <dir> --round-dir <dir> [--brief <file>]
 # Interface out: the prompt on stdout, and the same prompt kept as
-#                critic-input.md in the round dir. The diff is the range the reviewer
-#                reviewed (range.reviewed_from..range.head): the whole PR
-#                in round 1, on an empty delta, or after a rebase; the
-#                delta otherwise, which after a base merge holds only the
-#                PR's own changes.
+#                critic-input.md in the round dir. The diff is the round's
+#                range (range.reviewed_from..range.head): the whole PR
+#                in round 1, on an empty delta, after a rebase, or in a
+#                convergence round, where no reviewer runs; the delta
+#                otherwise, which after a base merge holds only the PR's
+#                own changes.
 # Exit codes: 0 built; 2 usage, no round.json, or no critic-prompt.md;
 # 4 the prompt is over 200,000 bytes, too large to pass inline: nothing
 # on stdout, no critic-input.md, and the size on stderr; 5 the diff could

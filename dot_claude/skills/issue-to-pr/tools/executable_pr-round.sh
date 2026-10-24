@@ -16,8 +16,9 @@
 #                [--max-tools <n>] [--max-tokens-budget <n>]
 #                [--exclude <globs>] (passed to every review run; the
 #                binding owns the defaults)
-#                [--rerun] [--convergence: a base merge with no PR change
-#                reviews the whole PR instead of nothing]
+#                [--rerun] [--convergence: from round 2 on, run no
+#                reviewer; the critic and the caller's read review the
+#                whole PR]
 # Interface out: the round directory under
 #                $HOME/.cache/pr-loop/<owner/repo>/pr-<n>/round-<N>/ with
 #                each run's outputs plus round.json (range, identity, runs,
@@ -27,7 +28,8 @@
 #                merge base), the merge base otherwise,
 #                range.review_scope: "delta", "full: <why>", or
 #                "none: <why>" when a base merge alone moved the head and
-#                no reviewer runs),
+#                no reviewer runs; reviewer_skipped: "convergence" on a
+#                convergence round, null otherwise),
 #                delta.txt from round 2 on, unless a rebase, an unusable
 #                prior head, or a change that adds or modifies no lines (a
 #                deletion-only, binary-only or mode-only change, issue #56)
@@ -99,6 +101,10 @@ case "$effort" in ""|low|medium|high) ;; *) usage ;; esac
 case "$repo" in /*) ;; *) printf 'repo must be an absolute path\n' >&2; exit 2 ;; esac
 [[ "$pr" =~ ^[0-9]+$ ]] || usage
 [[ "$round" =~ ^[0-9]+$ ]] || usage
+[[ -z "$convergence" || $((10#$round)) -gt 1 ]] || {
+  printf 'round 1 runs the reviewer; a convergence round follows a refine round\n' >&2
+  exit 2
+}
 # headRefOid is always the full SHA, so only a full one can ever match.
 [[ -z "$expect_head" || "$expect_head" =~ ^([0-9a-f]{40}|[0-9a-f]{64})$ ]] || usage
 head_wait=""
@@ -686,16 +692,14 @@ status_of() { # dir
 # From round 2 on the reviewer reads only the delta: a finding outside it
 # can only be a follow-up, and the whole-PR review cost 1.7M to 4.6M
 # tokens a round on PR 40 to yield one or two blocking findings. An empty
-# delta (the same head as the prior round, as in a convergence round)
-# reviews the whole PR again: an empty range is no review at all.
+# delta (the same head as the prior round) reviews the whole PR again: an
+# empty range is no review at all.
 review_from="origin/$base" reviewed_from="$base_sha" review_to="$head"
 if [[ -n "$delta" ]]; then review_from="$delta_from" reviewed_from="$delta_from" review_to="$delta_to"; fi
 # A base merge alone leaves the PR's own code as the prior round reviewed
 # it, so the round records that and bills nothing. Nothing reviewed is
 # never clean. The trees decide, not the hunks: a deletion-only change
-# also leaves the delta empty (issue #43) and is still a change. The
-# convergence round still reviews the whole PR: the loop's clean verdict
-# must rest on a review of the merged head.
+# also leaves the delta empty (issue #43) and is still a change.
 same_tree=1
 if [[ "$scope" == delta && "$delta_from" != "$prior_head" ]]; then
   # diff exits 1 when the trees differ; above 1 it failed, and a failure
@@ -709,13 +713,9 @@ if [[ "$scope" == delta && "$delta_from" != "$prior_head" ]]; then
     exit 5
   fi
 fi
-if [[ $same_tree -eq 0 ]]; then
-  if [[ -z "$convergence" ]]; then
-    scope="none: the PR's own code did not change since the prior round (a base merge only)"
-    review_from="$delta_from" reviewed_from="$delta_from"
-  else
-    scope="full: only a base merge since the prior round"
-  fi
+if [[ $same_tree -eq 0 && -z "$convergence" ]]; then
+  scope="none: the PR's own code did not change since the prior round (a base merge only)"
+  review_from="$delta_from" reviewed_from="$delta_from"
 fi
 if [[ "$scope" == delta && -z "$delta" ]]; then
   # A moved tree with no added line (a deletion, a binary or mode change)
@@ -736,8 +736,16 @@ if [[ "$scope" == delta && -z "$delta" ]]; then
   fi
 fi
 
+# In 15 convergence rounds (PRs 101 to 164) the reviewer took 12 to 54
+# minutes and found nothing blocking; both blocking findings came from the
+# caller's read (issue #167). The critic and the read review the whole PR
+# at the head instead. delta.txt stays as computed, so a finding blocks
+# or follows up as it did when the reviewer ran.
+if [[ -n "$convergence" ]]; then
+  scope="full: this is the convergence round" reviewed_from="$base_sha"
+fi
 range_status=none
-if [[ "$scope" != none:* ]]; then
+if [[ "$scope" != none:* && -z "$convergence" ]]; then
   set +e
   "$review" --repo "$repo" --out "$round_dir" ${brief:+--brief "$brief"} ${effort:+--effort "$effort"} ${timeout:+--timeout "$timeout"} ${max_tools:+--max-tools "$max_tools"} ${token_budget:+--max-tokens-budget "$token_budget"} ${exclude:+--exclude "$exclude"} --base "$review_from" --head "$review_to"
   rc=$?
@@ -823,6 +831,7 @@ done
 jq -n --arg pr "$pr" --arg url "$url" --arg base "$base" --arg base_sha "$base_sha" --arg head "$head" \
      --arg hb "$head_branch" --arg expect "$expect" --arg prior "$prior_head" --arg from "$reviewed_from" --arg scope "$scope" \
      --argjson round "$((10#$round))" --argjson runs "$runs" --argjson complete "$complete" \
+     --arg conv "$convergence" \
      --argjson rt "$current_tokens" --argjson ct "$((current_tokens + prior_tokens))" '
   {pr: $pr, url: $url, round: $round,
    identity: {expected_branch: (if $expect == "" then null else $expect end),
@@ -831,5 +840,6 @@ jq -n --arg pr "$pr" --arg url "$url" --arg base "$base" --arg base_sha "$base_s
            prior_head: (if $prior == "" then null else $prior end), reviewed_from: $from,
            review_scope: $scope},
    runs: $runs, reviewer_complete: $complete,
+   reviewer_skipped: (if $conv == "" then null else "convergence" end),
    round_tokens: $rt, cumulative_tokens: $ct}' > "$round_dir/round.json"
 printf '%s\n' "$round_dir"

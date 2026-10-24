@@ -215,7 +215,10 @@ newest round directory is
    `gh pr view <n> --json headRefOid`.
 2. **The newest round reviewed the whole PR.** `range.review_scope`
    starts with `full:`. A `delta`, `none:`, partial, nothing reviewable
-   or unrecovered round declares nothing.
+   or unrecovered round declares nothing. A convergence round
+   (`reviewer_skipped` is `convergence`) counts: no reviewer ran, by
+   design, and the critic and the read reviewed the whole PR at the
+   head.
 3. **The round's comment is on the PR** with the same round number and
    verdict as `round.json`. On a repository that is not owned
    (pr-review §8), check `comment.md` in the round directory instead,

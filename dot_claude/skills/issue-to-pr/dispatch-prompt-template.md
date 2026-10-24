@@ -122,7 +122,9 @@ rerun of a round adds no line.
 3. **The convergence round:** after a refine round, when the newest
    round is `No issues found.` or a converged candidate, run the
    pr-review skill once more on the same head, and pass `--convergence`
-   to `pr-round.sh`. It takes the next free round number. A blocking
+   to `pr-round.sh`. It takes the next free round number. The round
+   runs no reviewer: the critic and your read review the whole PR at
+   this head. A blocking
    finding in it sends you back to step 2 while refine rounds remain.
    A clean round 1 needs no convergence round: it already reviewed the
    whole PR at this head.

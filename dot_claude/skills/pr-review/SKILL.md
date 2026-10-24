@@ -117,7 +117,7 @@ reviews only the delta, from `range.reviewed_from` (the prior head) to
 the PR head: a finding outside it can only be a follow-up, except a
 high. High severity blocks anywhere, in the delta or out, and the
 caller counts it under Findings. An empty
-delta (the same head again, as in a convergence round) reviews the
+delta (the same head again) reviews the
 whole PR from the merge base instead, never an empty range. A change
 that adds or modifies no lines (a deletion) also reviews the whole PR,
 with the scope `full: the change since the prior round adds no lines`
@@ -142,9 +142,17 @@ head's tree equals the baseline's), the round reviews nothing:
 `range.review_scope` starts with `none:`, `runs` is empty,
 `reviewer_complete` is `false`, and nothing is billed. A PR change
 with no added lines (a deletion) is still a change and reviews the
-whole PR. The convergence round passes `--convergence`,
-and the round then reviews the whole PR from the merge base, with the
-scope `full: only a base merge since the prior round`.
+whole PR.
+
+The convergence round passes `--convergence`. It runs no reviewer and
+no per-commit retry, so nothing is billed for the reviewer. The critic
+and your own read review the whole PR at the head. `round.json`
+records the scope `full: this is the convergence round` (the whole PR,
+from the merge base to the head), empty `runs`, and
+`reviewer_skipped: "convergence"`, also after a base merge.
+`delta.txt` stays as the round computed it, so a finding blocks or
+follows up as it did when the reviewer ran. Round 1 refuses
+`--convergence` with exit 2: round 1 keeps the reviewer.
 
 A `partial` prior round does not send the next round back to the whole
 PR: the same caps re-fail the same files. Its unfinished files go to
@@ -195,6 +203,11 @@ merge since the prior round).` and the round dir's `prior-findings.md`,
 verbatim, as its `**Findings:**` section when the file exists. The
 prior round's blocking findings then stand for /pr-refine and for the
 next round.
+
+**`reviewer_skipped: "convergence"`** is a convergence round: no
+reviewer ran, by design. Steps 3 to 5 run as usual. The round is clean
+when the critic and your read have no blocking finding. It is not
+partial and not unrecovered: the shapes below do not apply to it.
 
 **`reviewer_complete: true`** with zero findings is a clean review:
 report it as clean. **`reviewer_complete: false`** takes one of three
@@ -318,11 +331,14 @@ line, heading, verdict, visible consolidated findings tagged by source,
 collapsed blocks with each source's output verbatim. The reviewer's
 sections render with the binding's renderer, once per run recorded in
 `round.json` (`render.sh <runs[].dir>`), completed or skipped alike:
-thin coverage and a skipped run must read as what they are.
+thin coverage and a skipped run must read as what they are. A
+convergence round has no runs: its Reviewer details block holds the
+line `No reviewer ran: the convergence round runs none by design.`
 
 The verdict line is machine-read by /pr-refine; keep the protocol exact,
 one of: `**Verdict:** No issues found.` when every source ran and
-produced no blocking finding, `**Verdict:** <n> finding(s).` when <n>
+produced no blocking finding (on a convergence round, the critic and
+the read), `**Verdict:** <n> finding(s).` when <n>
 blocking findings exist, `**Verdict:** partial (the reviewer's coverage has a gap).` when
 the binding ended partial with nothing else to report,
 `**Verdict:** nothing reviewable (no files in the reviewer's scope).`

@@ -18,7 +18,9 @@ reads quickly and loses nothing.
 - **The verdict line** is machine-read by /pr-refine. Keep it exactly one
   of:
   - `**Verdict:** No issues found.` — every source ran and produced no
-    blocking finding. Follow-ups, if any, are listed below it.
+    blocking finding. On a convergence round, where no reviewer runs,
+    the sources are the critic and the caller's read. Follow-ups, if
+    any, are listed below it.
   - `**Verdict:** <n> finding(s).` — <n> blocking findings, counted
     across the sources that ran. Follow-ups never count.
   - `**Verdict:** partial (the reviewer's coverage has a gap).` — the
