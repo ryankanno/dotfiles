@@ -71,7 +71,12 @@ mkdir -p "$out"
 # Partial runs failed on ocr's own caps, not on the code: "reached the
 # maximum tool-request rounds" and "file review exceeded its time limit",
 # a 26-line file among them, and a full re-review re-failed the same
-# files. The model provider serves 6 requests at once and queues the
+# files. A third stop is ocr's own context limit: "Context compression
+# exceeded threshold for <group>, stopping." ended a group of a
+# 6,475-line script and its 5,775-line test after 111 tool calls, with
+# no review of either (issue #165). No setting below acts on it, and
+# render.sh names it as each failed file's reason.
+# The model provider serves 6 requests at once and queues the
 # rest, so the default 8 parallel groups wait out the 15-minute task
 # timeout. These are the settings under which the earlier refine loop
 # converged: one group at a time, and a task deadline of --timeout times

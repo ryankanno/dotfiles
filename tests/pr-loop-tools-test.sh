@@ -195,13 +195,44 @@ assert_eq "$(printf '%s\n' "$OUT" | grep -cE '^~~~~$')" 0 "no fence at column 0"
 assert_eq "$(printf '%s\n' "$OUT" | grep -cE '^  ~~~+$')" 2 "open and close fences are indented"
 assert_contains "$OUT" '  line two' "content lines are indented"
 
-echo "renderer: failed files are listed"
+echo "renderer: failed files are listed with ocr's classification and reason"
 new_sandbox
 fixture_minimal '{"status":"complete","comments":[],
   "manifest":{"input":{},"coverage":{"selected":[],"completed":[],
-    "failed":[{"path":"big.py"},{"path":"small.py"}],"waived":[],"reused":[]}}}'
+    "failed":[{"path":"big.py","classification":"budget","reason":"reached the maximum tool-request rounds without finishing"},
+              {"path":"small.py","classification":"unknown","reason":"stopped because context compression exceeded its threshold"}],
+    "waived":[],"reused":[]}}}'
 render
-assert_contains "$OUT" '- **Failed files:** big.py, small.py' "failed files listed"
+assert_contains "$OUT" '- **Failed files:** big.py (budget: reached the maximum tool-request rounds without finishing), small.py (unknown: stopped because context compression exceeded its threshold)' "each failed file carries its classification and reason"
+
+echo "renderer: the Files line splits the changed files into selected and skipped, from stderr.txt"
+new_sandbox
+fixture_minimal '{"status":"complete","comments":[],
+  "manifest":{"input":{},"coverage":{"selected":[{"path":"a.py"},{"path":"b.py"}],
+    "completed":[{"path":"a.py"},{"path":"b.py"}],"failed":[],"waived":[],"reused":[]}}}'
+printf '%s\n' \
+  '[ocr] 7 file(s) changed, reviewing 2 in /repo' \
+  '[ocr] Skipping docs/a.md — filtered by path/extension rules' \
+  '[ocr] Skipping docs/b.md — filtered by path/extension rules' \
+  '[ocr] Skipping logo.png — binary file' \
+  '[ocr] Skipping go.sum — filtered by path/extension rules' \
+  '[ocr] Skipping big.lock — a reason ocr adds later' \
+  '[ocr] Filtered 5 file(s) by include/exclude rules' \
+  '[ocr] Skipping LLM grouping for 2 file(s), 9 changed line(s) — reviewing as one group' \
+  '[ocr] Skipping plan phase for group "a.py,b.py" (2 file(s), max 5 lines, total 9 lines)' >"$WS/stderr.txt"
+render
+assert_contains "$OUT" '- **Files:** 7 changed, 2 selected (5 skipped: 3 by path rules, 1 a reason ocr adds later, 1 binary), 2 completed, 0 failed, 0 waived, 0 reused.' "the Files line shows the selection split"
+assert_contains "$OUT" '- **Skipped files:** by path rules: docs/a.md, docs/b.md, go.sum; a reason ocr adds later: big.lock; binary: logo.png' "the skipped paths are listed by reason"
+assert_not_contains "$OUT" 'LLM grouping' "a grouping line is not a skipped file"
+
+echo "renderer: a run that skipped no file has no Skipped files line"
+new_sandbox
+fixture_minimal '{"status":"complete","comments":[],
+  "manifest":{"input":{},"coverage":{"selected":[{"path":"a.py"}],"completed":[{"path":"a.py"}],"failed":[],"waived":[],"reused":[]}}}'
+printf '%s\n' '[ocr] 1 file(s) changed, reviewing 1 in /repo' >"$WS/stderr.txt"
+render
+assert_contains "$OUT" '- **Files:** 1 changed, 1 selected, 1 completed, 0 failed, 0 waived, 0 reused.' "the changed count comes from ocr's own line"
+assert_not_contains "$OUT" 'Skipped files' "no skipped line without a skipped file"
 
 echo "renderer: a lost review pass is visible, not hidden behind full coverage"
 new_sandbox

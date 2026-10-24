@@ -3,7 +3,8 @@
 # reviewer sections of a PR comment. The coupling to ocr's output shape lives
 # here, with the binding, so a reviewer swap never touches the skills.
 #
-# Output is fact-only: every line comes from the json, nothing is inferred.
+# Output is fact-only: every line comes from the json, or from the run's
+# stderr.txt for the files ocr skipped before review, nothing is inferred.
 # The status line is printed verbatim whether the run completed or not; the
 # skill reading this output decides what an incomplete run means.
 set -euo pipefail
@@ -25,10 +26,15 @@ fi
   exit 2
 }
 
+# review.json records only the selection; ocr names the changed files it
+# skips before review on stderr alone (issue #69).
+err="$dir/stderr.txt"
+[[ -r "$err" ]] || err=/dev/null
+
 # The jq can still fail on a review.json that exists but does not parse
 # (a truncated mid-write from a failing reviewer); the run must render as
 # the gap it is, never abort with no reviewer section at all.
-out="$(jq -r '
+out="$(jq -r --rawfile err "$err" '
   def obj: if type == "object" then . else {} end;
   def arr: if type == "array" then . else [] end;
   def text: if type == "string" then . elif type == "null" then "unknown" else tojson end;
@@ -55,6 +61,13 @@ out="$(jq -r '
   | ((.manifest | obj).input | obj) as $in
   | ((.manifest | obj).execution | obj) as $ex
   | ((.manifest | obj).coverage | obj) as $cov
+  | ($err | split("\n")) as $el
+  | ([$el[] | capture("^\\[ocr\\] (?<n>[0-9]+) file\\(s\\) changed, ") | .n][0]) as $changed
+  # A grouping line has the same "Skipping ... — ..." shape and names no file.
+  | [$el[] | select(startswith("[ocr] Skipping LLM grouping ") | not)
+      | capture("^\\[ocr\\] Skipping (?<path>.+) — (?<reason>.+)$")
+      | .label = ({"filtered by path/extension rules": "by path rules", "binary file": "binary"}[.reason] // .reason)] as $sk
+  | ($sk | group_by(.label) | map({label: .[0].label, paths: map(.path), n: length}) | sort_by(-.n, .label)) as $skg
   | "- **Reviewer:** OpenCodeReview \($ex.ocr_version // "unknown" | code).\n"
   + "- **Status:** \(.status // "unknown" | code). \(.message // "No message." | text | safe | oneline)\n"
   + "- **Range:** \($in.exact_range // "unknown" | code) (mode \($in.mode // "unknown" | code)), resolved by the orchestrator from the PR.\n"
@@ -64,9 +77,18 @@ out="$(jq -r '
   + (if ($bt | length) > 0
      then ": " + ($bt | to_entries | sort_by(.key) | map("\(.key | code) \(.value)") | join(", "))
      else "" end) + "\n"
-  + "- **Files:** \(($cov.selected | arr) | length) selected, \(($cov.completed | arr) | length) completed, \(($cov.failed | arr) | length) failed, \(($cov.waived | arr) | length) waived, \(($cov.reused | arr) | length) reused.\n"
+  + "- **Files:** "
+  + (if $changed then "\($changed) changed, " else "" end)
+  + "\(($cov.selected | arr) | length) selected"
+  + (if ($sk | length) > 0 then
+       " (\($sk | length) skipped: \($skg | map("\(.n) \(.label | safe | oneline)") | join(", ")))"
+     else "" end)
+  + ", \(($cov.completed | arr) | length) completed, \(($cov.failed | arr) | length) failed, \(($cov.waived | arr) | length) waived, \(($cov.reused | arr) | length) reused.\n"
+  + (if ($sk | length) > 0 then
+       "- **Skipped files:** \($skg | map("\(.label | safe | oneline): \(.paths | map(safe | oneline) | join(", "))") | join("; "))\n"
+     else "" end)
   + (if (($cov.failed | arr) | length) > 0 then
-       "- **Failed files:** \(($cov.failed | arr) | map((.path // "?") | text | safe) | join(", "))\n"
+       "- **Failed files:** \(($cov.failed | arr) | map(obj | "\((.path // "?") | text | safe) (\(.classification // "unknown" | text | safe | oneline): \(.reason // "unknown" | text | safe | oneline))") | join(", "))\n"
      else "" end)
   # A lost review pass leaves every file counted completed; the warning is
   # the only trace of the gap, so it renders.
