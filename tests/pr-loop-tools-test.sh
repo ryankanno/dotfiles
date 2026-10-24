@@ -3344,8 +3344,6 @@ OUT="$("$CRITIC_INPUT" --repo test-owner/test-repo --round-dir "$WS" 2>&1)"; RC=
 assert_eq "$RC" 2 "exits 2"
 assert_contains "$OUT" "--repo must be the local checkout directory, got 'test-owner/test-repo'" "the message names the flag, the wanted form, and the value"
 
-# Claude Code replaces these placeholders in a skill's text with the
-# invocation's arguments, so the model reads a different command.
 echo "pr-round: a refine round's own dispositions file joins the earlier comments' lines"
 new_sandbox
 make_pr_round_env
@@ -3375,6 +3373,8 @@ run_prr --repo "$repo" --pr 39 --round 2 --brief "$WS/brief.md" --rerun >/dev/nu
 assert_eq "$([[ -f "$rd/refine-dispositions.md" ]] && printf yes || printf no)" "yes" "a rerun keeps the refine's file in place"
 assert_contains "$(cat "$rd/settled.md" 2>/dev/null)" "the refine rejected this one" "a rerun still reads the refine's file"
 
+# Claude Code replaces these placeholders in a skill's text with the
+# invocation's arguments, so the model reads a different command.
 echo "skills: no skill text holds a positional placeholder"
 assert_eq "$([[ -d "$ROOT/dot_claude/skills" ]] && echo present)" "present" "the skills directory exists, so an empty grep means no placeholder"
 OUT="$(grep -rnE --include='*.md' '\$([0-9]|ARGUMENTS)' "$ROOT/dot_claude/skills")"; RC=$?
