@@ -189,8 +189,8 @@ listing cannot be resolved, and 127 when `gh`, `jq`, or `git` is
 missing. It exits 6 when the round directory already holds evidence:
 `--rerun` moves that evidence into a `superseded-*/` subdirectory, then
 runs the round. Pass `--rerun` only when the earlier run of this round
-died and left no `round.json` (a harness timeout kills it), or when a
-convergence round's critic cannot run (§2). A round dir with a
+died and left no `round.json` (a harness timeout kills it), or when §2
+sends a convergence round back to the reviewer. A round dir with a
 `round.json` and a usable comment (below) is a finished round: use it.
 The
 script exits 7 when another live process runs the same round. Wait for
@@ -220,14 +220,13 @@ next round.
 reviewer ran, by design. Steps 3 to 5 run as usual. The round is clean
 when the critic ran and neither the critic nor your read has a blocking
 finding. It is not partial and not unrecovered: the shapes below do not
-apply to it. When `critic-input.sh` exits 4 (§3) and `range.head`
-equals `range.prior_head`, no critic can run either: post nothing, and
-run the round again with `--rerun` and without `--convergence`. The
-reviewer then reviews the whole PR. After a base merge, that rerun
-would review nothing (a `none:` scope), and any other non-zero exit of
-`critic-input.sh` also leaves the round with no critic. In both cases,
-post nothing and stop with `blocked: the convergence round has no
-critic`.
+apply to it. When `critic-input.sh` exits 2 on a usage error, fix the
+call and run it again. Any other non-zero exit leaves the round with no
+critic, and the round posts nothing. On exit 4 with `range.head` equal
+to `range.prior_head`, run the round again with `--rerun` and without
+`--convergence`: the reviewer then reviews the whole PR. In every other
+case, stop with
+`blocked: the convergence round has no critic: <the script's stderr line>`.
 
 **`reviewer_complete: true`** with zero findings is a clean review:
 report it as clean. **`reviewer_complete: false`** takes one of three
@@ -292,7 +291,7 @@ $HOME/.claude/skills/issue-to-pr/tools/subagent/critic-input.sh \
 When the script exits 4, the prompt is over 200,000 bytes and cannot
 pass inline. The script prints no prompt. The round runs with no critic.
 The Critic block records the gap with the script's stderr line. A
-convergence round instead runs again with the reviewer (§2).
+convergence round follows §2 instead.
 
 Its findings arrive numbered with file, line, the claim, the input or
 state that reaches it, the harm, severity, and how it checked. Findings
