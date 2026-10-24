@@ -133,8 +133,9 @@ GitHub renders the content as literal text):
 *Round <N> | <short-sha> | reviewer <binding> | critic <binding>*
 ```
 
-A convergence round runs no reviewer, so no renderer output exists. Its
-Reviewer details block holds the one line
+A convergence round runs no reviewer, so no renderer output exists. It
+has no visible `**Reviewer:**` line: the shapes that line names do not
+apply to it. Its Reviewer details block holds the one line
 `No reviewer ran: the convergence round runs none by design.`, and its
 footer reads `reviewer none`.
 

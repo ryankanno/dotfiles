@@ -191,8 +191,8 @@ missing. It exits 6 when the round directory already holds evidence:
 runs the round. Pass `--rerun` only when the earlier run of this round
 died and left no `round.json` (a harness timeout kills it), or when a
 convergence round's critic cannot run (§2). A round dir with a
-`round.json` and a usable `comment.md` (whole and scan-clean, below) is
-a finished round: use it. The
+`round.json` and a usable comment (below) is a finished round: use it.
+The
 script exits 7 when another live process runs the same round. Wait for
 that round. Never pass `--rerun` over it: two callers on one round
 overwrote each other's evidence on PRs 137 and 230.
@@ -220,10 +220,14 @@ next round.
 reviewer ran, by design. Steps 3 to 5 run as usual. The round is clean
 when the critic ran and neither the critic nor your read has a blocking
 finding. It is not partial and not unrecovered: the shapes below do not
-apply to it. When `critic-input.sh` exits 4 (§3), no critic can run
-either: post nothing, and run the round again with `--rerun` and
-without `--convergence`. On the same head, the reviewer then reviews
-the whole PR.
+apply to it. When `critic-input.sh` exits 4 (§3) and `range.head`
+equals `range.prior_head`, no critic can run either: post nothing, and
+run the round again with `--rerun` and without `--convergence`. The
+reviewer then reviews the whole PR. After a base merge, that rerun
+would review nothing (a `none:` scope), and any other non-zero exit of
+`critic-input.sh` also leaves the round with no critic. In both cases,
+post nothing and stop with `blocked: the convergence round has no
+critic`.
 
 **`reviewer_complete: true`** with zero findings is a clean review:
 report it as clean. **`reviewer_complete: false`** takes one of three
