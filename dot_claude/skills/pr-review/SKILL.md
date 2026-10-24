@@ -104,7 +104,8 @@ A refine round writes its own Dispositions lines to
 lines from the comments or from `--dispositions`, for `background.md`
 and for the critic's `settled.md`.
 A file that fails the scan stops the round with exit 2 before any
-review runs. The file is not evidence of an earlier run, and `--rerun`
+review runs. Fix what its stderr line names, then run the round again.
+The file is not evidence of an earlier run, and `--rerun`
 does not move it.
 
 The background has a size limit: the manifest's

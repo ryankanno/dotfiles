@@ -129,7 +129,7 @@ ocr "${args[@]}" >"$out/stdout.txt" 2>"$out/stderr.txt"
 rc=$?
 set -e
 if [[ $rc -ne 0 ]]; then
-  printf '%s\n' "$rc" >"$out/exit.txt"
+  printf '%s\n' "$rc" >"$out/exit.txt" 2>/dev/null || true
   # ocr can fail after it wrote a whole review.json (PR #162: "no space
   # left on device" on its session_end write); the run is still that session.
   # The disk can still be full, so a failed write must not replace ocr's code.

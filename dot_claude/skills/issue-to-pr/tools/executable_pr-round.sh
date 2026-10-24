@@ -460,7 +460,10 @@ refine_disp="$round_dir/refine-dispositions.md"
 if [[ -f "$refine_disp" ]]; then
   rc=0; "$scan" "$refine_disp" >&2 || rc=$?
   if [[ $rc -ne 0 ]]; then
-    printf 'scan exit %s on %s; fix the file and run the round again\n' "$rc" "$refine_disp" >&2
+    case $rc in
+      1) printf 'scan exit 1 on %s; the file carries a hit; fix the file and run the round again\n' "$refine_disp" >&2 ;;
+      *) printf 'scan exit %s on %s; the scan itself failed; fix that and run the round again\n' "$rc" "$refine_disp" >&2 ;;
+    esac
     exit 2
   else
     own=$(awk '{ sub(/\r$/, "") }

@@ -337,10 +337,10 @@ report; the file is its durable copy, the exact text, no summary layer.
   `round.json` and no usable comment on disk or on the PR. The `--rerun` is the pane's, once, after a dead
   run (the dispatch template's "Review rounds" section). An exit 7 is a
   live round, not a failure.
-- **A convergence round with no critic:** pr-review §2 leaves the
+- **A convergence round with no critic:** when pr-review §2 leaves the
   round with no critic and
-  does not send it back to the reviewer with `--rerun`.
-  The round posts nothing, and the pane stops with
+  does not send it back to the reviewer with `--rerun`,
+  the round posts nothing, and the pane stops with
   `blocked: the convergence round has no critic: <the script's stderr line>`.
 - **PR creation failed:** capture the pane's error, report blocked. Do
   not redispatch the whole task.
