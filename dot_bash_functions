@@ -243,8 +243,13 @@ complete -F _tm_sessions tm
 
 function tmk() {
     if [ -n "$1" ]; then
-        # an exact name first, so a dotted name is not parsed as window.pane; then tmux's prefix match
-        tmux kill-session -t "=${1}:" 2>/dev/null || tmux kill-session -t "$1" 2>/dev/null
+        # a plain "a.b" or "a:b" target resolves to whatever session holds window or pane a.b,
+        # so only a name without "." or ":" falls back to tmux's prefix and session-ID match
+        if [[ $1 == *[.:]* ]]; then
+            tmux kill-session -t "=${1}:"
+        else
+            tmux kill-session -t "=${1}:" 2>/dev/null || tmux kill-session -t "$1"
+        fi
     else
         echo "Please pass in a named tmux session to kill."
     fi

@@ -63,17 +63,18 @@ cat >"$WS/bin/tmux" <<'STUB'
 #!/usr/bin/env bash
 printf '[%s]' "$@" >>"$STUB_DIR/tmux.calls"; echo >>"$STUB_DIR/tmux.calls"
 [[ $1 == list-sessions ]] && { echo frompineapples.com; exit 0; }
-[[ " ${TMUX_TARGETS-} " == *" $3 "* ]]
+[[ " ${TMUX_TARGETS-} " == *" $3 "* ]] || { echo "can't find session: $3" >&2; exit 1; }
 STUB
 chmod +x "$WS/bin/tmux"
 
-# Runs $1 with fzf picking $2 and tmux accepting targets $3; sets LAST and CALLS.
+# Runs $1 with fzf picking $2 and tmux accepting targets $3; sets LAST, CALLS and ERR.
 run_tmux_fn() {
   rm -f "$WS/tmux.calls"
   FZF_PICK="$2" TMUX_TARGETS="$3" PATH="$WS/bin:$PATH" \
-    bash -c 'source "$1"; eval "$2"' _ "$ROOT/dot_bash_functions" "$1" >/dev/null 2>&1 </dev/null
+    bash -c 'source "$1"; eval "$2"' _ "$ROOT/dot_bash_functions" "$1" >/dev/null 2>"$WS/tmux.err" </dev/null
   CALLS="$(cat "$WS/tmux.calls" 2>/dev/null)"
   LAST="$(tail -n 1 <<<"$CALLS")"
+  ERR="$(cat "$WS/tmux.err")"
 }
 
 run_tmux_fn 'TMUX=1 tm frompineapples.com' frompineapples.com '=frompineapples.com:'
@@ -88,6 +89,15 @@ assert_eq "$CALLS" "[kill-session][-t][=frompineapples.com:]" \
 run_tmux_fn 'tmk fromp' '' 'fromp'
 assert_eq "$LAST" "[kill-session][-t][fromp]" \
   "tmk falls back to the tmux prefix match when no session has the exact name"
+run_tmux_fn 'tmk nosuch' '' ''
+assert_contains "$ERR" "can't find session: nosuch" \
+  "tmk reports tmux's error when no session matches"
+# tmux reads a plain "x.1" as session or window x, pane 1, and kills the session that holds it.
+run_tmux_fn 'tmk x.1' '' ''
+assert_eq "$CALLS" "[kill-session][-t][=x.1:]" \
+  "tmk does not fall back to a plain target for a dotted name with no exact match"
+assert_contains "$ERR" "can't find session: =x.1:" \
+  "tmk reports tmux's error for a dotted name with no exact match"
 
 # --- fzf key binds ---
 
