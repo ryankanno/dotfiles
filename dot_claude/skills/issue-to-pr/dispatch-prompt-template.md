@@ -21,8 +21,9 @@ PR, and do not redo work the branch already holds.
 - A round with a `round.json` and a `comment.md` is finished:
   continue the "Review rounds" loop below from it, with the next free
   round number. A round with a `round.json` and no `comment.md` is
-  unfinished: continue it from pr-review §2, and do not run
-  `pr-round.sh` again. Any other round is unfinished: finish that same
+  unfinished: continue it from pr-review §2. Do not run `pr-round.sh`
+  again, except for the `--rerun` that pr-review §2 names after a
+  convergence round's `critic-input.sh` exit 4. Any other round is unfinished: finish that same
   round with the pr-review skill, by the exit 6 and exit 7 rules below.
 - The PR has had <refine count> refine rounds. Count them against the
   cap of 3 refine rounds below. Do not get the count from the round
@@ -127,7 +128,9 @@ rerun of a round adds no line.
    this head. A blocking
    finding in it sends you back to step 2 while refine rounds remain.
    A clean round 1 needs no convergence round: it already reviewed the
-   whole PR at this head.
+   whole PR at this head. When pr-review §2 leaves the round with no
+   critic, stop with
+   `blocked: the convergence round has no critic: <the script's stderr line>`.
 4. **Stop** and report one stop state: `clean` (after a clean round 1
    or the convergence round), `converged candidate` (after the
    convergence round), `cap spent`, or `blocked: <reason>`.

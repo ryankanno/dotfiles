@@ -292,7 +292,7 @@ why.
   after 3 rounds), or
   `blocked` (pane death after redispatch, no gate found, scan hit, a
   PR that is not `OPEN` before a refine, a `pr-round.sh` exit 4, 5, 9, or 127, an exit 6 after the one `--rerun`, an
-  exit 8 after the one retry, or a partial, nothing-reviewable or unrecovered reviewer with nothing
+  exit 8 after the one retry, a convergence round with no critic, or a partial, nothing-reviewable or unrecovered reviewer with nothing
   from any source)
 - per-round one-liners: round number, short SHA, verdict, who ran it
 - the ratification: each item of step 6 and its result, and every
@@ -337,6 +337,9 @@ report; the file is its durable copy, the exact text, no summary layer.
   `round.json` and no usable comment on disk or on the PR. The `--rerun` is the pane's, once, after a dead
   run (the dispatch template's "Review rounds" section). An exit 7 is a
   live round, not a failure.
+- **A convergence round with no critic:** pr-review §2 leaves the
+  round with no critic, and the round posts nothing. The pane stops with
+  `blocked: the convergence round has no critic: <the script's stderr line>`.
 - **PR creation failed:** capture the pane's error, report blocked. Do
   not redispatch the whole task.
 
