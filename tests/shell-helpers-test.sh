@@ -83,6 +83,14 @@ assert_eq "$LAST" "[switch-client][-t][=frompineapples.com:]" \
 run_tmux_fn 'unset TMUX; tm frompineapples.com' frompineapples.com '=frompineapples.com:'
 assert_eq "$LAST" "[attach-session][-t][=frompineapples.com:]" \
   "tm outside tmux attaches to a dotted session by its exact name"
+# list-sessions prints a name made with `new-session -s 'a\b'` as a\\b, so that is the name tm and tmk get.
+bs='a\\b'
+run_tmux_fn 'TMUX=1 tm' "$bs" "=$bs:"
+assert_eq "$LAST" "[switch-client][-t][=$bs:]" \
+  "tm switches to a session with a backslash in its name by its exact name"
+run_tmux_fn "tmk $(printf %q "$bs")" '' "=$bs:"
+assert_eq "$CALLS" "[kill-session][-t][=$bs:]" \
+  "tmk kills a session with a backslash in its name by its exact name"
 run_tmux_fn 'tmk frompineapples.com' '' '=frompineapples.com:'
 assert_eq "$CALLS" "[kill-session][-t][=frompineapples.com:]" \
   "tmk kills a dotted session by its exact name"
