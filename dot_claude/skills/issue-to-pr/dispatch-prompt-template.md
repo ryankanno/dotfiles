@@ -122,7 +122,9 @@ rerun of a round adds no line.
 3. **The convergence round:** after a refine round, when the newest
    round is `No issues found.` or a converged candidate, run the
    pr-review skill once more on the same head, and pass `--convergence`
-   to `pr-round.sh`. It takes the next free round number. A blocking
+   to `pr-round.sh`. It takes the next free round number. The round
+   runs no reviewer: the critic and your read review the whole PR at
+   this head. A blocking
    finding in it sends you back to step 2 while refine rounds remain.
    A clean round 1 needs no convergence round: it already reviewed the
    whole PR at this head.
@@ -140,6 +142,9 @@ When it exits 7, another process runs that round: wait for it, and
 never `--rerun` over it. When it exits 8, GitHub did not report the
 pushed head in time, and the round left no evidence: run it again
 once, without `--rerun`. A second exit 8 stops the loop as blocked.
+When it exits 9, an earlier round has no comment on disk or on the PR:
+stop with `blocked: round <N> has no comment`, with the round its
+stderr line names.
 
 After you stop, a refine instruction can arrive by `workmux send`. It
 names a disposition the orchestrator overrules. Run the pr-refine skill

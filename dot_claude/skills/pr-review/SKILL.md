@@ -117,7 +117,7 @@ reviews only the delta, from `range.reviewed_from` (the prior head) to
 the PR head: a finding outside it can only be a follow-up, except a
 high. High severity blocks anywhere, in the delta or out, and the
 caller counts it under Findings. An empty
-delta (the same head again, as in a convergence round) reviews the
+delta (the same head again) reviews the
 whole PR from the merge base instead, never an empty range. A change
 that adds or modifies no lines (a deletion) also reviews the whole PR,
 with the scope `full: the change since the prior round adds no lines`
@@ -138,13 +138,22 @@ changes since the prior round, conflict resolutions included, and none
 of the base's. A finding on the base's lines reads `reviewed`.
 
 When the base merge is the only change since the prior round (the
-head's tree equals the baseline's), the round reviews nothing:
+head's tree equals the baseline's), a round other than the convergence
+round (below) reviews nothing:
 `range.review_scope` starts with `none:`, `runs` is empty,
 `reviewer_complete` is `false`, and nothing is billed. A PR change
 with no added lines (a deletion) is still a change and reviews the
-whole PR. The convergence round passes `--convergence`,
-and the round then reviews the whole PR from the merge base, with the
-scope `full: only a base merge since the prior round`.
+whole PR.
+
+The convergence round passes `--convergence`. It runs no reviewer and
+no per-commit retry, so nothing is billed for the reviewer. The critic
+and your own read review the whole PR at the head. `round.json`
+records the scope `full: this is the convergence round` (the whole PR,
+from the merge base to the head), empty `runs`, and
+`reviewer_skipped: "convergence"`, also after a base merge.
+`delta.txt` stays as the round computed it, so a finding blocks or
+follows up as it did when the reviewer ran. Round 1 refuses
+`--convergence` with exit 2: round 1 keeps the reviewer.
 
 A `partial` prior round does not send the next round back to the whole
 PR: the same caps re-fail the same files. Its unfinished files go to
@@ -180,11 +189,22 @@ listing cannot be resolved, and 127 when `gh`, `jq`, or `git` is
 missing. It exits 6 when the round directory already holds evidence:
 `--rerun` moves that evidence into a `superseded-*/` subdirectory, then
 runs the round. Pass `--rerun` only when the earlier run of this round
-died and left no `round.json` (a harness timeout kills it). A round dir
-with a `round.json` and a `comment.md` is a finished round: use it. The
+died and left no `round.json` (a harness timeout kills it), or when §2
+sends a convergence round back to the reviewer. A round dir with a
+`round.json` and a usable comment (below) is a finished round: use it.
+The
 script exits 7 when another live process runs the same round. Wait for
 that round. Never pass `--rerun` over it: two callers on one round
 overwrote each other's evidence on PRs 137 and 230.
+
+The script exits 9 before any review when an earlier round in the PR's
+round folder has a `round.json` and no usable comment. A usable comment
+is a whole, scan-clean `comment.md` in that round's directory, or a
+round comment of yours on the PR with that round's heading. A round
+whose `round.json` is under `superseded-*/` does not count. The stderr
+line names the round, and the round dir holds no evidence. In the
+issue-to-pr loop, the pane stops with
+`blocked: round <N> has no comment`.
 
 ## 2. Read round.json
 
@@ -195,6 +215,18 @@ merge since the prior round).` and the round dir's `prior-findings.md`,
 verbatim, as its `**Findings:**` section when the file exists. The
 prior round's blocking findings then stand for /pr-refine and for the
 next round.
+
+**`reviewer_skipped: "convergence"`** is a convergence round: no
+reviewer ran, by design. Steps 3 to 5 run as usual. The round is clean
+when the critic ran and neither the critic nor your read has a blocking
+finding. It is not partial and not unrecovered: the shapes below do not
+apply to it. When `critic-input.sh` exits 2 on a usage error, fix the
+call and run it again. Any other non-zero exit leaves the round with no
+critic, and the round posts nothing. On exit 4 with `range.head` equal
+to `range.prior_head`, run the round again with `--rerun` and without
+`--convergence`: the reviewer then reviews the whole PR. In every other
+case, stop with
+`blocked: the convergence round has no critic: <the script's stderr line>`.
 
 **`reviewer_complete: true`** with zero findings is a clean review:
 report it as clean. **`reviewer_complete: false`** takes one of three
@@ -258,7 +290,8 @@ $HOME/.claude/skills/issue-to-pr/tools/subagent/critic-input.sh \
 
 When the script exits 4, the prompt is over 200,000 bytes and cannot
 pass inline. The script prints no prompt. The round runs with no critic.
-The Critic block records the gap with the script's stderr line.
+The Critic block records the gap with the script's stderr line. A
+convergence round follows §2 instead.
 
 Its findings arrive numbered with file, line, the claim, the input or
 state that reaches it, the harm, severity, and how it checked. Findings
@@ -318,11 +351,14 @@ line, heading, verdict, visible consolidated findings tagged by source,
 collapsed blocks with each source's output verbatim. The reviewer's
 sections render with the binding's renderer, once per run recorded in
 `round.json` (`render.sh <runs[].dir>`), completed or skipped alike:
-thin coverage and a skipped run must read as what they are.
+thin coverage and a skipped run must read as what they are. A
+convergence round has no runs: its Reviewer details block holds the
+line `No reviewer ran: the convergence round runs none by design.`
 
 The verdict line is machine-read by /pr-refine; keep the protocol exact,
 one of: `**Verdict:** No issues found.` when every source ran and
-produced no blocking finding, `**Verdict:** <n> finding(s).` when <n>
+produced no blocking finding (on a convergence round, the critic and
+the read), `**Verdict:** <n> finding(s).` when <n>
 blocking findings exist, `**Verdict:** partial (the reviewer's coverage has a gap).` when
 the binding ended partial with nothing else to report,
 `**Verdict:** nothing reviewable (no files in the reviewer's scope).`

@@ -18,7 +18,9 @@ reads quickly and loses nothing.
 - **The verdict line** is machine-read by /pr-refine. Keep it exactly one
   of:
   - `**Verdict:** No issues found.` — every source ran and produced no
-    blocking finding. Follow-ups, if any, are listed below it.
+    blocking finding. On a convergence round, where no reviewer runs,
+    the sources are the critic and the caller's read. Follow-ups, if
+    any, are listed below it.
   - `**Verdict:** <n> finding(s).` — <n> blocking findings, counted
     across the sources that ran. Follow-ups never count.
   - `**Verdict:** partial (the reviewer's coverage has a gap).` — the
@@ -130,6 +132,12 @@ GitHub renders the content as literal text):
 
 *Round <N> | <short-sha> | reviewer <binding> | critic <binding>*
 ```
+
+A convergence round runs no reviewer, so no renderer output exists. It
+has no visible `**Reviewer:**` line: the shapes that line names do not
+apply to it. Its Reviewer details block holds the one line
+`No reviewer ran: the convergence round runs none by design.`, and its
+footer reads `reviewer none`.
 
 The renderer escapes `</details>` in its output; the critic's and the
 read's text pass through the same scan, so quote them inside fenced

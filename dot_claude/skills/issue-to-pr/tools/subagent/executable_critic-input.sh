@@ -9,11 +9,12 @@
 #
 # Interface in:  --repo <dir> --round-dir <dir> [--brief <file>]
 # Interface out: the prompt on stdout, and the same prompt kept as
-#                critic-input.md in the round dir. The diff is the range the reviewer
-#                reviewed (range.reviewed_from..range.head): the whole PR
-#                in round 1, on an empty delta, or after a rebase; the
-#                delta otherwise, which after a base merge holds only the
-#                PR's own changes.
+#                critic-input.md in the round dir. The diff is the round's
+#                range (range.reviewed_from..range.head): the whole PR
+#                in round 1, on an empty delta, after a rebase, or in a
+#                convergence round, where no reviewer runs; the delta
+#                otherwise, which after a base merge holds only the PR's
+#                own changes.
 # Exit codes: 0 built; 2 usage, no round.json, or no critic-prompt.md;
 # 4 the prompt is over 200,000 bytes, too large to pass inline: nothing
 # on stdout, no critic-input.md, and the size on stderr; 5 the diff could
@@ -55,6 +56,7 @@ from=$(jq -r 'if .range.reviewed_from then .range.reviewed_from
              else (.range.base // "") end' "$dir/round.json")
 prior=$(jq -r '.range.prior_head // empty' "$dir/round.json")
 scope=$(jq -r '.range.review_scope // empty' "$dir/round.json")
+skipped=$(jq -r '.reviewer_skipped // empty' "$dir/round.json")
 
 # A generated file's hunks are its generator's output: the critic reviews
 # the source change that produced them, and drift between the two is the
@@ -136,9 +138,13 @@ if [[ -s "$dir/prior-findings.md" ]]; then
   # without reviewed_from cannot mislabel a convergence re-review.
   # A refine that ends in a whole-PR review (a rebase) still answered the
   # findings, but the diff is not the answer alone: say which, and why.
-  if [[ -n "$prior" && "$head" != "$prior" && "$scope" == full:* ]]; then
+  # A convergence round re-reviews the head the prior round reviewed; only
+  # a base merge moves it, never a refine.
+  refined=""
+  if [[ -n "$prior" && "$head" != "$prior" && "$skipped" != convergence ]]; then refined=1; fi
+  if [[ -n "$refined" && "$scope" == full:* ]]; then
     printf 'The prior round named these as blocking; the refine'"'"'s answer is inside the diff below, which is the whole PR, re-reviewed from the merge base because %s.\n\n' "${scope#full: }"
-  elif [[ -n "$prior" && "$head" != "$prior" ]]; then
+  elif [[ -n "$refined" ]]; then
     printf 'The prior round named these as blocking; the diff below is the refine'"'"'s answer to them.\n\n'
   else
     printf 'The prior round named these as blocking; no refine followed, and the diff below is the whole PR, re-reviewed from the merge base.\n\n'
