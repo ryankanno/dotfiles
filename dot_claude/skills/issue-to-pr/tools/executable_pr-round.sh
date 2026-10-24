@@ -110,7 +110,10 @@ case "$repo" in /*) ;; *) printf 'repo must be an absolute path\n' >&2; exit 2 ;
   exit 2
 }
 # headRefOid is always the full SHA, so only a full one can ever match.
-[[ -z "$expect_head" || "$expect_head" =~ ^([0-9a-f]{40}|[0-9a-f]{64})$ ]] || usage
+[[ -z "$expect_head" || "$expect_head" =~ ^([0-9a-f]{40}|[0-9a-f]{64})$ ]] || {
+  printf "pr-round.sh: --expect-head must be the full commit SHA (git rev-parse HEAD), got '%s'\n" "$expect_head" >&2
+  exit 2
+}
 head_wait=""
 if [[ -n "$expect_head" ]]; then
   head_wait="${PR_ROUND_HEAD_WAIT:-60}"
