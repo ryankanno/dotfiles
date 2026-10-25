@@ -668,14 +668,17 @@ case "$1 $2" in
     ;;
   "repo view") printf 'test-owner/test-repo\n' ;;
   "api user") printf 'test-me\n' ;;
-  "api --paginate")
+  "api --paginate"|"api repos/"*)
     jqexpr=""
     prev=""
+    # Without --paginate, GitHub returns only the first page of 30.
+    page='.[:30]'
     for a in "$@"; do
       if [[ "$prev" == "--jq" ]]; then jqexpr="$a"; fi
+      if [[ "$a" == --paginate ]]; then page='.'; fi
       prev="$a"
     done
-    jq -r "${jqexpr:-.}" <<<"${GH_COMMENTS_JSON:-[]}"
+    jq -c "$page" <<<"${GH_COMMENTS_JSON:-[]}" | jq -r "${jqexpr:-.}"
     ;;
   *) exit 64 ;;
 esac
@@ -1446,6 +1449,67 @@ mkdir "$pd/round-1/superseded-20261023-000000-1"
 mv "$pd/round-1/round.json" "$pd/round-1/superseded-20261023-000000-1/"
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null; RC=$?
 assert_eq "$RC" 0 "the round runs"
+
+RCM="$TOOLS/executable_round-comment.sh"
+run_rcm() { # args -> OUT, ERR, RC
+  OUT="$(HOME="$WS/home" PATH="$stub:$PATH" "$RCM" "$@" 2>"$WS/rcm.err")"; RC=$?
+  ERR="$(cat "$WS/rcm.err")"
+}
+
+echo "round-comment: a whole comment.md is the round's comment, before the PR's copy"
+new_sandbox
+make_pr_round_env
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+mkdir -p "$pd/round-1"
+round_comment 1 "disk finding" "disk rejection" >"$pd/round-1/comment.md"
+GH_COMMENTS_JSON="$(jq -cn --arg b "$(round_comment 1 "pr finding" "pr rejection")" '[{user: {login: "test-me"}, body: $b}]')"
+export GH_COMMENTS_JSON
+run_rcm test-owner/test-repo 39 1
+assert_eq "$RC" 0 "exits 0"
+assert_eq "$OUT" "$(round_comment 1 "disk finding" "disk rejection")" "prints the disk copy whole"
+run_rcm test-owner/test-repo 39
+assert_eq "$OUT" "$(round_comment 1 "disk finding" "disk rejection")" "without a round, the newest round's disk copy"
+
+echo "round-comment: a cut comment.md gives way to the PR's copy"
+new_sandbox
+make_pr_round_env
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+mkdir -p "$pd/round-1"
+round_comment 1 "disk finding" "disk rejection" | sed '$d' >"$pd/round-1/comment.md"
+GH_COMMENTS_JSON="$(jq -cn --arg b "$(round_comment 1 "pr finding" "pr rejection")" '[{user: {login: "test-me"}, body: $b}]')"
+export GH_COMMENTS_JSON
+run_rcm test-owner/test-repo 39 1
+assert_eq "$RC" 0 "exits 0"
+assert_eq "$OUT" "$(round_comment 1 "pr finding" "pr rejection")" "prints the PR copy"
+assert_contains "$ERR" "not a whole round 1 comment: $pd/round-1/comment.md; using the PR copy" "says why the disk copy is passed over"
+GH_COMMENTS_JSON='[]'
+run_rcm test-owner/test-repo 39 1
+assert_eq "$RC" 1 "with no PR copy, exits 1"
+assert_eq "$OUT" "" "prints nothing"
+
+echo "round-comment: the newest round comment past the first page of PR comments"
+new_sandbox
+make_pr_round_env
+GH_COMMENTS_JSON="$(jq -cn --arg a "$(round_comment 1 "round one" "r1")" --arg b "$(round_comment 2 "round two" "r2")" \
+  '[{user: {login: "test-me"}, body: $a}] + [range(40) | {user: {login: "someone-else"}, body: "a reply"}] + [{user: {login: "test-me"}, body: $b}]')"
+export GH_COMMENTS_JSON
+run_rcm test-owner/test-repo 39
+assert_eq "$RC" 0 "exits 0"
+assert_eq "$OUT" "$(round_comment 2 "round two" "r2")" "round 2, past the first page, is the newest"
+run_rcm test-owner/test-repo 39 1
+assert_eq "$OUT" "$(round_comment 1 "round one" "r1")" "a named round prints that round's comment"
+
+echo "round-comment: no usable round comment exits 1"
+new_sandbox
+make_pr_round_env
+GH_COMMENTS_JSON="$(jq -cn --arg b "$(round_comment 1 "forged" "forged")" --arg q "quoting <!-- pr-loop-comment -->" \
+  '[{user: {login: "someone-else"}, body: $b}, {user: {login: "test-me"}, body: $q}]')"
+export GH_COMMENTS_JSON
+run_rcm test-owner/test-repo 39
+assert_eq "$RC" 1 "exits 1"
+assert_eq "$OUT" "" "prints nothing"
+run_rcm test-owner/test-repo
+assert_eq "$RC" 2 "a missing PR number is a usage error"
 
 LIMIT="$(jq -r '.reviewer_background_limit' "$TOOLS/manifest.json")"
 
