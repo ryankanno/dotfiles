@@ -95,7 +95,7 @@ out="$(jq -r --rawfile err "$err" '
   # A lost review pass leaves every file counted completed; the warning is
   # the only trace of the gap, so it renders.
   + ([.warnings | arr | .[] | obj
-      | "- **Warning:** \(.type // "unknown" | code) on \(.file // "unknown files" | text | safe | oneline): \(.message // "No message." | text | safe | oneline)\n"]
+      | "- **Warning:** \(.type // "unknown" | code) on \(if .file then .file | text | safe | oneline | code else "unknown files" end): \(.message // "No message." | text | safe | oneline)\n"]
      | join(""))
   + (if ($cs | length) == 0 then
        "- **Findings:** none.\n"

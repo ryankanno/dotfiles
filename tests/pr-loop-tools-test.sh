@@ -250,7 +250,16 @@ fixture_minimal '{"status":"complete","comments":[],
   "warnings":[{"type":"review_round_failed","file":"a.sh,b.sh","message":"round 2: LLM completion error: context deadline exceeded"}]}'
 render
 assert_eq "$RC" 0 "exits 0"
-assert_contains "$OUT" '- **Warning:** `review_round_failed` on a.sh,b.sh: round 2: LLM completion error: context deadline exceeded' "the warning is rendered"
+assert_contains "$OUT" '- **Warning:** `review_round_failed` on `a.sh,b.sh`: round 2: LLM completion error: context deadline exceeded' "the warning is rendered"
+
+echo "renderer: a warning's path renders as code, so GitHub keeps its underscores"
+new_sandbox
+fixture_minimal '{"status":"complete","comments":[],
+  "warnings":[{"type":"review_round_failed","file":"pkg/__init__.py","message":"lost"},
+              {"type":"review_round_failed","message":"lost"}]}'
+render
+assert_contains "$OUT" '- **Warning:** `review_round_failed` on `pkg/__init__.py`: lost' "a warning's path is a code span"
+assert_contains "$OUT" '- **Warning:** `review_round_failed` on unknown files: lost' "the fallback without a path stays prose"
 
 echo "renderer: a run with no review.json renders the gap, not a usage error"
 new_sandbox
