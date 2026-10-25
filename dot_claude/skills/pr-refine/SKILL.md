@@ -159,6 +159,19 @@ never force.
 
 ## 6. Re-run the round — once
 
+Write this round's Rejected and Accepted lines, as §2 records them, to
+`refine-dispositions.md` in the new round's directory before you run
+the round: `$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/round-<N>/`, with
+`<N>` the new round's number. Create the directory when it is missing.
+Write the lines as `report-template.md`'s Dispositions block writes them:
+`- Rejected:` or `- Accepted:` at column 0, wrapped text indented.
+A `- Fixed:` line stays out of the file: the round reads only the other
+two, and the scan reads the whole file. The file's Rejected and
+Accepted lines join the standing dispositions for the reviewer and
+the critic (pr-review §1).
+The file passes `scan.sh` first: a hit stops the round with exit 2
+before any review. Fix the file, then run the round again.
+
 Run the full review round exactly as
 `$HOME/.claude/skills/pr-review/SKILL.md` defines it, over the new head
 SHA — once, at the end, over the final head, never once per

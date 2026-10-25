@@ -84,11 +84,13 @@ out="$(jq -r --rawfile err "$err" '
        " (\($sk | length) skipped: \($skg | map("\(.n) \(.label | safe | oneline)") | join(", ")))"
      else "" end)
   + ", \(($cov.completed | arr) | length) completed, \(($cov.failed | arr) | length) failed, \(($cov.waived | arr) | length) waived, \(($cov.reused | arr) | length) reused.\n"
+  # A path as plain text loses its underscores to the GitHub emphasis
+  # (pkg/__init__.py renders as pkg/<strong>init</strong>.py).
   + (if ($sk | length) > 0 then
-       "- **Skipped files:** \($skg | map("\(.label | safe | oneline): \(.paths | map(safe | oneline) | join(", "))") | join("; "))\n"
+       "- **Skipped files:** \($skg | map("\(.label | safe | oneline): \(.paths | map(safe | oneline | code) | join(", "))") | join("; "))\n"
      else "" end)
   + (if (($cov.failed | arr) | length) > 0 then
-       "- **Failed files:** \(($cov.failed | arr) | map(obj | "\((.path // "?") | text | safe) (\(.classification // "unknown" | text | safe | oneline): \(.reason // "unknown" | text | safe | oneline))") | join(", "))\n"
+       "- **Failed files:** \(($cov.failed | arr) | map(obj | "\((.path // "?") | text | safe | oneline | code) (\(.classification // "unknown" | text | safe | oneline): \(.reason // "unknown" | text | safe | oneline))") | join(", "))\n"
      else "" end)
   # A lost review pass leaves every file counted completed; the warning is
   # the only trace of the gap, so it renders.

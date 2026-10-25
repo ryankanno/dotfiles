@@ -98,6 +98,16 @@ Fixed lines stay out: a fix the reviewer still flags is a fix to
 re-check. `--dispositions <file>` replaces the lines read from the
 comments with the file's content.
 
+A refine round writes its own Dispositions lines to
+`refine-dispositions.md` in the round directory before the round runs
+(pr-refine §6). The script adds its Rejected and Accepted lines to the
+lines from the comments or from `--dispositions`, for `background.md`
+and for the critic's `settled.md`.
+A file that fails the scan stops the round with exit 2 before any
+review runs. Fix what its stderr line names, then run the round again.
+The file is not evidence of an earlier run, and `--rerun`
+does not move it.
+
 The background has a size limit: the manifest's
 `reviewer_background_limit` (8000 characters for ocr, which aborts on
 anything longer before it reviews a line). The dispositions fill the
@@ -108,7 +118,8 @@ stops the round with exit 2 before any review runs, leaving the round
 dir untouched: condense it to the
 task (its asks,
 the settled decisions, the constraints) and rerun, never pass a
-dispatch prompt or loop instructions as the brief.
+dispatch prompt or loop instructions as the brief. A convergence round
+runs no reviewer, so it writes no `background.md` and checks no limit.
 
 From round 2 on, `round.json` carries `range.prior_head` (the previous
 round's head) and the round directory holds `delta.txt`, the
