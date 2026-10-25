@@ -199,8 +199,9 @@ on a delta round. After a base merge it runs from the baseline to a
 commit that has the head's tree and only the baseline as parent.
 
 The script exits 4 when the PR is missing, not open, or not
-resolvable, 5 when the repository, its refs, or the changed-file
-listing cannot be resolved, and 127 when `gh`, `jq`, or `git` is
+resolvable, 5 when the repository, its refs, the changed-file
+listing, the gh user, or the PR comments cannot be read, and 127 when
+`gh`, `jq`, or `git` is
 missing. It exits 6 when the round directory already holds evidence:
 `--rerun` moves that evidence into a `superseded-*/` subdirectory, then
 runs the round. Pass `--rerun` only when the earlier run of this round
@@ -235,8 +236,8 @@ next round.
 reviewer ran, by design. Steps 3 to 5 run as usual. The round is clean
 when the critic ran and neither the critic nor your read has a blocking
 finding. It is not partial and not unrecovered: the shapes below do not
-apply to it. When `critic-input.sh` exits 2 on a usage error, fix the
-call and run it again. Any other non-zero exit leaves the round with no
+apply to it. When `critic-input.sh` exits 2, fix it as §3 says and run
+it again. Any other non-zero exit leaves the round with no
 critic, and the round posts nothing. On exit 4 with `range.head` equal
 to `range.prior_head`, run the round again with `--rerun` and without
 `--convergence`: the reviewer then reviews the whole PR. In every other
@@ -299,8 +300,9 @@ $HOME/.claude/skills/issue-to-pr/tools/subagent/critic-input.sh \
   --repo <checkout-dir> --round-dir <round-dir> --brief <brief-file>
 ```
 
-When the script exits 2 (a usage error, no `round.json`, or no
-`critic-prompt.md`), fix what its stderr line names and run it again.
+When the script exits 2, fix the cause and run it again: the call, a
+missing `critic-prompt.md` (its stderr line names it), or a missing
+`round.json` (it prints only its usage line; run the round first).
 When it exits 4 (the prompt is over 200,000 bytes and
 cannot pass inline), 5 (the diff failed) or 127 (a dependency is
 missing), it prints no prompt. The round runs with no critic. The

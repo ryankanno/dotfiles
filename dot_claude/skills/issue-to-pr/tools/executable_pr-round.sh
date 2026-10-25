@@ -60,8 +60,9 @@
 # alone or once the standing dispositions assemble into it, or the round
 # dir's refine-dispositions.md fails the scan; 3 identity
 # mismatch; 4 the PR is
-# missing, not open, or not resolvable; 5 the repository, its refs, or
-# the changed-file listing could not be resolved; 6 the round dir already holds
+# missing, not open, or not resolvable; 5 the repository, its refs, the
+# changed-file listing, the gh user, or the PR comments could not be
+# read; 6 the round dir already holds
 # evidence and --rerun was not passed; 7 another live process runs this
 # round (its pid is in round-<N>.lock); 8 GitHub did not report the
 # --expect-head SHA within the wait; 9 an earlier round in the PR's round

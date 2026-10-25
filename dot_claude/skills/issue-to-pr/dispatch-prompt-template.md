@@ -18,10 +18,10 @@ PR, and do not redo work the branch already holds.
 - Read the newest round directory under
   `$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/`. When there is none,
   start at Round 1 below.
-- A round with a `round.json` and a `comment.md` is finished:
-  continue the "Review rounds" loop below from it, with the next free
-  round number. A round with a `round.json` and no `comment.md` is
-  unfinished: continue it from pr-review §2. Do not run `pr-round.sh`
+- A round with a `round.json` and a usable comment (`round-comment.sh`
+  prints it) is finished: continue the "Review rounds" loop below from
+  it, with the next free round number. A round with a `round.json` and
+  no usable comment is unfinished: continue it from pr-review §2. Do not run `pr-round.sh`
   again, except for the `--rerun` that pr-review §2 names after a
   convergence round's `critic-input.sh` exit 4. Any other round is unfinished: finish that same
   round with the pr-review skill, by the exit 6 and exit 7 rules below.
@@ -142,7 +142,8 @@ Every review round passes `--brief <the brief file above>` to
 A round runs longer than one tool call. Start it in the background as
 pr-review §1 says. Then act on the exit code of `pr-round.sh`. A
 `<stderr line>` is the script's last stderr line, verbatim: scan hits or
-a passed-over `comment.md` can come above it.
+a passed-over `comment.md` can come above it. When the script printed
+no stderr line, stop with the exit code alone.
 
 | Exit | What it means | What you do |
 |---|---|---|
@@ -151,7 +152,7 @@ a passed-over `comment.md` can come above it.
 | 3 | An identity mismatch: the PR head is not this loop's branch. | Stop with `blocked: identity mismatch: <stderr line>`. |
 | 4 | The PR is missing, not open, or not resolvable. | Stop with `blocked: pr-round.sh exit 4: <stderr line>`. |
 | 5 | The repository, its refs, the changed-file listing, the gh user, or the PR comments could not be read. | Stop with `blocked: pr-round.sh exit 5: <stderr line>`. |
-| 6 | The round dir already holds evidence. | When it has no `round.json`, your earlier run of that round died: pass `--rerun` once. On an exit 6 after that `--rerun`, stop with `blocked: pr-round.sh exit 6: <stderr line>`. When it has a `round.json`, the round already ran: do not run it again. When it also has no usable comment, finish it from pr-review §2. |
+| 6 | The round dir already holds evidence. | When it has no `round.json`, your earlier run of that round died: pass `--rerun` once. On an exit 6 after that `--rerun`, stop with `blocked: pr-round.sh exit 6: <stderr line>`. When it has a `round.json` and a usable comment, the round is finished: continue the loop from it. When it has a `round.json` and no usable comment, finish it from pr-review §2, with the one `--rerun` §2 names after a convergence round's `critic-input.sh` exit 4. |
 | 7 | Another process runs that round. | Wait for it. Never `--rerun` over it. |
 | 8 | GitHub did not report the pushed head in time, and the round left no evidence. | Run the round again once, without `--rerun`. On a second exit 8, stop with `blocked: pr-round.sh exit 8: <stderr line>`. |
 | 9 | An earlier round has no comment on disk or on the PR. | Stop with `blocked: round <N> has no comment`, with the round its stderr line names. |
