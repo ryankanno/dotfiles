@@ -528,6 +528,23 @@ for p in /Users/other/x /home/other/x /private/tmp/x /var/folders/ab/x \
   assert_eq "$RC" 1 "blocks $p"
 done
 
+# PR #175 round 1: a finding that quoted `/var/folders/...` as an example blocked the post.
+echo "scan: a placeholder path, only ... after the prefix, is not a leak"
+for p in /Users/... /home/... /tmp/... /root/... /run/user/... /private/... \
+  /var/folders/... /Volumes/... /mnt/...; do
+  new_sandbox
+  scan "a path such as \`$p\` or $p, in prose"
+  assert_eq "$RC" 0 "passes $p"
+done
+
+echo "scan: a real path beside a placeholder, or a dotted one, still blocks"
+for line in 'see /tmp/... and /tmp/agent-scratch-9f2/x' 'at /tmp/.scratch-9f2/x' \
+  'at /private/.scratch-9f2' 'at /var/folders/..x'; do
+  new_sandbox
+  scan "$line"
+  assert_eq "$RC" 1 "blocks: $line"
+done
+
 echo "scan: ordinary code under review is not a leak"
 new_sandbox
 scan 'the owner someone/repo serves http://localhost:3000 on 127.0.0.1; a bearer token check; grep -E "/Users/|/home/|sk-[A-Za-z0-9_-]{20,}"; docs that name the /tmp/ prefix, /root/ usage, and /run/user/ ids; mounted at /Volumes/ and /mnt/ as concepts'

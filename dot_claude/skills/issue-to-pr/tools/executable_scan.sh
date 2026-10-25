@@ -50,11 +50,16 @@ mv "$tmp" "$file"
 # Token patterns require the variable part (a key body). Home and temp
 # patterns require the first path segment (a username, a scratch name,
 # an ssh key); the fixed macOS prefixes are bare by design: over-blocking
-# prose is recoverable, a leaked path is not. The AWS secret rule is
-# anchored on the key's own name, so a forty-hex sha is not a hit.
-pattern='/Users/[A-Za-z0-9._-]+|/home/[A-Za-z0-9._-]+|/tmp/[A-Za-z0-9._-]+|/root/[A-Za-z0-9._-]+'
-pattern+='|/run/user/[0-9]+|/private/|/var/folders/'
-pattern+='|/Volumes/[A-Za-z0-9._-]+|/mnt/[A-Za-z0-9._-]+'
+# prose is recoverable, a leaked path is not. A path part of only "..."
+# is a placeholder, not a segment: a finding that quoted /var/folders/...
+# as an example blocked its round's post (PR #175 round 1). grep -E has
+# no lookahead, so $seg spells out every first segment except that one.
+# The AWS secret rule is anchored on the key's own name, so a forty-hex
+# sha is not a hit.
+dots='\.\.?([^.]|$)|\.\.\.[A-Za-z0-9._/-]'
+seg="([A-Za-z0-9_-]|$dots)"
+pattern="(/Users|/home|/tmp|/root|/Volumes|/mnt)/$seg"
+pattern+="|/run/user/[0-9]+|(/private|/var/folders)/([^.]|\$|$dots)"
 pattern+='|sk-[A-Za-z0-9_-]{20,}|sk_live_[0-9a-zA-Z]{24,}|AIza[0-9A-Za-z_-]{35}'
 pattern+='|(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}'
 pattern+="|(aws_secret_access_key|AWS_SECRET_ACCESS_KEY)[[:space:]]*[=:][[:space:]]*[\"']?[A-Za-z0-9/+=]{40}"
