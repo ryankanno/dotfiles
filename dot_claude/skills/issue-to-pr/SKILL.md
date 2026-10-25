@@ -291,9 +291,11 @@ why.
   calls are listed), `capped-unrecovered` (blocking findings remain
   after 3 rounds), or
   `blocked` (pane death after redispatch, no gate found, scan hit, a
-  PR that is not `OPEN` before a refine, a `pr-round.sh` exit 4, 5, 9, or 127, an exit 6 after the one `--rerun`, an
-  exit 8 after the one retry, a convergence round with no critic, or a partial, nothing-reviewable or unrecovered reviewer with nothing
-  from any source)
+  PR that is not `OPEN` before a refine, a convergence round with no
+  critic, the pane's `Stop: blocked: <reason>` on a `pr-round.sh` exit
+  (the exit-code table in the dispatch template's "Review rounds"
+  section), or a partial, nothing-reviewable or unrecovered reviewer
+  with nothing from any source)
 - per-round one-liners: round number, short SHA, verdict, who ran it
 - the ratification: each item of step 6 and its result, and every
   disposition you overruled, with the reason
@@ -330,12 +332,11 @@ report; the file is its durable copy, the exact text, no summary layer.
 - **Empty reviewer result:** handled inside the review round (retry once
   per-commit). Two empties: the round is unrecovered, never clean and
   never failing.
-- **`pr-round.sh` exit 4, 5, 9, or 127, an exit 6 after the pane's one
-  `--rerun`, or an exit 8 after the pane's one retry:** the round reports blocked, with the script's stderr line
-  in the final report. On exit 9 the pane stops with
-  `blocked: round <N> has no comment`: an earlier round has a
-  `round.json` and no usable comment on disk or on the PR. The `--rerun` is the pane's, once, after a dead
-  run (the dispatch template's "Review rounds" section). An exit 7 is a
+- **A `pr-round.sh` exit:** the pane acts on it by the exit-code table
+  in the dispatch template's "Review rounds" section. When the pane
+  stops with `Stop: blocked: <reason>`, the loop ends `blocked`, and the
+  final report carries that reason. The `--rerun` after a dead run and
+  the retry after an exit 8 are the pane's, once each. An exit 7 is a
   live round, not a failure.
 - **A convergence round with no critic:** when pr-review §2 leaves the
   round with no critic and
