@@ -1508,6 +1508,21 @@ run_rcm test-owner/test-repo 39
 assert_eq "$RC" 0 "exits 0"
 assert_eq "$OUT" "$(round_comment 2 "unposted finding" "unposted rejection")" "the refine reads its round before the post"
 
+echo "round-comment: a newer round's PR copy wins over an older comment.md, which stands alone"
+new_sandbox
+make_pr_round_env
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+mkdir -p "$pd/round-1"
+round_comment 1 "stale finding" "stale rejection" >"$pd/round-1/comment.md"
+GH_COMMENTS_JSON="$(jq -cn --arg b "$(round_comment 2 "posted finding" "posted rejection")" '[{user: {login: "test-me"}, body: $b}]')"
+export GH_COMMENTS_JSON
+run_rcm test-owner/test-repo 39
+assert_eq "$OUT" "$(round_comment 2 "posted finding" "posted rejection")" "the newer PR copy is the newest"
+GH_COMMENTS_JSON='[]'
+export GH_COMMENTS_JSON
+run_rcm test-owner/test-repo 39
+assert_eq "$OUT" "$(round_comment 1 "stale finding" "stale rejection")" "a lone comment.md stands with no PR copy"
+
 echo "round-comment: no usable round comment exits 1"
 new_sandbox
 make_pr_round_env
