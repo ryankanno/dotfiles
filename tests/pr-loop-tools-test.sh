@@ -537,9 +537,9 @@ for p in /Users/... /home/... /tmp/... /root/... /run/user/... /private/... \
   assert_eq "$RC" 0 "passes $p"
 done
 
-echo "scan: a real path beside a placeholder, or a dotted one, still blocks"
+echo "scan: a real path beside a placeholder, a dotted one, or a bare macOS prefix still blocks"
 for line in 'see /tmp/... and /tmp/agent-scratch-9f2/x' 'at /tmp/.scratch-9f2/x' \
-  'at /private/.scratch-9f2' 'at /var/folders/..x'; do
+  'at /private/.scratch-9f2' 'at /var/folders/..x' 'at /private/' 'at /var/folders/'; do
   new_sandbox
   scan "$line"
   assert_eq "$RC" 1 "blocks: $line"
@@ -668,17 +668,14 @@ case "$1 $2" in
     ;;
   "repo view") printf 'test-owner/test-repo\n' ;;
   "api user") printf 'test-me\n' ;;
-  "api --paginate"|"api repos/"*)
+  "api --paginate")
     jqexpr=""
     prev=""
-    # Without --paginate, GitHub returns only the first page of 30.
-    page='.[:30]'
     for a in "$@"; do
       if [[ "$prev" == "--jq" ]]; then jqexpr="$a"; fi
-      if [[ "$a" == --paginate ]]; then page='.'; fi
       prev="$a"
     done
-    jq -c "$page" <<<"${GH_COMMENTS_JSON:-[]}" | jq -r "${jqexpr:-.}"
+    jq -r "${jqexpr:-.}" <<<"${GH_COMMENTS_JSON:-[]}"
     ;;
   *) exit 64 ;;
 esac
@@ -1499,10 +1496,23 @@ assert_eq "$OUT" "$(round_comment 2 "round two" "r2")" "round 2, past the first 
 run_rcm test-owner/test-repo 39 1
 assert_eq "$OUT" "$(round_comment 1 "round one" "r1")" "a named round prints that round's comment"
 
+echo "round-comment: a round's comment.md newer than every PR copy is the newest"
+new_sandbox
+make_pr_round_env
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+mkdir -p "$pd/round-2"
+round_comment 2 "unposted finding" "unposted rejection" >"$pd/round-2/comment.md"
+GH_COMMENTS_JSON="$(jq -cn --arg b "$(round_comment 1 "posted finding" "posted rejection")" '[{user: {login: "test-me"}, body: $b}]')"
+export GH_COMMENTS_JSON
+run_rcm test-owner/test-repo 39
+assert_eq "$RC" 0 "exits 0"
+assert_eq "$OUT" "$(round_comment 2 "unposted finding" "unposted rejection")" "the refine reads its round before the post"
+
 echo "round-comment: no usable round comment exits 1"
 new_sandbox
 make_pr_round_env
-GH_COMMENTS_JSON="$(jq -cn --arg b "$(round_comment 1 "forged" "forged")" --arg q "quoting <!-- pr-loop-comment -->" \
+# The second body has a round heading, so only the marker-on-line-1 check keeps it out.
+GH_COMMENTS_JSON="$(jq -cn --arg b "$(round_comment 1 "forged" "forged")" --arg q "quoting $(round_comment 1 "quoted" "quoted")" \
   '[{user: {login: "someone-else"}, body: $b}, {user: {login: "test-me"}, body: $q}]')"
 export GH_COMMENTS_JSON
 run_rcm test-owner/test-repo 39
