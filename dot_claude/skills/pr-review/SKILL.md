@@ -299,9 +299,11 @@ $HOME/.claude/skills/issue-to-pr/tools/subagent/critic-input.sh \
   --repo <checkout-dir> --round-dir <round-dir> --brief <brief-file>
 ```
 
-When the script exits 4, the prompt is over 200,000 bytes and cannot
-pass inline. The script prints no prompt. The round runs with no critic.
-The Critic block records the gap with the script's stderr line. A
+When the script exits 2, the call has a usage error: fix the call and
+run it again. When it exits 4 (the prompt is over 200,000 bytes and
+cannot pass inline), 5 (the diff failed) or 127 (a dependency is
+missing), it prints no prompt. The round runs with no critic. The
+Critic block records the gap with the script's stderr line. A
 convergence round follows §2 instead.
 
 Its findings arrive numbered with file, line, the claim, the input or
@@ -419,7 +421,8 @@ gh pr comment <n> --body-file <round-dir>/comment.md
 ```
 
 Record the comment URL and the round directory: the final report needs
-the session ids and token totals from the round's `review.json`.
+the session ids and token totals from the round's `round.json`
+(`runs[].session_id` and `cumulative_tokens`).
 
 On any other repository, do not post. `<round-dir>/comment.md` stays
 as the draft. When the §7 scan exited 0, report to the caller that the
