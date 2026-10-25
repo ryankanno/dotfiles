@@ -105,6 +105,8 @@ lines from the comments or from `--dispositions`, for `background.md`
 and for the critic's `settled.md`.
 A file that fails the scan stops the round with exit 2 before any
 review runs. Fix what its stderr line names, then run the round again.
+In the issue-to-pr loop, the pane stops instead, by the exit-code table
+in the dispatch template's "Review rounds" section.
 The file is not evidence of an earlier run, and `--rerun`
 does not move it.
 
@@ -118,7 +120,9 @@ stops the round with exit 2 before any review runs, leaving the round
 dir untouched: condense it to the
 task (its asks,
 the settled decisions, the constraints) and rerun, never pass a
-dispatch prompt or loop instructions as the brief. A convergence round
+dispatch prompt or loop instructions as the brief. In the issue-to-pr
+loop, the pane stops instead: the brief is the orchestrator's to
+condense. A convergence round
 runs no reviewer, so it writes no `background.md` and checks no limit.
 
 From round 2 on, `round.json` carries `range.prior_head` (the previous
@@ -221,9 +225,9 @@ issue-to-pr loop, the pane stops with
 
 **`range.review_scope` starting with `none:`** is a base merge with no
 PR change. Skip steps 3 to 5: no source runs. Post a comment per
-report-template.md with its nothing-to-review verdict and the round
-dir's `prior-findings.md`, verbatim, as its `**Findings:**` section
-when the file exists. The
+report-template.md with the verdict line its list gives for a `none:`
+scope and the round dir's `prior-findings.md`, verbatim, as its
+`**Findings:**` section when the file exists. The
 prior round's blocking findings then stand for /pr-refine and for the
 next round.
 
@@ -295,8 +299,9 @@ $HOME/.claude/skills/issue-to-pr/tools/subagent/critic-input.sh \
   --repo <checkout-dir> --round-dir <round-dir> --brief <brief-file>
 ```
 
-When the script exits 2, the call has a usage error: fix the call and
-run it again. When it exits 4 (the prompt is over 200,000 bytes and
+When the script exits 2 (a usage error, no `round.json`, or no
+`critic-prompt.md`), fix what its stderr line names and run it again.
+When it exits 4 (the prompt is over 200,000 bytes and
 cannot pass inline), 5 (the diff failed) or 127 (a dependency is
 missing), it prints no prompt. The round runs with no critic. The
 Critic block records the gap with the script's stderr line. A

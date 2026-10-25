@@ -32,7 +32,7 @@ flowchart TD
     E -- "yes" --> R["Review round, run by the pane<br/>pr-round.sh: range resolved from the PR,<br/>identity check, reviewer binding,<br/>per-commit empty-retry"]
     R --> F["Adversarial critic: fresh clean-context subagent<br/>plus the caller's own read"]
     F --> FS["finding-scope.sh per finding:<br/>high or on the delta blocks,<br/>the rest are follow-ups"]
-    FS --> G["Assemble the comment per report-template<br/>marker first line, seven-state verdict"]
+    FS --> G["Assemble the comment per report-template<br/>marker first line, the verdict"]
     G --> S{"Scan before posting"}
     S -- "hit: do not leak" --> Y["Abort the post, record it,<br/>the final report surfaces it"]
     S -- "clean" --> H["Post the round comment<br/>append per round"]

@@ -10,9 +10,9 @@
 # Interface out: on stdout, round <round>'s comment, or without <round>
 #                the comment of the newest round that has one; on stderr,
 #                why a comment.md was passed over.
-# Exit codes: 0 printed; 1 no usable comment; 2 usage, or HOME unset;
-#             5 the gh user or the PR comments could not be read; 127 a
-#             dependency is missing.
+# Exit codes: 0 printed; 1 no usable comment; 2 usage, or an unusable
+#             environment (HOME unset, no scan.sh); 5 the gh user or the
+#             PR comments could not be read; 127 a dependency is missing.
 set -euo pipefail
 
 usage() {

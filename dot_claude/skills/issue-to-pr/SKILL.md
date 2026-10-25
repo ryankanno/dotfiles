@@ -335,9 +335,8 @@ report; the file is its durable copy, the exact text, no summary layer.
 - **A `pr-round.sh` exit:** the pane acts on it by the exit-code table
   in the dispatch template's "Review rounds" section. When the pane
   stops with `Stop: blocked: <reason>`, the loop ends `blocked`, and the
-  final report carries that reason. The `--rerun` after a dead run and
-  the retry after an exit 8 are the pane's, once each. An exit 7 is a
-  live round, not a failure.
+  final report carries that reason. An exit 7 is a live round, not a
+  failure.
 - **A convergence round with no critic:** when pr-review §2 leaves the
   round with no critic and
   does not send it back to the reviewer with `--rerun`,

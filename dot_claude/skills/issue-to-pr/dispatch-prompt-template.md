@@ -141,7 +141,8 @@ Every review round passes `--brief <the brief file above>` to
 
 A round runs longer than one tool call. Start it in the background as
 pr-review §1 says. Then act on the exit code of `pr-round.sh`. A
-`<stderr line>` is the script's stderr line, verbatim.
+`<stderr line>` is the script's last stderr line, verbatim: scan hits or
+a passed-over `comment.md` can come above it.
 
 | Exit | What it means | What you do |
 |---|---|---|
@@ -149,12 +150,13 @@ pr-review §1 says. Then act on the exit code of `pr-round.sh`. A
 | 2 | A usage error, an unusable environment, a brief over the reviewer's background limit, or a `refine-dispositions.md` that fails the scan. | Stop with `blocked: pr-round.sh exit 2: <stderr line>`. |
 | 3 | An identity mismatch: the PR head is not this loop's branch. | Stop with `blocked: identity mismatch: <stderr line>`. |
 | 4 | The PR is missing, not open, or not resolvable. | Stop with `blocked: pr-round.sh exit 4: <stderr line>`. |
-| 5 | The repository, its refs, or the changed-file listing could not be resolved. | Stop with `blocked: pr-round.sh exit 5: <stderr line>`. |
-| 6 | The round dir already holds evidence. | When it has no `round.json`, your earlier run of that round died: pass `--rerun` once. On an exit 6 after that `--rerun`, stop with `blocked: pr-round.sh exit 6: <stderr line>`. |
+| 5 | The repository, its refs, the changed-file listing, the gh user, or the PR comments could not be read. | Stop with `blocked: pr-round.sh exit 5: <stderr line>`. |
+| 6 | The round dir already holds evidence. | When it has no `round.json`, your earlier run of that round died: pass `--rerun` once. On an exit 6 after that `--rerun`, stop with `blocked: pr-round.sh exit 6: <stderr line>`. When it has a `round.json`, the round already ran: do not run it again. When it also has no usable comment, finish it from pr-review §2. |
 | 7 | Another process runs that round. | Wait for it. Never `--rerun` over it. |
 | 8 | GitHub did not report the pushed head in time, and the round left no evidence. | Run the round again once, without `--rerun`. On a second exit 8, stop with `blocked: pr-round.sh exit 8: <stderr line>`. |
 | 9 | An earlier round has no comment on disk or on the PR. | Stop with `blocked: round <N> has no comment`, with the round its stderr line names. |
 | 127 | A dependency is missing. | Stop with `blocked: pr-round.sh exit 127: <stderr line>`. |
+| Any other | A failure the table does not list. | Stop with `blocked: pr-round.sh exit <code>: <stderr line>`. |
 
 After you stop, a refine instruction can arrive by `workmux send`. It
 names a disposition the orchestrator overrules. Run the pr-refine skill

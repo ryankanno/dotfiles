@@ -69,13 +69,13 @@ your newest round comment on the PR, read across every page of
 comments. The stderr says why a file gave way.
 
 On a repository that is not owned (pr-review §8), read the round from
-`comment.md` only: no round comment is on the PR, so the tool prints
-the file or nothing.
+`comment.md` only: no round comment is on the PR.
 
 When the tool exits 1, no round comment exists: there is nothing to
 refine yet. Say so and stop; producing findings is /pr-review's round,
-not this one. Any other non-zero exit is a failed read: report its
-stderr line and stop.
+not this one. When it exits 2, the call is wrong: fix it and run it
+again. Any other non-zero exit is a failed read: report its last stderr
+line and stop.
 
 The verdict line is one of the lines in the verdict list of
 `$HOME/.claude/skills/pr-review/report-template.md`. Each line there
@@ -155,7 +155,9 @@ two, and the scan reads the whole file. The file's Rejected and
 Accepted lines join the standing dispositions for the reviewer and
 the critic (pr-review §1).
 The file passes `scan.sh` first: a hit stops the round with exit 2
-before any review. Fix the file, then run the round again.
+before any review. Fix the file, then run the round again. In the
+issue-to-pr loop, the pane stops instead, by the dispatch template's
+exit-code table.
 
 Run the full review round exactly as
 `$HOME/.claude/skills/pr-review/SKILL.md` defines it, over the new head
