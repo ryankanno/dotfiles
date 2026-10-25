@@ -3655,14 +3655,25 @@ assert_contains "$S" 'adds its Rejected and Accepted lines' "pr-review §1 says 
 assert_contains "$S" 'A file that fails the scan stops the round with exit 2' "pr-review §1 says a scan hit stops the round"
 assert_contains "$S" 'Fix what its stderr line names, then run the round again' "pr-review §1 gives the recovery"
 
-# Only round-comment.sh's exit 1 means no usable comment; its other failures stop the pane (issue #181).
-echo "skills: the Resuming bullet and the exit 6 row stop on a failed round-comment.sh read"
+# Only round-comment.sh's exit 1 means no usable comment; an exit 2 gets one retry, and its other failures stop the pane (issue #181).
+echo "skills: the Resuming bullet and the exit 6 row retry a round-comment.sh exit 2 once and stop on its other failures"
 RCSTOP='stop with `blocked: round-comment.sh exit <code>: <stderr line>`.'
+RCRETRY='fix the call or the environment and run it once more.'
 S="$(skill_section issue-to-pr/dispatch-prompt-template.md '## Resuming PR')"
 assert_contains "$S" 'no usable comment (the call exits 1) is unfinished' "the Resuming bullet keys an unfinished round on exit 1"
-assert_contains "$S" "On an exit other than 0 or 1, $RCSTOP" "the Resuming bullet stops on a failed read"
+assert_contains "$S" 'On a `round-comment.sh` exit 2, '"$RCRETRY" "the Resuming bullet retries an exit 2 once"
+assert_contains "$S" 'On a second exit 2, or a `round-comment.sh` exit other than 0, 1 or 2, '"$RCSTOP" "the Resuming bullet names the tool it stops on"
 S="$(skill_section issue-to-pr/dispatch-prompt-template.md '## Review rounds')"
 assert_contains "$S" 'no usable comment (that call exits 1), finish it from pr-review §2' "the exit 6 row keys an unfinished round on exit 1"
-assert_contains "$S" "On an exit of that call other than 0 or 1, $RCSTOP" "the exit 6 row stops on a failed read"
+assert_contains "$S" "On an exit 2 of that call, $RCRETRY" "the exit 6 row retries an exit 2 once"
+assert_contains "$S" "On a second exit 2, or an exit of that call other than 0, 1 or 2, $RCSTOP" "the exit 6 row stops on its other failures"
+
+# The orchestrator ends the loop blocked on the resume's round-comment.sh stop too (issue #181).
+echo "skills: issue-to-pr's blocked causes and failure policy name the resume's round-comment.sh stop"
+S="$(skill_section issue-to-pr/SKILL.md '## 7. The final report')"
+assert_contains "$S" 'or on a resume'"'"'s `round-comment.sh` exit (its "Resuming" section)' "step 7's blocked causes name the resume's stop"
+S="$(skill_section issue-to-pr/SKILL.md '## Failure policies')"
+assert_contains "$S" '**A `pr-round.sh` or `round-comment.sh` exit:**' "the failure policy covers both tools"
+assert_contains "$S" 'or on a resume by its "Resuming" section' "the failure policy points to the Resuming section"
 
 report

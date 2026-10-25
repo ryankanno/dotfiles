@@ -294,6 +294,7 @@ why.
   PR that is not `OPEN` before a refine, a convergence round with no
   critic, the pane's `Stop: blocked: <reason>` on a `pr-round.sh` exit
   (the exit-code table in the dispatch template's "Review rounds"
+  section) or on a resume's `round-comment.sh` exit (its "Resuming"
   section), or a partial, nothing-reviewable or unrecovered reviewer
   with nothing from any source)
 - per-round one-liners: round number, short SHA, verdict, who ran it
@@ -332,11 +333,12 @@ report; the file is its durable copy, the exact text, no summary layer.
 - **Empty reviewer result:** handled inside the review round (retry once
   per-commit). Two empties: the round is unrecovered, never clean and
   never failing.
-- **A `pr-round.sh` exit:** the pane acts on it by the exit-code table
-  in the dispatch template's "Review rounds" section. When the pane
+- **A `pr-round.sh` or `round-comment.sh` exit:** the pane acts on it
+  by the exit-code table in the dispatch template's "Review rounds"
+  section, or on a resume by its "Resuming" section. When the pane
   stops with `Stop: blocked: <reason>`, the loop ends `blocked`, and the
-  final report carries that reason. An exit 7 is a live round, not a
-  failure.
+  final report carries that reason. A `pr-round.sh` exit 7 is a live
+  round, not a failure.
 - **A convergence round with no critic:** when pr-review §2 leaves the
   round with no critic and
   does not send it back to the reviewer with `--rerun`,
