@@ -46,7 +46,8 @@
 #                when there are prior
 #                dispositions (read from this loop's own round comments,
 #                each earlier round's comment.md on disk before its PR
-#                copy, unless --dispositions names a file, plus the
+#                copy, as round-comment.sh reads them, unless
+#                --dispositions names a file, plus the
 #                Rejected and Accepted lines of refine-dispositions.md in
 #                the round dir, which a refine writes before the round
 #                and which no --rerun moves; newest first within the
@@ -163,6 +164,9 @@ done
 scan="$here/scan.sh"
 [[ -f "$scan" ]] || scan="$here/executable_scan.sh"
 [[ -f "$scan" ]] || { printf 'scan.sh not found in %s\n' "$here" >&2; exit 2; }
+round_comment="$here/round-comment.sh"
+[[ -f "$round_comment" ]] || round_comment="$here/executable_round-comment.sh"
+[[ -f "$round_comment" ]] || { printf 'round-comment.sh not found in %s\n' "$here" >&2; exit 2; }
 # ocr aborts on a background over 8000 characters before reviewing
 # anything, and the per-commit retry then repeats the abort once per
 # commit (measured on sudoku PR 191: an 11083-character brief, 15 runs, no
@@ -360,64 +364,45 @@ bodies=$(gh api --paginate "repos/$owner_repo/issues/$pr/comments" \
 # (issue #58). A comment without the round heading stays.
 bodies=$(jq -c --argjson r "$((10#$round))" \
   'select(((capture("(?m)^## Review round (?<n>[0-9]+):") | .n | tonumber) // 0) < $r)' <<<"$bodies")
-# A round's own comment.md is the scanned text its comment posts, and it
-# exists before anyone posts it: a refine must not wait on the post. The
-# disk copy replaces that round's PR copy; the PR fills rounds with no
-# file. The merge's sort_by(.n), not this loop's glob order, puts them
+# Each earlier round with a folder reads its comment through
+# round-comment.sh, the one place that decides a usable comment: its
+# comment.md, which exists before anyone posts it, so a refine never
+# waits on the post, else its PR copy. The PR fills rounds with no
+# folder. The merge's sort_by(.n), not this loop's glob order, puts them
 # oldest first, so the last line is the newest earlier round.
-disk='{}'
-for f in "$HOME/.cache/pr-loop/$owner_repo/pr-$pr"/round-*/comment.md; do
-  [[ -f "$f" ]] || continue
-  n="${f%/comment.md}"; n="${n##*/round-}"
+folders='{}'
+for d in "$HOME/.cache/pr-loop/$owner_repo/pr-$pr"/round-*; do
+  [[ -f "$d/round.json" || -f "$d/comment.md" ]] || continue
+  n="${d##*/round-}"
   [[ "$n" =~ ^[0-9]+$ && $((10#$n)) -lt $((10#$round)) ]] || continue
-  # The same contract as a PR copy: the marker on line 1 and this round's
-  # heading; and the template's footer, its last line, so a file cut off
-  # anywhere above it or misplaced cannot replace a whole one. Checked
-  # before the scan, which rewrites the file in place.
-  [[ -r "$f" ]] || { printf 'cannot read %s; using the PR copy of round %s\n' "$f" "$((10#$n))" >&2; continue; }
-  if [[ "$(head -1 "$f")" != '<!-- pr-loop-comment -->' ]] ||
-     ! grep -q "^## Review round $((10#$n)):" "$f" ||
-     [[ "$(tail -n 1 "$f")" != "*Round $((10#$n)) |"* ]]; then
-    printf 'not a whole round %s comment: %s; using the PR copy\n' "$((10#$n))" "$f" >&2
-    continue
-  fi
-  # A file that failed the scan was never posted, and background.md leaves
-  # the machine through the reviewer: that round falls back to the PR's copy.
-  rc=0; "$scan" "$f" >/dev/null 2>&1 || rc=$?
+  n=$((10#$n))
+  # The body rides as one JSON string on stdin, never in an argument:
+  # every earlier round's body together outgrows the exec argument limit.
+  rc=0
+  next=$("$round_comment" "$owner_repo" "$pr" "$n" | jq -Rs --arg k "$n" '{($k): .}') || rc=$?
   case $rc in
-    0) ;;
-    1) printf 'scan hits in %s; using the PR copy of round %s\n' "$f" "$((10#$n))" >&2; continue ;;
-    *) printf 'scan failed on %s; using the PR copy of round %s\n' "$f" "$((10#$n))" >&2; continue ;;
+    0) folders=$(printf '%s\n%s\n' "$folders" "$next" | jq -cs '.[0] + .[1]') ;;
+    1)
+      # An earlier round on record with no usable comment would drop out
+      # of the background, prior-findings.md and the critic input in
+      # silence (issue #166): a pane that died before comment.md, a
+      # cut-off file, or a file the scan blocked, which the PR then never
+      # got either.
+      if [[ -f "$d/round.json" ]]; then
+        printf 'round %s has no comment: no whole, scan-clean %s and no round %s comment by %s on PR %s\n' \
+          "$n" "$d/comment.md" "$n" "$me" "$pr" >&2
+        exit 9
+      fi ;;
+    *)
+      printf 'cannot read the round %s comment (round-comment.sh exit %s)\n' "$n" "$rc" >&2
+      exit 5 ;;
   esac
-  next=$(jq -c --arg k "$((10#$n))" --rawfile b "$f" '. + {($k): $b}' <<<"$disk") || {
-    printf 'cannot merge %s; using the PR copy of round %s\n' "$f" "$((10#$n))" >&2
-    continue
-  }
-  disk=$next
 done
-# An earlier round on record with no usable comment would drop out of the
-# background, prior-findings.md and the critic input in silence (issue
-# #166): a pane that died before comment.md, a cut-off file, or a file the
-# scan blocked, which the PR then never got either.
-have=$({ jq -r 'keys[]' <<<"$disk"
-         jq -r '(capture("(?m)^## Review round (?<n>[0-9]+):") | .n | tonumber) // empty' <<<"$bodies"; })
-for f in "$HOME/.cache/pr-loop/$owner_repo/pr-$pr"/round-*/round.json; do
-  [[ -f "$f" ]] || continue
-  n="${f%/round.json}"; n="${n##*/round-}"
-  [[ "$n" =~ ^[0-9]+$ && $((10#$n)) -lt $((10#$round)) ]] || continue
-  grep -qx "$((10#$n))" <<<"$have" || {
-    printf 'round %s has no comment: no whole, scan-clean %s and no round %s comment by %s on PR %s\n' \
-      "$((10#$n))" "${f%/round.json}/comment.md" "$((10#$n))" "$me" "$pr" >&2
-    exit 9
-  }
-done
-# The disk bodies ride on stdin ahead of the PR's, never in an argument:
-# every earlier round's body together outgrows the exec argument limit.
-bodies=$(printf '%s\n%s\n' "$disk" "$bodies" | jq -rs '
-  .[0] as $disk | .[1:]
+bodies=$(printf '%s\n%s\n' "$folders" "$bodies" | jq -rs '
+  .[0] as $folders | .[1:]
   | map({n: ((capture("(?m)^## Review round (?<n>[0-9]+):") | .n | tonumber) // 0), b: .})
-  | map(select((.n | tostring) as $k | $disk | has($k) | not))
-  | . + ($disk | to_entries | map({n: (.key | tonumber), b: .value}))
+  | map(select((.n | tostring) as $k | $folders | has($k) | not))
+  | . + ($folders | to_entries | map({n: (.key | tonumber), b: .value}))
   | sort_by(.n) | .[] | .b | @json')
 if [[ -n "$dispositions" ]]; then
   settled=$(cat "$dispositions")
