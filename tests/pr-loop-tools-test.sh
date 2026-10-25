@@ -3655,4 +3655,14 @@ assert_contains "$S" 'adds its Rejected and Accepted lines' "pr-review §1 says 
 assert_contains "$S" 'A file that fails the scan stops the round with exit 2' "pr-review §1 says a scan hit stops the round"
 assert_contains "$S" 'Fix what its stderr line names, then run the round again' "pr-review §1 gives the recovery"
 
+# Only round-comment.sh's exit 1 means no usable comment; its other failures stop the pane (issue #181).
+echo "skills: the Resuming bullet and the exit 6 row stop on a failed round-comment.sh read"
+RCSTOP='stop with `blocked: round-comment.sh exit <code>: <stderr line>`.'
+S="$(skill_section issue-to-pr/dispatch-prompt-template.md '## Resuming PR')"
+assert_contains "$S" 'no usable comment (the call exits 1) is unfinished' "the Resuming bullet keys an unfinished round on exit 1"
+assert_contains "$S" "On an exit other than 0 or 1, $RCSTOP" "the Resuming bullet stops on a failed read"
+S="$(skill_section issue-to-pr/dispatch-prompt-template.md '## Review rounds')"
+assert_contains "$S" 'no usable comment (that call exits 1), finish it from pr-review §2' "the exit 6 row keys an unfinished round on exit 1"
+assert_contains "$S" "On an exit of that call other than 0 or 1, $RCSTOP" "the exit 6 row stops on a failed read"
+
 report
