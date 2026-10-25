@@ -289,7 +289,7 @@ why.
   and the gate exited 0), `converged` (blocking findings existed but the convergence
   round found every one low and dispositioned; the accepted judgment
   calls are listed), `capped-unrecovered` (blocking findings remain
-  after 3 rounds), or
+  after 3 refine rounds), or
   `blocked` (pane death after redispatch, no gate found, scan hit, a
   PR that is not `OPEN` before a refine, a convergence round with no
   critic, the pane's `Stop: blocked: <reason>` on a `pr-round.sh` exit

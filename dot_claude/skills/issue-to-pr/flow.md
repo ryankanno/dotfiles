@@ -5,41 +5,15 @@ One picture of the unattended loop that /issue-to-pr drives and
 diagram is the map. When the two disagree, the skills win and this file
 gets fixed.
 
-**Verdict states** (machine-read by the next round):
-
-- `No issues found.` — every source ran and produced no blocking
-  finding.
-- `<n> finding(s).` — blocking findings exist, counted across the
-  sources that ran. A finding blocks when it is high or sits on a line
-  changed since the prior round's head; the rest are follow-ups for the
-  human, never refine work.
-- `partial (the reviewer's coverage has a gap).` — review text exists but
-  part of the range went unreviewed; neither clean nor failing; the
-  loop cannot declare the branch clean off that round.
-- `nothing reviewable (no files in the reviewer's scope).` — the
-  reviewer selected no file in the range; neither clean nor failing;
-  the loop cannot declare the branch clean off that round.
-- `unrecovered (the reviewer produced no review text).` — neither clean
-  nor failing; the loop cannot declare the branch clean off that round.
-- `nothing to review (only a base merge since the prior round).` — no
-  source ran; the prior round's blocking findings carry forward
-  verbatim; the loop cannot declare the branch clean off that round.
-- `converged (all blocking findings low and dispositioned).` — the
-  convergence round only: blocking findings existed,
-  every one low and fixed,
-  rejected, or accepted with a recorded reason. The loop ends when the
-  orchestrator ratifies it, unless a human names a finding.
+**Verdict states** (machine-read by the next round): the verdict list
+in [`report-template.md`](../pr-review/report-template.md).
 
 **Ownership:** the implementer pane runs every round (round 1, refine,
 convergence). The orchestrator runs none; it ratifies.
 
 **Loop end states** (the final message, the runner's contract): `clean`,
-`converged` (all blocking findings low and dispositioned; accepted
-judgment calls listed), `capped-unrecovered` (blocking findings remain
-after 3 refine rounds),
-`blocked` (pane death after redispatch, no gate, scan hit, or a partial,
-nothing reviewable, or unrecovered reviewer with nothing from any
-source).
+`converged`, `capped-unrecovered` or `blocked`, as issue-to-pr §7
+([`SKILL.md`](SKILL.md)) defines each.
 
 ## The loop
 
@@ -71,7 +45,7 @@ flowchart TD
     RC -- "yes: converged candidate" --> J
     RC -- "no" --> R
     I -- "partial, nothing reviewable,<br/>or unrecovered" --> P["Neither clean nor failing;<br/>nothing to fix, no clean claim"]
-    K -- "no" --> M["Capped-unrecovered:<br/>findings remain after 3 rounds"]
+    K -- "no" --> M["Capped-unrecovered:<br/>findings remain after 3 refine rounds"]
     J --> JB{"Convergence round blocking?"}
     JB -- "yes" --> K
     JB -- "no: the pane stops" --> N{"Orchestrator ratifies:<br/>round.json head = headRefOid,<br/>review_scope full, comment posted<br/>(or a scanned draft, not owned),<br/>gate green in the worktree,<br/>every Rejected/Accepted holds"}

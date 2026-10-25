@@ -221,9 +221,9 @@ issue-to-pr loop, the pane stops with
 
 **`range.review_scope` starting with `none:`** is a base merge with no
 PR change. Skip steps 3 to 5: no source runs. Post a comment per
-report-template.md with the verdict `nothing to review (only a base
-merge since the prior round).` and the round dir's `prior-findings.md`,
-verbatim, as its `**Findings:**` section when the file exists. The
+report-template.md with its nothing-to-review verdict and the round
+dir's `prior-findings.md`, verbatim, as its `**Findings:**` section
+when the file exists. The
 prior round's blocking findings then stand for /pr-refine and for the
 next round.
 
@@ -248,18 +248,14 @@ shapes, read from `runs[].status`:
   but part of the range went unreviewed (failed files, a group that
   lost a review pass, or commits whose retry produced no review text).
   Its findings count like any other source's.
-  With nothing from any source, the verdict is `partial (the
-  reviewer's coverage has a gap).`
 - **Nothing reviewable** (the range run is `skipped`): the reviewer
   selected no file in the range (docs, tests, lockfiles), so it had
-  nothing to review, and no per-commit retry runs. With nothing from any
-  source, the verdict is `nothing reviewable (no files in the reviewer's
-  scope).`
+  nothing to review, and no per-commit retry runs.
 - **Unrecovered** (none of these): the reviewer produced no
-  review text, whatever runs it attempted. With nothing from any
-  source, the verdict is `unrecovered (the reviewer produced no review
-  text).`
+  review text, whatever runs it attempted.
 
+With nothing from any source, each shape has its own verdict line in
+report-template.md's verdict list.
 In every shape, findings from any source make the verdict count them,
 and the visible `**Reviewer:**` line names the gap per
 report-template.md. No shape is clean and none is a failure:
@@ -368,20 +364,9 @@ thin coverage and a skipped run must read as what they are. A
 convergence round has no runs: its Reviewer details block holds the
 line `No reviewer ran: the convergence round runs none by design.`
 
-The verdict line is machine-read by /pr-refine; keep the protocol exact,
-one of: `**Verdict:** No issues found.` when every source ran and
-produced no blocking finding (on a convergence round, the critic and
-the read), `**Verdict:** <n> finding(s).` when <n>
-blocking findings exist, `**Verdict:** partial (the reviewer's coverage has a gap).` when
-the binding ended partial with nothing else to report,
-`**Verdict:** nothing reviewable (no files in the reviewer's scope).`
-when the range run was `skipped` with nothing else to report,
-`**Verdict:** unrecovered (the reviewer produced no review text).` when
-the binding ended unrecovered with nothing else to report,
-`**Verdict:** nothing to review (only a base merge since the prior round).`
-when `range.review_scope` starts with `none:`, or
-`**Verdict:** converged (all blocking findings low and dispositioned).`,
-which only a convergence round writes.
+The verdict line is machine-read by /pr-refine: write it exactly as one
+of the lines in report-template.md's verdict list, under the condition
+the list gives that line.
 
 ## 7. Scan before posting
 
