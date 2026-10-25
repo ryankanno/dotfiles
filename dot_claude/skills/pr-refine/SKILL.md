@@ -166,9 +166,9 @@ the round: `$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/round-<N>/`, with
 Write the lines as `report-template.md`'s Dispositions block writes them:
 `- Rejected:` or `- Accepted:` at column 0, wrapped text indented.
 A `- Fixed:` line stays out of the file: the round reads only the other
-two, and the scan reads the whole file. Its Rejected and Accepted
-lines join the standing dispositions for the reviewer and the critic
-(pr-review §1).
+two, and the scan reads the whole file. The file's Rejected and
+Accepted lines join the standing dispositions for the reviewer and
+the critic (pr-review §1).
 The file passes `scan.sh` first: a hit stops the round with exit 2
 before any review. Fix the file, then run the round again.
 
