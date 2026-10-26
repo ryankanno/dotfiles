@@ -54,47 +54,35 @@ The objective is the reader's value, not the critic's zero.
 
 ## 1. Read the round
 
-Read the newest round from disk first: `comment.md` in the newest
-`$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/round-<N>/` that has a
-`round.json`. That file is the scanned text the round posts, and it
-exists before the post, so the refine never waits for one. The next
-round's `pr-round.sh` skips a file that lacks the marker
-`<!-- pr-loop-comment -->` on line 1, the `## Review round <N>:` heading
-for its folder, or the template's last line, `*Round <N> | ...*`, or
-that then fails `$HOME/.claude/skills/issue-to-pr/tools/scan.sh`. Check
-it the same way, in that order; when it fails, treat that round as
-having no `comment.md`.
+Print the newest round's comment. `pr-round.sh` reads earlier rounds
+with the same tool:
+
+```bash
+$HOME/.claude/skills/issue-to-pr/tools/round-comment.sh <owner/repo> <n>
+```
+
+It prints the comment of the newest round that has a usable one. A
+round's `comment.md` comes first: it is the scanned text the round
+posts, and it exists before the post, so the refine never waits for
+one. A `comment.md` that is not whole or fails `scan.sh` gives way to
+your newest round comment on the PR, read across every page of
+comments. The stderr says why a file gave way.
 
 On a repository that is not owned (pr-review §8), read the round from
 `comment.md` only: no round comment is on the PR.
 
-When that round has no `comment.md`, select the newest matching comment
-on the PR: its first line is the marker `<!-- pr-loop-comment -->` and
-its author is you. The marker sits on the first line, so a marker
-quoted inside a finding cannot forge a round comment.
+When the tool exits 1, no round comment exists: there is nothing to
+refine yet. Say so and stop; producing findings is /pr-review's round,
+not this one. When it exits 2 (a usage error, an unset `HOME`, or a
+missing `scan.sh`), fix the call or the environment and run it once
+more. On a second exit 2, or an exit other than 0, 1 or 2 (a failed
+read, or a missing `gh` or `jq`), report its last stderr line and stop.
+In the issue-to-pr loop, the pane stops with
+`blocked: round-comment.sh exit <code>: <stderr line>`.
 
-```bash
-gh api user --jq .login
-gh pr view <n> --json comments --jq '[.comments[] | select(.author.login == "<login>") | select(.body | startswith("<!-- pr-loop-comment -->"))] | last | .body'
-```
-
-If neither exists (no file, and the jq prints `null`), no round comment
-exists: there is nothing to refine yet. Say so and stop; producing
-findings is /pr-review's round, not this one.
-
-The verdict line is one of
-`No issues found.`, `<n> finding(s).`,
-`partial (the reviewer's coverage has a gap).`,
-`nothing reviewable (no files in the reviewer's scope).`,
-`unrecovered (the reviewer produced no review text).`,
-`nothing to review (only a base merge since the prior round).`, or
-`converged (all blocking findings low and dispositioned).` Partial,
-nothing reviewable and unrecovered mean nothing to fix and no clean
-claim. Nothing to review
-means no clean claim: its Findings are the prior round's, carried
-verbatim, and you fix them like any round's. A converged verdict
-means the convergence round closed the loop: nothing to fix, no new
-round.
+The verdict line is one of the lines in the verdict list of
+`$HOME/.claude/skills/pr-review/report-template.md`. Each line there
+says what it leaves this round to fix.
 
 ## 2. Validate every finding
 
@@ -170,7 +158,9 @@ two, and the scan reads the whole file. The file's Rejected and
 Accepted lines join the standing dispositions for the reviewer and
 the critic (pr-review §1).
 The file passes `scan.sh` first: a hit stops the round with exit 2
-before any review. Fix the file, then run the round again.
+before any review. Fix the file, then run the round again. In the
+issue-to-pr loop, the pane stops instead, by the dispatch template's
+exit-code table.
 
 Run the full review round exactly as
 `$HOME/.claude/skills/pr-review/SKILL.md` defines it, over the new head

@@ -18,12 +18,17 @@ PR, and do not redo work the branch already holds.
 - Read the newest round directory under
   `$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/`. When there is none,
   start at Round 1 below.
-- A round with a `round.json` and a `comment.md` is finished:
-  continue the "Review rounds" loop below from it, with the next free
-  round number. A round with a `round.json` and no `comment.md` is
-  unfinished: continue it from pr-review §2. Do not run `pr-round.sh`
+- A round with a `round.json` and a usable comment
+  (`$HOME/.claude/skills/issue-to-pr/tools/round-comment.sh <owner/repo> <n> <N>`
+  exits 0, with `<N>` that round's number) is finished: continue the "Review rounds" loop below from
+  it, with the next free round number. A round with a `round.json` and
+  no usable comment (the call exits 1) is unfinished: continue it from pr-review §2. Do not run `pr-round.sh`
   again, except for the `--rerun` that pr-review §2 names after a
-  convergence round's `critic-input.sh` exit 4. Any other round is unfinished: finish that same
+  convergence round's `critic-input.sh` exit 4. On a `round-comment.sh`
+  exit 2, fix the call or the environment and run it once more. On a
+  second exit 2, or a `round-comment.sh` exit other than 0, 1 or 2, stop
+  with `blocked: round-comment.sh exit <code>: <stderr line>`.
+  Any other round is unfinished: finish that same
   round with the pr-review skill, by the exit 6 and exit 7 rules below.
 - The PR has had <refine count> refine rounds. Count them against the
   cap of 3 refine rounds below. Do not get the count from the round
@@ -140,15 +145,24 @@ Every review round passes `--brief <the brief file above>` to
 `pr-round.sh` and `critic-input.sh`.
 
 A round runs longer than one tool call. Start it in the background as
-pr-review §1 says. When `pr-round.sh` exits 6 and the round dir has no
-`round.json`, your earlier run of that round died: pass `--rerun` once.
-When it exits 7, another process runs that round: wait for it, and
-never `--rerun` over it. When it exits 8, GitHub did not report the
-pushed head in time, and the round left no evidence: run it again
-once, without `--rerun`. A second exit 8 stops the loop as blocked.
-When it exits 9, an earlier round has no comment on disk or on the PR:
-stop with `blocked: round <N> has no comment`, with the round its
-stderr line names.
+pr-review §1 says. Then act on the exit code of `pr-round.sh`. A
+`<stderr line>` is the script's last stderr line, verbatim: scan hits or
+a passed-over `comment.md` can come above it. When a row that stops
+finds no stderr line, its reason ends before `: <stderr line>`.
+
+| Exit | What it means | What you do |
+|---|---|---|
+| 0 | The round ran. | Continue the round with pr-review §2. |
+| 2 | A usage error, an unusable environment, a brief over the reviewer's background limit, or a `refine-dispositions.md` that fails the scan. | Stop with `blocked: pr-round.sh exit 2: <stderr line>`. |
+| 3 | An identity mismatch: the PR head is not this loop's branch. | Stop with `blocked: identity mismatch: <stderr line>`. |
+| 4 | The PR is missing, not open, or not resolvable. | Stop with `blocked: pr-round.sh exit 4: <stderr line>`. |
+| 5 | The repository, its refs, the changed-file listing, the gh user, or the PR comments could not be read. | Stop with `blocked: pr-round.sh exit 5: <stderr line>`. |
+| 6 | The round dir already holds evidence. | When it has no `round.json`, your earlier run of that round died: pass `--rerun` once. On an exit 6 after that `--rerun`, stop with `blocked: pr-round.sh exit 6: <stderr line>`. When it has a `round.json` and a usable comment (`round-comment.sh <owner/repo> <n> <N>` exits 0), the round is finished: continue the loop from it. When it has a `round.json` and no usable comment (that call exits 1), finish it from pr-review §2, with the one `--rerun` §2 names after a convergence round's `critic-input.sh` exit 4. On an exit 2 of that call, fix the call or the environment and run it once more. On a second exit 2, or an exit of that call other than 0, 1 or 2, stop with `blocked: round-comment.sh exit <code>: <stderr line>`. |
+| 7 | Another process runs that round. | Wait for it. Never `--rerun` over it. |
+| 8 | GitHub did not report the pushed head in time, and the round left no evidence. | Run the round again once, without `--rerun`. On a second exit 8, stop with `blocked: pr-round.sh exit 8: <stderr line>`. |
+| 9 | An earlier round has no comment on disk or on the PR. | Stop with `blocked: round <N> has no comment`, with the round its stderr line names. |
+| 127 | A dependency is missing. | Stop with `blocked: pr-round.sh exit 127: <stderr line>`. |
+| Any other | A failure the table does not list. | Stop with `blocked: pr-round.sh exit <code>: <stderr line>`. |
 
 After you stop, a refine instruction can arrive by `workmux send`. It
 names a disposition the orchestrator overrules. Run the pr-refine skill

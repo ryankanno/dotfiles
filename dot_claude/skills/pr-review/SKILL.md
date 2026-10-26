@@ -105,6 +105,8 @@ lines from the comments or from `--dispositions`, for `background.md`
 and for the critic's `settled.md`.
 A file that fails the scan stops the round with exit 2 before any
 review runs. Fix what its stderr line names, then run the round again.
+In the issue-to-pr loop, the pane stops instead, by the exit-code table
+in the dispatch template's "Review rounds" section.
 The file is not evidence of an earlier run, and `--rerun`
 does not move it.
 
@@ -118,7 +120,9 @@ stops the round with exit 2 before any review runs, leaving the round
 dir untouched: condense it to the
 task (its asks,
 the settled decisions, the constraints) and rerun, never pass a
-dispatch prompt or loop instructions as the brief. A convergence round
+dispatch prompt or loop instructions as the brief. In the issue-to-pr
+loop, the pane stops instead: the brief is the orchestrator's to
+condense. A convergence round
 runs no reviewer, so it writes no `background.md` and checks no limit.
 
 From round 2 on, `round.json` carries `range.prior_head` (the previous
@@ -195,8 +199,9 @@ on a delta round. After a base merge it runs from the baseline to a
 commit that has the head's tree and only the baseline as parent.
 
 The script exits 4 when the PR is missing, not open, or not
-resolvable, 5 when the repository, its refs, or the changed-file
-listing cannot be resolved, and 127 when `gh`, `jq`, or `git` is
+resolvable, 5 when the repository, its refs, the changed-file
+listing, the gh user, or the PR comments cannot be read, and 127 when
+`gh`, `jq`, or `git` is
 missing. It exits 6 when the round directory already holds evidence:
 `--rerun` moves that evidence into a `superseded-*/` subdirectory, then
 runs the round. Pass `--rerun` only when the earlier run of this round
@@ -221,9 +226,9 @@ issue-to-pr loop, the pane stops with
 
 **`range.review_scope` starting with `none:`** is a base merge with no
 PR change. Skip steps 3 to 5: no source runs. Post a comment per
-report-template.md with the verdict `nothing to review (only a base
-merge since the prior round).` and the round dir's `prior-findings.md`,
-verbatim, as its `**Findings:**` section when the file exists. The
+report-template.md with the verdict line its list gives for a `none:`
+scope and the round dir's `prior-findings.md`, verbatim, as its
+`**Findings:**` section when the file exists. The
 prior round's blocking findings then stand for /pr-refine and for the
 next round.
 
@@ -231,8 +236,8 @@ next round.
 reviewer ran, by design. Steps 3 to 5 run as usual. The round is clean
 when the critic ran and neither the critic nor your read has a blocking
 finding. It is not partial and not unrecovered: the shapes below do not
-apply to it. When `critic-input.sh` exits 2 on a usage error, fix the
-call and run it again. Any other non-zero exit leaves the round with no
+apply to it. When `critic-input.sh` exits 2, fix it as §3 says and run
+it again. Any other non-zero exit leaves the round with no
 critic, and the round posts nothing. On exit 4 with `range.head` equal
 to `range.prior_head`, run the round again with `--rerun` and without
 `--convergence`: the reviewer then reviews the whole PR. In every other
@@ -248,18 +253,14 @@ shapes, read from `runs[].status`:
   but part of the range went unreviewed (failed files, a group that
   lost a review pass, or commits whose retry produced no review text).
   Its findings count like any other source's.
-  With nothing from any source, the verdict is `partial (the
-  reviewer's coverage has a gap).`
 - **Nothing reviewable** (the range run is `skipped`): the reviewer
   selected no file in the range (docs, tests, lockfiles), so it had
-  nothing to review, and no per-commit retry runs. With nothing from any
-  source, the verdict is `nothing reviewable (no files in the reviewer's
-  scope).`
+  nothing to review, and no per-commit retry runs.
 - **Unrecovered** (none of these): the reviewer produced no
-  review text, whatever runs it attempted. With nothing from any
-  source, the verdict is `unrecovered (the reviewer produced no review
-  text).`
+  review text, whatever runs it attempted.
 
+With nothing from any source, each shape has its own verdict line in
+report-template.md's verdict list.
 In every shape, findings from any source make the verdict count them,
 and the visible `**Reviewer:**` line names the gap per
 report-template.md. No shape is clean and none is a failure:
@@ -299,9 +300,13 @@ $HOME/.claude/skills/issue-to-pr/tools/subagent/critic-input.sh \
   --repo <checkout-dir> --round-dir <round-dir> --brief <brief-file>
 ```
 
-When the script exits 4, the prompt is over 200,000 bytes and cannot
-pass inline. The script prints no prompt. The round runs with no critic.
-The Critic block records the gap with the script's stderr line. A
+When the script exits 2, fix the cause and run it again: the call, a
+missing `critic-prompt.md` (its stderr line names it), or a missing
+`round.json` (it prints only its usage line; run the round first).
+When it exits 4 (the prompt is over 200,000 bytes and
+cannot pass inline), 5 (the diff failed) or 127 (a dependency is
+missing), it prints no prompt. The round runs with no critic. The
+Critic block records the gap with the script's stderr line. A
 convergence round follows §2 instead.
 
 Its findings arrive numbered with file, line, the claim, the input or
@@ -366,20 +371,9 @@ thin coverage and a skipped run must read as what they are. A
 convergence round has no runs: its Reviewer details block holds the
 line `No reviewer ran: the convergence round runs none by design.`
 
-The verdict line is machine-read by /pr-refine; keep the protocol exact,
-one of: `**Verdict:** No issues found.` when every source ran and
-produced no blocking finding (on a convergence round, the critic and
-the read), `**Verdict:** <n> finding(s).` when <n>
-blocking findings exist, `**Verdict:** partial (the reviewer's coverage has a gap).` when
-the binding ended partial with nothing else to report,
-`**Verdict:** nothing reviewable (no files in the reviewer's scope).`
-when the range run was `skipped` with nothing else to report,
-`**Verdict:** unrecovered (the reviewer produced no review text).` when
-the binding ended unrecovered with nothing else to report,
-`**Verdict:** nothing to review (only a base merge since the prior round).`
-when `range.review_scope` starts with `none:`, or
-`**Verdict:** converged (all blocking findings low and dispositioned).`,
-which only a convergence round writes.
+The verdict line is machine-read by /pr-refine: write it exactly as one
+of the lines in report-template.md's verdict list, under the condition
+the list gives that line.
 
 ## 7. Scan before posting
 
@@ -419,7 +413,8 @@ gh pr comment <n> --body-file <round-dir>/comment.md
 ```
 
 Record the comment URL and the round directory: the final report needs
-the session ids and token totals from the round's `review.json`.
+the session ids and token totals from the round's `round.json`
+(`runs[].session_id` and `cumulative_tokens`).
 
 On any other repository, do not post. `<round-dir>/comment.md` stays
 as the draft. When the §7 scan exited 0, report to the caller that the

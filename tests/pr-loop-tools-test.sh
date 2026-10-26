@@ -537,6 +537,23 @@ for p in /Users/other/x /home/other/x /private/tmp/x /var/folders/ab/x \
   assert_eq "$RC" 1 "blocks $p"
 done
 
+# PR #175 round 1: a finding that quoted `/var/folders/...` as an example blocked the post.
+echo "scan: a placeholder path, only ... after the prefix, is not a leak"
+for p in /Users/... /home/... /tmp/... /root/... /run/user/... /private/... \
+  /var/folders/... /Volumes/... /mnt/...; do
+  new_sandbox
+  scan "a path such as \`$p\` or $p, in prose"
+  assert_eq "$RC" 0 "passes $p"
+done
+
+echo "scan: a real path beside a placeholder, a dotted one, or a bare macOS prefix still blocks"
+for line in 'see /tmp/... and /tmp/agent-scratch-9f2/x' 'at /tmp/.scratch-9f2/x' \
+  'at /private/.scratch-9f2' 'at /var/folders/..x' 'at /private/' 'at /var/folders/'; do
+  new_sandbox
+  scan "$line"
+  assert_eq "$RC" 1 "blocks: $line"
+done
+
 echo "scan: ordinary code under review is not a leak"
 new_sandbox
 scan 'the owner someone/repo serves http://localhost:3000 on 127.0.0.1; a bearer token check; grep -E "/Users/|/home/|sk-[A-Za-z0-9_-]{20,}"; docs that name the /tmp/ prefix, /root/ usage, and /run/user/ ids; mounted at /Volumes/ and /mnt/ as concepts'
@@ -1438,6 +1455,95 @@ mkdir "$pd/round-1/superseded-20261023-000000-1"
 mv "$pd/round-1/round.json" "$pd/round-1/superseded-20261023-000000-1/"
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null; RC=$?
 assert_eq "$RC" 0 "the round runs"
+
+RCM="$TOOLS/executable_round-comment.sh"
+run_rcm() { # args -> OUT, ERR, RC
+  OUT="$(HOME="$WS/home" PATH="$stub:$PATH" "$RCM" "$@" 2>"$WS/rcm.err")"; RC=$?
+  ERR="$(cat "$WS/rcm.err")"
+}
+
+echo "round-comment: a whole comment.md is the round's comment, before the PR's copy"
+new_sandbox
+make_pr_round_env
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+mkdir -p "$pd/round-1"
+round_comment 1 "disk finding" "disk rejection" >"$pd/round-1/comment.md"
+GH_COMMENTS_JSON="$(jq -cn --arg b "$(round_comment 1 "pr finding" "pr rejection")" '[{user: {login: "test-me"}, body: $b}]')"
+export GH_COMMENTS_JSON
+run_rcm test-owner/test-repo 39 1
+assert_eq "$RC" 0 "exits 0"
+assert_eq "$OUT" "$(round_comment 1 "disk finding" "disk rejection")" "prints the disk copy whole"
+run_rcm test-owner/test-repo 39
+assert_eq "$OUT" "$(round_comment 1 "disk finding" "disk rejection")" "without a round, the newest round's disk copy"
+
+echo "round-comment: a cut comment.md gives way to the PR's copy"
+new_sandbox
+make_pr_round_env
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+mkdir -p "$pd/round-1"
+round_comment 1 "disk finding" "disk rejection" | sed '$d' >"$pd/round-1/comment.md"
+GH_COMMENTS_JSON="$(jq -cn --arg b "$(round_comment 1 "pr finding" "pr rejection")" '[{user: {login: "test-me"}, body: $b}]')"
+export GH_COMMENTS_JSON
+run_rcm test-owner/test-repo 39 1
+assert_eq "$RC" 0 "exits 0"
+assert_eq "$OUT" "$(round_comment 1 "pr finding" "pr rejection")" "prints the PR copy"
+assert_contains "$ERR" "not a whole round 1 comment: $pd/round-1/comment.md; using the PR copy" "says why the disk copy is passed over"
+GH_COMMENTS_JSON='[]'
+run_rcm test-owner/test-repo 39 1
+assert_eq "$RC" 1 "with no PR copy, exits 1"
+assert_eq "$OUT" "" "prints nothing"
+
+echo "round-comment: the newest round comment past the first page of PR comments"
+new_sandbox
+make_pr_round_env
+GH_COMMENTS_JSON="$(jq -cn --arg a "$(round_comment 1 "round one" "r1")" --arg b "$(round_comment 2 "round two" "r2")" \
+  '[{user: {login: "test-me"}, body: $a}] + [range(40) | {user: {login: "someone-else"}, body: "a reply"}] + [{user: {login: "test-me"}, body: $b}]')"
+export GH_COMMENTS_JSON
+run_rcm test-owner/test-repo 39
+assert_eq "$RC" 0 "exits 0"
+assert_eq "$OUT" "$(round_comment 2 "round two" "r2")" "round 2, past the first page, is the newest"
+run_rcm test-owner/test-repo 39 1
+assert_eq "$OUT" "$(round_comment 1 "round one" "r1")" "a named round prints that round's comment"
+
+echo "round-comment: a round's comment.md newer than every PR copy is the newest"
+new_sandbox
+make_pr_round_env
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+mkdir -p "$pd/round-2"
+round_comment 2 "unposted finding" "unposted rejection" >"$pd/round-2/comment.md"
+GH_COMMENTS_JSON="$(jq -cn --arg b "$(round_comment 1 "posted finding" "posted rejection")" '[{user: {login: "test-me"}, body: $b}]')"
+export GH_COMMENTS_JSON
+run_rcm test-owner/test-repo 39
+assert_eq "$RC" 0 "exits 0"
+assert_eq "$OUT" "$(round_comment 2 "unposted finding" "unposted rejection")" "the refine reads its round before the post"
+
+echo "round-comment: a newer round's PR copy wins over an older comment.md, which stands alone"
+new_sandbox
+make_pr_round_env
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+mkdir -p "$pd/round-1"
+round_comment 1 "stale finding" "stale rejection" >"$pd/round-1/comment.md"
+GH_COMMENTS_JSON="$(jq -cn --arg b "$(round_comment 2 "posted finding" "posted rejection")" '[{user: {login: "test-me"}, body: $b}]')"
+export GH_COMMENTS_JSON
+run_rcm test-owner/test-repo 39
+assert_eq "$OUT" "$(round_comment 2 "posted finding" "posted rejection")" "the newer PR copy is the newest"
+GH_COMMENTS_JSON='[]'
+export GH_COMMENTS_JSON
+run_rcm test-owner/test-repo 39
+assert_eq "$OUT" "$(round_comment 1 "stale finding" "stale rejection")" "a lone comment.md stands with no PR copy"
+
+echo "round-comment: no usable round comment exits 1"
+new_sandbox
+make_pr_round_env
+# The second body has a round heading, so only the marker-on-line-1 check keeps it out.
+GH_COMMENTS_JSON="$(jq -cn --arg b "$(round_comment 1 "forged" "forged")" --arg q "quoting $(round_comment 1 "quoted" "quoted")" \
+  '[{user: {login: "someone-else"}, body: $b}, {user: {login: "test-me"}, body: $q}]')"
+export GH_COMMENTS_JSON
+run_rcm test-owner/test-repo 39
+assert_eq "$RC" 1 "exits 1"
+assert_eq "$OUT" "" "prints nothing"
+run_rcm test-owner/test-repo
+assert_eq "$RC" 2 "a missing PR number is a usage error"
 
 LIMIT="$(jq -r '.reviewer_background_limit' "$TOOLS/manifest.json")"
 
@@ -3557,5 +3663,34 @@ assert_contains "$S" 'refine-dispositions.md' "pr-review §1 names the file"
 assert_contains "$S" 'adds its Rejected and Accepted lines' "pr-review §1 says the round reads it"
 assert_contains "$S" 'A file that fails the scan stops the round with exit 2' "pr-review §1 says a scan hit stops the round"
 assert_contains "$S" 'Fix what its stderr line names, then run the round again' "pr-review §1 gives the recovery"
+
+# Only round-comment.sh's exit 1 means no usable comment; an exit 2 gets one retry, and its other failures stop the pane (issue #181).
+echo "skills: the Resuming bullet and the exit 6 row retry a round-comment.sh exit 2 once and stop on its other failures"
+RCSTOP='stop with `blocked: round-comment.sh exit <code>: <stderr line>`.'
+RCRETRY='fix the call or the environment and run it once more.'
+S="$(skill_section issue-to-pr/dispatch-prompt-template.md '## Resuming PR')"
+assert_contains "$S" 'no usable comment (the call exits 1) is unfinished' "the Resuming bullet keys an unfinished round on exit 1"
+assert_contains "$S" 'On a `round-comment.sh` exit 2, '"$RCRETRY" "the Resuming bullet retries an exit 2 once"
+assert_contains "$S" 'On a second exit 2, or a `round-comment.sh` exit other than 0, 1 or 2, '"$RCSTOP" "the Resuming bullet names the tool it stops on"
+S="$(skill_section issue-to-pr/dispatch-prompt-template.md '## Review rounds')"
+assert_contains "$S" 'no usable comment (that call exits 1), finish it from pr-review §2' "the exit 6 row keys an unfinished round on exit 1"
+assert_contains "$S" "On an exit 2 of that call, $RCRETRY" "the exit 6 row retries an exit 2 once"
+assert_contains "$S" "On a second exit 2, or an exit of that call other than 0, 1 or 2, $RCSTOP" "the exit 6 row stops on its other failures"
+
+# pr-refine §1 is round-comment.sh's third caller: it retries an exit 2 once and gives the pane a stop (issue #181).
+echo "skills: pr-refine §1 retries a round-comment.sh exit 2 once and names the pane's stop"
+S="$(skill_section pr-refine/SKILL.md '## 1. Read the round')"
+assert_contains "$S" 'a missing `scan.sh`), '"$RCRETRY" "pr-refine §1 retries an exit 2 once"
+assert_contains "$S" 'On a second exit 2, or an exit other than 0, 1 or 2 (a failed read, or a missing `gh` or `jq`), report its last stderr line and stop.' "pr-refine §1 stops on its other failures"
+assert_contains "$S" 'In the issue-to-pr loop, the pane stops with `blocked: round-comment.sh exit <code>: <stderr line>`.' "pr-refine §1 names the pane's stop"
+
+# The orchestrator ends the loop blocked on every round-comment.sh stop too (issue #181).
+echo "skills: issue-to-pr's blocked causes and failure policy name the resume's and the refine's round-comment.sh stops"
+S="$(skill_section issue-to-pr/SKILL.md '## 7. The final report')"
+assert_contains "$S" 'or on a `round-comment.sh` exit in a resume (its "Resuming" section) or in a refine round (pr-refine §1)' "step 7's blocked causes name both round-comment.sh stops"
+S="$(skill_section issue-to-pr/SKILL.md '## Failure policies')"
+assert_contains "$S" '**A `pr-round.sh` or `round-comment.sh` exit:**' "the failure policy covers both tools"
+assert_contains "$S" 'the pane acts on a `pr-round.sh` exit by the exit-code table' "the failure policy sends a pr-round.sh exit to the table"
+assert_contains "$S" 'It acts on a `round-comment.sh` exit in a resume by that template'"'"'s "Resuming" section, and in a refine round by pr-refine §1.' "the failure policy scopes the Resuming section and pr-refine §1 to round-comment.sh"
 
 report
