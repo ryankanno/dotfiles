@@ -295,8 +295,9 @@ why.
   critic, the pane's `Stop: blocked: <reason>` on a `pr-round.sh` exit
   (the exit-code table in the dispatch template's "Review rounds"
   section) or on a `round-comment.sh` exit in a resume (its "Resuming"
-  section) or in a refine round (pr-refine §1), or a partial, nothing-reviewable or unrecovered reviewer
-  with nothing from any source)
+  section) or in a refine round (pr-refine §1), or a partial,
+  nothing-reviewable or unrecovered reviewer with nothing from any
+  source)
 - per-round one-liners: round number, short SHA, verdict, who ran it
 - the ratification: each item of step 6 and its result, and every
   disposition you overruled, with the reason
