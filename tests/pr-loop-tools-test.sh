@@ -3693,4 +3693,58 @@ assert_contains "$S" '**A `pr-round.sh` or `round-comment.sh` exit:**' "the fail
 assert_contains "$S" 'the pane acts on a `pr-round.sh` exit by the exit-code table' "the failure policy sends a pr-round.sh exit to the table"
 assert_contains "$S" 'It acts on a `round-comment.sh` exit in a resume by that template'"'"'s "Resuming" section, and in a refine round by pr-refine §1.' "the failure policy scopes the Resuming section and pr-refine §1 to round-comment.sh"
 
+# An own-command mistake with a read-only fix needs no stop (issue #176).
+echo "claude.md: the failure rule has one exception for the agent's own command"
+S="$(grep '^- When anything fails' "$ROOT/dot_claude/CLAUDE.md")"
+assert_contains "$S" 'Exception: when your own command fails (a wrong flag, the wrong directory, a typo) and the fix is read-only, say in one or two lines what happened and fix it in the same turn.' "an own-command mistake is fixed in the same turn"
+assert_contains "$S" 'Failures in the code, the tests, or production, and consequential next steps, still stop and wait.' "real failures still stop"
+
+# The orchestrator reads the diff itself on every PR (issue #83), and audits known and probed reasons (issues #98, #99).
+echo "skills: issue-to-pr ratification adds the orchestrator's own read and checks known and probed reasons"
+S="$(skill_section issue-to-pr/SKILL.md '## 6. Ratification')"
+assert_contains "$S" '6. **The orchestrator'"'"'s own read.** Read `git diff origin/<base>...<headRefOid>` in the implementer'"'"'s worktree against the brief, as pr-review §4 defines the caller'"'"'s read.' "item 6 reads the PR diff as pr-review §4 defines it"
+assert_contains "$S" 'Run no reviewer and no critic. A problem it finds is handled like a disposition that does not hold.' "a problem the read finds is handled like a failed disposition"
+assert_contains "$S" 'so this audit and the read in item 6 are the loop'"'"'s independent checks.' "step 6 names both independent checks"
+assert_contains "$S" '- All six hold and the newest round' "the clean decision counts six items"
+assert_not_contains "$S" 'All five hold' "no decision counts five items"
+assert_contains "$S" 'Check each `known` reason against the issue or the commit it names.' "item 5 checks a known reason"
+assert_contains "$S" 'A rejection of a runtime or framework semantics claim without a probe does not hold.' "item 5 needs a probe for a semantics rejection"
+S="$(cat "$ROOT/dot_claude/skills/issue-to-pr/final-report-template.md")"
+assert_contains "$S" '| 6. The orchestrator'"'"'s own read of the diff |' "the final report records the read"
+S="$(skill_section issue-to-pr/dispatch-prompt-template.md '## Review rounds')"
+assert_contains "$S" 'It names a disposition the orchestrator overrules, or a problem its own read found.' "the pane knows a refine instruction can carry the read's problem"
+
+# A gap two sources report counts once, and the read starts with its own defect pass (issue #174).
+echo "skills: pr-review counts a two-source gap once and reads the diff before the other sources"
+S="$(skill_section pr-review/SKILL.md '## 6. Assemble the comment')"
+assert_contains "$S" 'When two sources report one gap, list it once with both tags (`[reviewer, critic]`), and the verdict counts it once.' "a two-source gap is one finding"
+S="$(skill_section pr-review/SKILL.md '## 4. The caller')"
+assert_contains "$S" 'Start with a defect pass over the diff against the brief, before you open the reviewer'"'"'s and the critic'"'"'s output.' "the read's own pass comes first"
+
+# The loop keeps ocr's 2000-character warning (issue #86).
+echo "skills: pr-review §1 says the loop accepts ocr's background warning"
+S="$(skill_section pr-review/SKILL.md '## 1. Run the round')"
+assert_contains "$S" 'ocr also warns when the background is over 2000 characters, and the loop accepts the warning: a shorter background drops the brief'"'"'s asks and the standing dispositions, and a reviewer without the dispositions re-flags settled findings.' "pr-review §1 gives the reason the warning stays"
+
+# The critic reads its input file; the caller copies nothing by hand (issue #87).
+echo "skills: the critic's prompt is one instruction to read critic-input.md"
+S="$(skill_section issue-to-pr/tools/subagent/binding.md '## How to invoke')"
+assert_contains "$S" 'The subagent'"'"'s prompt is one instruction: read `<round-dir>/critic-input.md` in full and follow it.' "the binding's prompt is the one instruction"
+assert_contains "$S" 'No input but `critic-input.md` is left on disk for it to read.' "critic-input.md is the one file on disk"
+assert_not_contains "$S" 'no input left on disk for it to read.' "the old clause without its exception is gone"
+S="$(skill_section pr-review/SKILL.md '## 3. The adversarial critic')"
+assert_contains "$S" 'whose prompt is one instruction: read `<round-dir>/critic-input.md` in full and follow it.' "pr-review §3 matches the binding"
+S="$(skill_section pr-review/SKILL.md '## Never')"
+assert_contains "$S" 'the prompt is §3'"'"'s one instruction, and the input is `critic-input.sh`'"'"'s output and nothing else.' "the Never rule matches §3"
+
+# A refine rejects a known finding and probes a semantics claim (issues #98, #99).
+echo "skills: pr-refine §2 checks known findings and probes semantics claims"
+S="$(skill_section pr-refine/SKILL.md '## 2. Validate every finding')"
+assert_contains "$S" 'Before you fix a high or medium finding, search the open issues' "pr-refine §2 searches the open issues first"
+assert_contains "$S" 'A duplicate is rejected as `known: tracked in #N` or `known: fixed in <sha>`.' "pr-refine §2 names the known reasons"
+assert_contains "$S" 'A claim about runtime or framework semantics is settled with the cheapest probe (a test or a script in the repo) before it is fixed, rejected or accepted.' "pr-refine §2 probes a semantics claim"
+assert_contains "$S" 'The probe'"'"'s output is the disposition'"'"'s evidence.' "the probe's output is the evidence"
+S="$(skill_section issue-to-pr/SKILL.md '## 1. Intake')"
+assert_contains "$S" 'For a gh-issue source, the brief lists related open issues as `Related, out of scope: #N`.' "a gh-issue brief lists related issues"
+
 report

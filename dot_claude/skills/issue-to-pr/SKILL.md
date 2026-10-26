@@ -45,7 +45,9 @@ One interactive moment. Collect and confirm, then go silent:
    - HTML file: `<path>` plus the element to read
      (extract: that element's text)
 2. **The brief.** Write the extracted task to a brief file: title, body,
-   acceptance criteria if present, and the source locator. Show it. Wait
+   acceptance criteria if present, and the source locator. For a
+   gh-issue source, the brief lists related open issues as
+   `Related, out of scope: #N`. Show it. Wait
    for confirmation. Extraction errors surface here or never. The
    reviewer reads this brief as its background, under the manifest's
    `reviewer_background_limit` (8000 characters for ocr), and later
@@ -234,15 +236,23 @@ newest round directory is
    Dispositions blocks of every round comment. On a repository that is
    not owned, read them from each round directory's `comment.md`.
    Check each reason
-   against the diff. The author of the code wrote these reasons, so
-   this audit is the loop's independent check.
+   against the diff. Check each `known` reason against the issue or the
+   commit it names. A rejection of a runtime or framework semantics
+   claim without a probe does not hold. The author of the code wrote
+   these reasons and ran every round's read, so this audit and the read
+   in item 6 are the loop's independent checks.
+6. **The orchestrator's own read.** Read
+   `git diff origin/<base>...<headRefOid>` in the implementer's
+   worktree against the brief, as pr-review §4 defines the caller's
+   read. Run no reviewer and no critic. A problem it finds is handled
+   like a disposition that does not hold.
 
 Then decide:
 
-- All five hold and the newest round (a clean round 1 or the
+- All six hold and the newest round (a clean round 1 or the
   convergence round) is `No issues found.`: the
   loop ends `clean`.
-- All five hold and the convergence round is `converged (all blocking
+- All six hold and the convergence round is `converged (all blocking
   findings low and dispositioned).`: the loop ends `converged`, with the
   accepted judgment calls listed in the final report.
 - The loop ends `clean` or `converged`, and

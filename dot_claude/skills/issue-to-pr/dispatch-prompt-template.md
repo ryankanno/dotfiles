@@ -165,7 +165,8 @@ finds no stderr line, its reason ends before `: <stderr line>`.
 | Any other | A failure the table does not list. | Stop with `blocked: pr-round.sh exit <code>: <stderr line>`. |
 
 After you stop, a refine instruction can arrive by `workmux send`. It
-names a disposition the orchestrator overrules. Run the pr-refine skill
+names a disposition the orchestrator overrules, or a problem its own
+read found. Run the pr-refine skill
 on that finding, then the convergence round again, then stop.
 <only when intake set the reviewer's effort, timeout, tool cap, token
 budget or exclude; omit this line otherwise, and keep only the flags

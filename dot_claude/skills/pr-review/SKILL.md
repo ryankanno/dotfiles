@@ -112,7 +112,11 @@ does not move it.
 
 The background has a size limit: the manifest's
 `reviewer_background_limit` (8000 characters for ocr, which aborts on
-anything longer before it reviews a line). The dispositions fill the
+anything longer before it reviews a line). ocr also warns when the
+background is over 2000 characters, and the loop accepts the warning:
+a shorter background drops the brief's asks and the standing
+dispositions, and a reviewer without the dispositions re-flags settled
+findings. The dispositions fill the
 room the brief leaves, newest first, and the background says how many
 older ones gave way. A brief over the limit on its own, or one whose
 assembled background overflows once the standing dispositions join it,
@@ -288,12 +292,12 @@ never written.
 
 Resolve the critic from the manifest and follow its binding file
 (`$HOME/.claude/skills/issue-to-pr/tools/<critic>/binding.md`) for how to
-spawn it: a fresh, clean-context subagent whose prompt is the output of
-`critic-input.sh`, verbatim. Never write the critic's prompt yourself:
-the script carries the instructions, the brief, the findings this
-round's diff answers, the settled dispositions, and the one diff, and
-leaves out the follow-ups. It keeps the same prompt as
-`critic-input.md` in the round directory.
+spawn it: a fresh, clean-context subagent whose prompt is one
+instruction: read `<round-dir>/critic-input.md` in full and follow it.
+`critic-input.sh` writes that file. Never write the critic's input
+yourself: the script carries the instructions, the brief, the findings
+this round's diff answers, the settled dispositions, and the one diff,
+and leaves out the follow-ups.
 
 ```bash
 $HOME/.claude/skills/issue-to-pr/tools/subagent/critic-input.sh \
@@ -318,7 +322,9 @@ lists: an unconfirmed candidate is not a finding.
 
 ## 4. The caller's own read
 
-Read the diff against the brief yourself:
+Read the diff against the brief yourself. Start with a defect pass
+over the diff against the brief, before you open the reviewer's and the
+critic's output. Then check:
 
 - **Scope creep:** anything the diff changes that the brief does not
   ask for.
@@ -364,7 +370,9 @@ $HOME/.claude/skills/issue-to-pr/tools/finding-scope.sh <round-dir> <path>:<star
 
 Follow [`report-template.md`](report-template.md) exactly: marker first
 line, heading, verdict, visible consolidated findings tagged by source,
-collapsed blocks with each source's output verbatim. The reviewer's
+collapsed blocks with each source's output verbatim. When two sources
+report one gap, list it once with both tags (`[reviewer, critic]`), and
+the verdict counts it once. The reviewer's
 sections render with the binding's renderer, once per run recorded in
 `round.json` (`render.sh <runs[].dir>`), completed or skipped alike:
 thin coverage and a skipped run must read as what they are. A
@@ -428,6 +436,7 @@ report the scan's hits, as §7 says. Record the round directory.
   not at all.
 - Never post a comment that failed the scan.
 - Never report an empty result as clean or as a failure.
-- Never write, wrap, or prefix the critic's prompt, also after a context
-  compaction: the prompt is `critic-input.sh`'s output and nothing else.
+- Never write, wrap, or prefix the critic's input, also after a context
+  compaction: the prompt is §3's one instruction, and the input is
+  `critic-input.sh`'s output and nothing else.
 - Never run two rounds of one PR at the same time.

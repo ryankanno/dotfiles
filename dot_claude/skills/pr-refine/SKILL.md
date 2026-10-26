@@ -100,6 +100,15 @@ git diff origin/<base>...<head>
 - The finding is not already dispositioned: check the prior rounds'
   Dispositions blocks; a re-flag without materially new evidence is
   rejected with a pointer to the recorded reason.
+- The finding is not already known. Before you fix a high or medium
+  finding, search the open issues (`gh issue list --search "<subject>"`)
+  and the recent commits on the finding's file
+  (`git log --oneline origin/<base> -- <file>`). A duplicate is
+  rejected as `known: tracked in #N` or `known: fixed in <sha>`.
+- A claim about runtime or framework semantics is settled with the
+  cheapest probe (a test or a script in the repo) before it is fixed,
+  rejected or accepted. The probe's output is the disposition's
+  evidence.
 
 Every disposition of a named finding, fixed, rejected, or accepted,
 appears in this round's comment, in the Dispositions block, as one
