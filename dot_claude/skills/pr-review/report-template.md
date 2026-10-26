@@ -92,7 +92,9 @@ Visible, in this order:
 
 Each finding is one line, tagged with its source: `[reviewer]` for the
 reviewer binding's output, `[critic]` for the adversarial subagent,
-`[read]` for the caller's own read. Number across all sources, highest
+`[read]` for the caller's own read. A gap two sources report is one line
+with both tags, for example `[reviewer, critic]` (pr-review §6). Number
+across all sources, highest
 severity first, follow-ups continuing the numbering. Follow-ups are
 never fixed in the loop and never dispositioned. A named finding's disposition is a record, not a
 preference: fixed carries the commit and what proves it, rejected

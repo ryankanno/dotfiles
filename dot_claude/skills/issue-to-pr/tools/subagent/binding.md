@@ -21,7 +21,7 @@ left on disk for it to read.
 
 ```bash
 $HOME/.claude/skills/issue-to-pr/tools/subagent/critic-input.sh \
-  --repo <checkout-dir> --round-dir <round-dir> --brief <brief-file>
+  --repo <checkout-dir> --round-dir <round-dir> --brief <brief-file> >/dev/null
 ```
 
 The script emits `critic-prompt.md` verbatim, then inline: the brief,

@@ -245,7 +245,8 @@ newest round directory is
    `git diff origin/<base>...<headRefOid>` in the implementer's
    worktree against the brief, as pr-review §4 defines the caller's
    read. Run no reviewer and no critic. A problem it finds is handled
-   like a disposition that does not hold.
+   like a disposition that does not hold. Do it before items 3 and 5
+   read the round comments.
 
 Then decide:
 

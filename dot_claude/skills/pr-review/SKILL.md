@@ -301,14 +301,13 @@ and leaves out the follow-ups.
 
 ```bash
 $HOME/.claude/skills/issue-to-pr/tools/subagent/critic-input.sh \
-  --repo <checkout-dir> --round-dir <round-dir> --brief <brief-file>
+  --repo <checkout-dir> --round-dir <round-dir> --brief <brief-file> >/dev/null
 ```
 
 When the script exits 2, fix the cause and run it again: the call, a
 missing `critic-prompt.md` (its stderr line names it), or a missing
 `round.json` (it prints only its usage line; run the round first).
-When it exits 4 (the prompt is over 200,000 bytes and
-cannot pass inline), 5 (the diff failed) or 127 (a dependency is
+When it exits 4 (the prompt is over 200,000 bytes), 5 (the diff failed) or 127 (a dependency is
 missing), it prints no prompt. The round runs with no critic. The
 Critic block records the gap with the script's stderr line. A
 convergence round follows §2 instead.
@@ -324,7 +323,8 @@ lists: an unconfirmed candidate is not a finding.
 
 Read the diff against the brief yourself. Start with a defect pass
 over the diff against the brief, before you open the reviewer's and the
-critic's output. Then check:
+critic's output. Do it before §3 spawns the critic, or while the critic
+runs in the background. Then check:
 
 - **Scope creep:** anything the diff changes that the brief does not
   ask for.
@@ -372,7 +372,8 @@ Follow [`report-template.md`](report-template.md) exactly: marker first
 line, heading, verdict, visible consolidated findings tagged by source,
 collapsed blocks with each source's output verbatim. When two sources
 report one gap, list it once with both tags (`[reviewer, critic]`), and
-the verdict counts it once. The reviewer's
+the verdict counts it once. The line keeps the higher severity, and it
+blocks when either report blocks. The reviewer's
 sections render with the binding's renderer, once per run recorded in
 `round.json` (`render.sh <runs[].dir>`), completed or skipped alike:
 thin coverage and a skipped run must read as what they are. A

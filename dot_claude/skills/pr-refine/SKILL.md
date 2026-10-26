@@ -103,11 +103,12 @@ git diff origin/<base>...<head>
 - The finding is not already known. Before you fix a high or medium
   finding, search the open issues (`gh issue list --search "<subject>"`)
   and the recent commits on the finding's file
-  (`git log --oneline origin/<base> -- <file>`). A duplicate is
-  rejected as `known: tracked in #N` or `known: fixed in <sha>`.
+  (`git log --oneline <head> -- <file>`). A duplicate is
+  rejected as `known: tracked in #N` or `known: fixed in <sha>`. An
+  issue this PR closes is not a duplicate.
 - A claim about runtime or framework semantics is settled with the
-  cheapest probe (a test or a script in the repo) before it is fixed,
-  rejected or accepted. The probe's output is the disposition's
+  cheapest probe (a test, or a script run in the repo's environment)
+  before it is fixed, rejected or accepted. The probe's output is the disposition's
   evidence.
 
 Every disposition of a named finding, fixed, rejected, or accepted,
@@ -118,8 +119,9 @@ round reads them — and in the loop's final report.
 ## 3. Fix under TDD — only what the previous round named
 
 Fix only the blocking findings named by the previous round's comment,
-under its **Findings:** heading; its **Follow-ups:** are not this
-round's work. Anything
+under its **Findings:** heading, or the one finding an orchestrator's
+refine instruction names (issue-to-pr §6); its **Follow-ups:** are not
+this round's work. Anything
 this round's own sources discover mid-round is recorded as input for
 the next round, not fixed here: one instruction, one fix pass, one
 re-run.
@@ -193,8 +195,8 @@ ratification declares the loop clean or converged.
 
 ## Never
 
-- Never fix a finding the previous round's comment did not name as
-  blocking.
+- Never fix a finding that neither the previous round's comment named
+  as blocking nor an orchestrator's refine instruction named.
 - Never re-run the reviewer twice in one round.
 - Never fix a finding by adding machinery beyond it.
 - Never force-push, and never push before the round's gate is green.
