@@ -99,11 +99,12 @@ git diff origin/<base>...<head>
 - Fixing it stays inside the brief's scope.
 - The finding is not already dispositioned: check the prior rounds'
   Dispositions blocks; a re-flag without materially new evidence is
-  rejected with a pointer to the recorded reason.
+  rejected with a pointer to the recorded reason. The reason in an
+  orchestrator's refine instruction is materially new evidence.
 - The finding is not already known. Before you fix a high or medium
   finding, search the open issues (`gh issue list --search "<subject>"`)
   and the recent commits on the finding's file
-  (`git log --oneline <head> -- <file>`). A duplicate is
+  (`git log --oneline <head>..origin/<base> -- <file>`). A duplicate is
   rejected as `known: tracked in #N` or `known: fixed in <sha>`. An
   issue this PR closes is not a duplicate.
 - A claim about runtime or framework semantics is settled with the
