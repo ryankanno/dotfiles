@@ -74,9 +74,11 @@ On a repository that is not owned (pr-review §8), read the round from
 When the tool exits 1, no round comment exists: there is nothing to
 refine yet. Say so and stop; producing findings is /pr-review's round,
 not this one. When it exits 2 (a usage error, an unset `HOME`, or a
-missing `scan.sh`), fix the call or the environment and run it again.
-Any other non-zero exit is a failed read or a missing dependency
-(`gh`, `jq`): report its last stderr line and stop.
+missing `scan.sh`), fix the call or the environment and run it once
+more. On a second exit 2, or an exit other than 0, 1 or 2 (a failed
+read, or a missing `gh` or `jq`), report its last stderr line and stop.
+In the issue-to-pr loop, the pane stops with
+`blocked: round-comment.sh exit <code>: <stderr line>`.
 
 The verdict line is one of the lines in the verdict list of
 `$HOME/.claude/skills/pr-review/report-template.md`. Each line there

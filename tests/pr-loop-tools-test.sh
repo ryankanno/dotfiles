@@ -3668,12 +3668,19 @@ assert_contains "$S" 'no usable comment (that call exits 1), finish it from pr-r
 assert_contains "$S" "On an exit 2 of that call, $RCRETRY" "the exit 6 row retries an exit 2 once"
 assert_contains "$S" "On a second exit 2, or an exit of that call other than 0, 1 or 2, $RCSTOP" "the exit 6 row stops on its other failures"
 
-# The orchestrator ends the loop blocked on the resume's round-comment.sh stop too (issue #181).
-echo "skills: issue-to-pr's blocked causes and failure policy name the resume's round-comment.sh stop"
+# pr-refine §1 is round-comment.sh's third caller: it retries an exit 2 once and gives the pane a stop (issue #181).
+echo "skills: pr-refine §1 retries a round-comment.sh exit 2 once and names the pane's stop"
+S="$(skill_section pr-refine/SKILL.md '## 1. Read the round')"
+assert_contains "$S" 'a missing `scan.sh`), '"$RCRETRY" "pr-refine §1 retries an exit 2 once"
+assert_contains "$S" 'On a second exit 2, or an exit other than 0, 1 or 2 (a failed read, or a missing `gh` or `jq`), report its last stderr line and stop.' "pr-refine §1 stops on its other failures"
+assert_contains "$S" 'In the issue-to-pr loop, the pane stops with `blocked: round-comment.sh exit <code>: <stderr line>`.' "pr-refine §1 names the pane's stop"
+
+# The orchestrator ends the loop blocked on every round-comment.sh stop too (issue #181).
+echo "skills: issue-to-pr's blocked causes and failure policy name the resume's and the refine's round-comment.sh stops"
 S="$(skill_section issue-to-pr/SKILL.md '## 7. The final report')"
-assert_contains "$S" 'or on a resume'"'"'s `round-comment.sh` exit (its "Resuming" section)' "step 7's blocked causes name the resume's stop"
+assert_contains "$S" 'or on a `round-comment.sh` exit in a resume (its "Resuming" section) or in a refine round (pr-refine §1)' "step 7's blocked causes name both round-comment.sh stops"
 S="$(skill_section issue-to-pr/SKILL.md '## Failure policies')"
 assert_contains "$S" '**A `pr-round.sh` or `round-comment.sh` exit:**' "the failure policy covers both tools"
-assert_contains "$S" 'or on a resume by its "Resuming" section' "the failure policy points to the Resuming section"
+assert_contains "$S" 'on a resume by its "Resuming" section, or in a refine round by pr-refine §1.' "the failure policy points to the Resuming section and pr-refine §1"
 
 report
