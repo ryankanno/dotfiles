@@ -334,13 +334,13 @@ report; the file is its durable copy, the exact text, no summary layer.
 - **Empty reviewer result:** handled inside the review round (retry once
   per-commit). Two empties: the round is unrecovered, never clean and
   never failing.
-- **A `pr-round.sh` or `round-comment.sh` exit:** the pane acts on it
-  by the exit-code table in the dispatch template's "Review rounds"
-  section, on a resume by its "Resuming" section, or in a refine round
-  by pr-refine §1. When the pane
-  stops with `Stop: blocked: <reason>`, the loop ends `blocked`, and the
-  final report carries that reason. A `pr-round.sh` exit 7 is a live
-  round, not a failure.
+- **A `pr-round.sh` or `round-comment.sh` exit:** the pane acts on a
+  `pr-round.sh` exit by the exit-code table in the dispatch template's
+  "Review rounds" section. It acts on a `round-comment.sh` exit in a
+  resume by that template's "Resuming" section, and in a refine round
+  by pr-refine §1. When the pane stops with `Stop: blocked: <reason>`,
+  the loop ends `blocked`, and the final report carries that reason. A
+  `pr-round.sh` exit 7 is a live round, not a failure.
 - **A convergence round with no critic:** when pr-review §2 leaves the
   round with no critic and
   does not send it back to the reviewer with `--rerun`,

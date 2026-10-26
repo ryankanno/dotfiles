@@ -3681,6 +3681,7 @@ S="$(skill_section issue-to-pr/SKILL.md '## 7. The final report')"
 assert_contains "$S" 'or on a `round-comment.sh` exit in a resume (its "Resuming" section) or in a refine round (pr-refine §1)' "step 7's blocked causes name both round-comment.sh stops"
 S="$(skill_section issue-to-pr/SKILL.md '## Failure policies')"
 assert_contains "$S" '**A `pr-round.sh` or `round-comment.sh` exit:**' "the failure policy covers both tools"
-assert_contains "$S" 'on a resume by its "Resuming" section, or in a refine round by pr-refine §1.' "the failure policy points to the Resuming section and pr-refine §1"
+assert_contains "$S" 'the pane acts on a `pr-round.sh` exit by the exit-code table' "the failure policy sends a pr-round.sh exit to the table"
+assert_contains "$S" 'It acts on a `round-comment.sh` exit in a resume by that template'"'"'s "Resuming" section, and in a refine round by pr-refine §1.' "the failure policy scopes the Resuming section and pr-refine §1 to round-comment.sh"
 
 report
