@@ -274,7 +274,9 @@ owner_repo=$(cd "$repo" && gh repo view --json nameWithOwner --jq .nameWithOwner
   exit 5
 }
 round_dir="$HOME/.cache/pr-loop/$owner_repo/pr-$pr/round-$round"
-mkdir -p "$round_dir"
+# resume-state.sh reads a round-<N>/ with no line as a refine, so this run
+# makes the round dir only after its line.
+mkdir -p "${round_dir%/*}"
 
 # Two callers once ran the same round at once, and one's --rerun moved the
 # other's in-flight evidence (PRs 137, 230). The lock sits beside the round
@@ -347,6 +349,7 @@ if [[ -z "$rerun" ]] && ! awk -v r="$((10#$round))" '$1 + 0 == r { found = 1; ex
     exit 2
   }
 fi
+mkdir -p "$round_dir"
 
 # The refs resolve before any prior evidence is touched: a network or
 # resolution failure must leave the round dir exactly as it was, not

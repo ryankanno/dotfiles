@@ -3678,8 +3678,9 @@ assert_eq "$RC" 6 "the run on the finished round is refused"
 run_rst test-owner/test-repo 39
 assert_eq "$OUT" $'refine_rounds=1\nnewest_finished=refine' "round 2 is still the refine it ran as"
 
-# A refine pushes its fix and writes round-<N>/ before its round runs, so
-# a round that stops before pr-round.sh writes its line is still a refine.
+# A refine pushes its fix and makes round-<N>/ before its round runs, also
+# when it fixed every finding and has no refine-dispositions.md, so a round
+# that stops before pr-round.sh writes its line is still a refine.
 echo "resume-state: a refine whose round stopped before its line still counts"
 new_sandbox
 make_pr_round_env
@@ -3691,11 +3692,42 @@ old_json="$GH_PR_JSON"
 advance_head g.txt 'refined\n'
 export GH_PR_JSON="$old_json"
 mkdir -p "$pd/round-2"
-printf -- '- Rejected: [critic] the refine rejected this one: the code guards it\n' >"$pd/round-2/refine-dispositions.md"
 PR_ROUND_HEAD_WAIT=1 run_prr --repo "$repo" --pr 39 --round 2 --expect-head "$FR_NEXT" >/dev/null 2>&1; RC=$?
 assert_eq "$RC" 8 "GitHub does not report the pushed head"
 run_rst test-owner/test-repo 39
 assert_eq "$OUT" $'refine_rounds=1\nnewest_finished=review' "the stopped refine counts, and round 1 is the newest finished"
+
+echo "resume-state: a refine that has its line and stopped before round.json counts once"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+advance_head g.txt 'refined\n'
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null 2>&1; RC=$?
+assert_eq "$RC" 9 "round 2 stops: round 1 has no comment"
+run_rst test-owner/test-repo 39
+assert_eq "$OUT" $'refine_rounds=1\nnewest_finished=none' "the stopped refine counts once"
+
+# pr-round.sh makes round-<N>/ only after the line, so a round that stops
+# at the lock leaves no folder that a resume reads as a refine.
+echo "resume-state: a convergence round refused at the lock is not a refine"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
+advance_head g.txt 'refined\n'
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+finish_round 2
+sleep 30 &
+holder=$!
+printf '%s\n' "$holder" >"$pd/round-3.lock"
+run_prr --repo "$repo" --pr 39 --round 3 --convergence >/dev/null 2>&1; RC=$?
+kill "$holder" 2>/dev/null; wait "$holder" 2>/dev/null
+assert_eq "$RC" 7 "a live holder refuses the round"
+run_rst test-owner/test-repo 39
+assert_eq "$OUT" $'refine_rounds=1\nnewest_finished=refine' "the refused convergence round adds no refine"
 
 echo "resume-state: a round comment it cannot read exits 5, not a guess"
 new_sandbox
@@ -3805,6 +3837,7 @@ assert_contains "$S" 'before you run the round' "pr-refine §6 writes it first"
 assert_contains "$S" 'as `report-template.md`'"'"'s Dispositions block writes them' "pr-refine §6 pins the line format"
 assert_contains "$S" 'a hit stops the round with exit 2' "pr-refine §6 says the file must pass the scan"
 assert_contains "$S" 'A `- Fixed:` line stays out of the file' "pr-refine §6 keeps Fixed lines out of the file"
+assert_contains "$S" 'Create the directory when it is missing, also when you have no such lines.' "pr-refine §6 makes the round dir for a refine that fixed every finding"
 S="$(skill_section pr-review/SKILL.md '## 1. Run the round')"
 assert_contains "$S" 'refine-dispositions.md' "pr-review §1 names the file"
 assert_contains "$S" 'adds its Rejected and Accepted lines' "pr-review §1 says the round reads it"
@@ -3823,6 +3856,11 @@ S="$(skill_section issue-to-pr/dispatch-prompt-template.md '## Review rounds')"
 assert_contains "$S" 'no usable comment (that call exits 1), finish it from pr-review §2' "the exit 6 row keys an unfinished round on exit 1"
 assert_contains "$S" "On an exit 2 of that call, $RCRETRY" "the exit 6 row retries an exit 2 once"
 assert_contains "$S" "On a second exit 2, or an exit of that call other than 0, 1 or 2, $RCSTOP" "the exit 6 row stops on its other failures"
+
+echo "skills: resume.md retries a resume-state.sh exit 2 once and stops only on an exit other than 0, 1 or 2"
+S="$(skill_section issue-to-pr/resume.md '# Resuming a PR')"
+assert_contains "$S" "On exit 2, $RCRETRY" "resume.md retries an exit 2 once"
+assert_contains "$S" 'On a second exit 2, or an exit other than 0, 1 or 2, open no pane' "resume.md keeps exit 1 off the blocked path"
 
 # pr-refine §1 is round-comment.sh's third caller: it retries an exit 2 once and gives the pane a stop (issue #181).
 echo "skills: pr-refine §1 retries a round-comment.sh exit 2 once and names the pane's stop"
