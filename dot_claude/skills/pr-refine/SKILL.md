@@ -182,7 +182,7 @@ Run the full review round exactly as
 SHA — once, at the end, over the final head, never once per
 intermediate head. Pass `--expect-head` with the SHA you pushed
 (`git rev-parse HEAD`). Pass the `--effort`, `--timeout`, `--max-tools`,
-`--max-tokens-budget` and `--exclude` the loop's rounds use, when the dispatch prompt or
+`--max-tokens-budget`, `--concurrency` and `--exclude` the loop's rounds use, when the dispatch prompt or
 the caller names them. Write, scan and post the round's comment per
 pr-review §6 to §8.
 
