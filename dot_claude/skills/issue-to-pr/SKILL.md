@@ -257,8 +257,9 @@ Then decide:
   workmux send <handle> "Refine round <k> on PR <n>: the orchestrator overrules <finding>: <reason>. Run the pr-refine skill on it, then the convergence round."
   ```
 
-  `<k>` is the count of refine rounds the PR has had, plus 1, as the
-  dispatch template counts them. Add nothing beyond the finding and the
+  `<k>` is the `refine_rounds` that
+  `$HOME/.claude/skills/issue-to-pr/tools/resume-state.sh <owner/repo> <n>`
+  prints, plus 1. Add nothing beyond the finding and the
   reason: no fix directions and no retry policy. `workmux send` prints
   nothing when it succeeds. Verify the delivery with
   `workmux capture <handle>`, and send again only when the capture does
@@ -290,7 +291,8 @@ why. The template names every field. The verdict is one of these:
   critic, the pane's `Stop: blocked: <reason>` on a `pr-round.sh` exit
   (the exit-code table in the dispatch template's "Review rounds"
   section) or on a `round-comment.sh` exit in a resume (its "Resuming"
-  section) or in a refine round (pr-refine §1), or a partial,
+  section) or in a refine round (pr-refine §1), a `resume-state.sh`
+  exit other than 0 or 1 ([`resume.md`](resume.md)), or a partial,
   nothing-reviewable or unrecovered reviewer with nothing from any
   source)
 

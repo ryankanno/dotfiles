@@ -48,7 +48,9 @@ mkdir -p "$HOME/.cache/pr-loop/<owner/repo>/pr-<n>"
 
 Use the harness's own background run when it has one that outlives the
 tool call's time limit and reports the exit (Claude Code's Bash
-`run_in_background`). End the command with `echo "exit=$?" >>"<log>"`.
+`run_in_background`). End the command with `echo "exit=$?" >>"<log>"`,
+with `<log>` the file
+`$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/round-<N>.log`.
 Only when the harness has no such run, read
 [`background-run.md`](background-run.md) and start the round in a
 detached tmux session. Either way, the
@@ -147,7 +149,9 @@ sends a convergence round back to the reviewer. A round dir with a
 The
 script exits 7 when another live process runs the same round. Wait for
 that round. Never pass `--rerun` over it: `--rerun` moves the live
-round's evidence away while it writes.
+round's evidence away while it writes. Start no other round of the PR
+while one runs: the lock holds one round only, and a later round finds
+no prior head on record and reviews the whole PR.
 
 The script exits 9 before any review when an earlier round in the PR's
 round folder has a `round.json` and no usable comment. A usable comment

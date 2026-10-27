@@ -34,15 +34,13 @@ PR, and do not redo work the branch already holds.
   Count them against the cap of 3 refine rounds below. Do not get the
   count from the round numbers: a convergence round takes a round
   number of its own.
-<or, only when resume-state.sh exits non-zero, in place of the bullet
-above:>
+<or, only when resume-state.sh exits 1, in place of the bullet above:>
 - The PR's refine-round count is unknown. Run at most 1 more refine
   round.
-<omit this bullet when resume-state.sh exits non-zero:>
-- The newest finished round <was (newest_finished=convergence) | was
-  not> a convergence round. When it was a convergence round with no
-  blocking finding, do not run another convergence round: stop, and
-  report its stop state.
+<omit this bullet when resume-state.sh exits 1:>
+- The newest finished round <was | was not> a convergence round. When
+  it was a convergence round with no blocking finding, do not run
+  another convergence round: stop, and report its stop state.
 <only when the prior run left a final report:>
 - The prior run's final report is `<path of final-report.md>`: its
   verdict and remaining findings carry forward.
