@@ -3588,7 +3588,7 @@ finish_round 2
 run_prr --repo "$repo" --pr 39 --round 3 --convergence >/dev/null
 assert_eq "$(cat "$pd/rounds.txt" 2>/dev/null)" $'1 review\n2 refine\n3 convergence' "round 1 is review, a later round is refine, and --convergence is convergence"
 
-echo "pr-round: a --rerun adds no line to rounds.txt, and a refused run repeats the round's line"
+echo "pr-round: a --rerun adds no line to rounds.txt, and neither does a refused run"
 new_sandbox
 make_pr_round_env
 make_fixture_repo
@@ -3598,7 +3598,7 @@ run_prr --repo "$repo" --pr 39 --round 1 >/dev/null 2>&1; RC=$?
 assert_eq "$RC" 6 "the second run is refused"
 run_prr --repo "$repo" --pr 39 --round 1 --rerun >/dev/null; RC=$?
 assert_eq "$RC" 0 "the rerun runs"
-assert_eq "$(cat "$pd/rounds.txt" 2>/dev/null)" $'1 review\n1 review' "the refused run repeats the line, and the rerun adds none"
+assert_eq "$(cat "$pd/rounds.txt" 2>/dev/null)" "1 review" "the refused run and the rerun add no line"
 
 # A refine has pushed its fix before its round runs, so a round that
 # stops early is still a refine the cap counts.
@@ -3663,6 +3663,39 @@ finish_round 3
 printf '1 review\n2 refine\n2 refine\n3 refine\n3 convergence\n4 refine\n' >"$pd/rounds.txt"
 run_rst test-owner/test-repo 39
 assert_eq "$OUT" $'refine_rounds=1\nnewest_finished=convergence' "round 3 counts by its last line, and round 4 never ran"
+
+echo "resume-state: a refused run of a finished round keeps that round's kind"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
+advance_head g.txt 'refined\n'
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+finish_round 2
+run_prr --repo "$repo" --pr 39 --round 2 --convergence >/dev/null 2>&1; RC=$?
+assert_eq "$RC" 6 "the run on the finished round is refused"
+run_rst test-owner/test-repo 39
+assert_eq "$OUT" $'refine_rounds=1\nnewest_finished=refine' "round 2 is still the refine it ran as"
+
+# A refine pushes its fix and writes round-<N>/ before its round runs, so
+# a round that stops before pr-round.sh writes its line is still a refine.
+echo "resume-state: a refine whose round stopped before its line still counts"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
+old_json="$GH_PR_JSON"
+advance_head g.txt 'refined\n'
+export GH_PR_JSON="$old_json"
+mkdir -p "$pd/round-2"
+printf -- '- Rejected: [critic] the refine rejected this one: the code guards it\n' >"$pd/round-2/refine-dispositions.md"
+PR_ROUND_HEAD_WAIT=1 run_prr --repo "$repo" --pr 39 --round 2 --expect-head "$FR_NEXT" >/dev/null 2>&1; RC=$?
+assert_eq "$RC" 8 "GitHub does not report the pushed head"
+run_rst test-owner/test-repo 39
+assert_eq "$OUT" $'refine_rounds=1\nnewest_finished=review' "the stopped refine counts, and round 1 is the newest finished"
 
 echo "resume-state: a round comment it cannot read exits 5, not a guess"
 new_sandbox

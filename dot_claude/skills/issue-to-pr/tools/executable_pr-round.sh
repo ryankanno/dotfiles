@@ -55,8 +55,9 @@
 #                round runs no reviewer, so it assembles none and
 #                checks no limit), one "<N> review|refine|convergence"
 #                line appended to rounds.txt beside the round dirs when
-#                the round starts (review for round 1, convergence with
-#                --convergence, refine otherwise; none with --rerun), and
+#                the round takes its lock (review for round 1, convergence
+#                with --convergence, refine otherwise; none with --rerun
+#                or when the number already has a line), and
 #                the directory path on stdout.
 # Exit codes: 0 the round ran; 2 usage, the environment is unusable
 # (HOME unset, the round lock cannot be created, or rounds.txt cannot be
@@ -334,12 +335,13 @@ fi
 
 # A resume reads the refine count from this ledger (resume-state.sh). A
 # refine pushed its fix before this run, so the line goes in once the
-# round holds its lock, before the checks that can stop it. A rerun redoes
-# a round already on it, so it adds no line.
-if [[ -z "$rerun" ]]; then
+# round holds its lock, before the later checks that can stop it. A rerun
+# redoes a round already on it, and a refused run's flag can differ from
+# the run that made the round, so a number already on it adds no line.
+rounds_file="$HOME/.cache/pr-loop/$owner_repo/pr-$pr/rounds.txt"
+if [[ -z "$rerun" ]] && ! awk -v r="$((10#$round))" '$1 + 0 == r { found = 1; exit } END { exit !found }' "$rounds_file" 2>/dev/null; then
   kind=refine
   if [[ $((10#$round)) -eq 1 ]]; then kind=review; elif [[ -n "$convergence" ]]; then kind=convergence; fi
-  rounds_file="$HOME/.cache/pr-loop/$owner_repo/pr-$pr/rounds.txt"
   printf '%s %s\n' "$round" "$kind" >>"$rounds_file" || {
     printf 'cannot append round %s to %s\n' "$round" "$rounds_file" >&2
     exit 2

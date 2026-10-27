@@ -11,8 +11,10 @@
 #                number's last line gives its kind, and only a number with
 #                a round-<N>/ folder counts: a pane that died before its
 #                round started left a line for a round that never ran. A
-#                round is finished when it has a round.json and a usable
-#                comment (round-comment.sh exits 0).
+#                round-<N>/ folder past round 1 with no line and no
+#                round.json counts as a refine. A round is finished when
+#                it has a round.json and a usable comment
+#                (round-comment.sh exits 0).
 # Exit codes: 0 printed; 1 no rounds.txt; 2 usage, or an unusable
 #             environment (HOME unset, no round-comment.sh); 5 a round
 #             comment could not be read (stderr names round-comment.sh's
@@ -57,4 +59,12 @@ while read -r n raw kind; do
       exit 5 ;;
   esac
 done <<<"$rounds"
+# A refine writes round-<N>/ before its round runs (pr-refine §6), and a
+# round that stops before pr-round.sh takes its lock writes no line.
+lined=" $(cut -d' ' -f1 <<<"$rounds" | tr '\n' ' ')"
+for d in "$pd"/round-*; do
+  raw="${d##*/round-}"
+  [[ -d "$d" && "$raw" =~ ^[0-9]+$ && $((10#$raw)) -gt 1 && ! -f "$d/round.json" ]] || continue
+  [[ "$lined" == *" $((10#$raw)) "* ]] || refines=$((refines + 1))
+done
 printf 'refine_rounds=%s\nnewest_finished=%s\n' "$refines" "$newest"
