@@ -112,8 +112,8 @@ git diff origin/<base>...<head>
   evidence.
 
 The reason in an orchestrator's refine instruction is materially new
-evidence. No check above rejects the finding it names on the reason it
-overrules.
+evidence. No check above rejects the finding it names on the recorded
+reason that the instruction overrules.
 
 Every disposition of a named finding, fixed, rejected, or accepted,
 appears in this round's comment, in the Dispositions block, as one
