@@ -3881,7 +3881,7 @@ assert_contains "$S" 'It acts on a `round-comment.sh` exit in a resume by that t
 # The pane ends with the table's stop strings, and the orchestrator reads them (issue #184).
 # Only the "What you do" cell is read: the "What it means" prose is free to change.
 echo "skills: each row of the dispatch template's pr-round.sh exit-code table keeps its action"
-exit_action() { awk -F' [|] ' -v e="| $1" '$1 == e { sub(/ [|]$/, "", $NF); print $NF }' "$ROOT/dot_claude/skills/issue-to-pr/dispatch-prompt-template.md"; }
+exit_action() { awk -F'|' -v code="$1" '{ c = $2; gsub(/^ +| +$/, "", c) } c == code { a = $(NF - 1); gsub(/^ +| +$/, "", a); print a }' "$ROOT/dot_claude/skills/issue-to-pr/dispatch-prompt-template.md"; }
 assert_eq "$(exit_action 0)" 'Continue the round with pr-review §2.' "exit 0 continues the round"
 assert_eq "$(exit_action 2)" 'Stop with `blocked: pr-round.sh exit 2: <stderr line>`.' "exit 2 stops blocked"
 assert_eq "$(exit_action 3)" 'Stop with `blocked: identity mismatch: <stderr line>`.' "exit 3 stops on the identity mismatch"
@@ -3890,6 +3890,8 @@ assert_eq "$(exit_action 5)" 'Stop with `blocked: pr-round.sh exit 5: <stderr li
 S="$(exit_action 6)"
 assert_contains "$S" 'When it has no `round.json`, your earlier run of that round died: pass `--rerun` once.' "exit 6 without round.json reruns once"
 assert_contains "$S" 'On an exit 6 after that `--rerun`, stop with `blocked: pr-round.sh exit 6: <stderr line>`.' "exit 6 after the rerun stops blocked"
+assert_contains "$S" 'the round is finished: continue the loop from it.' "exit 6 with a usable comment continues the loop"
+assert_contains "$S" 'no usable comment (that call exits 1), finish it from pr-review §2' "exit 6 without a usable comment finishes from pr-review §2"
 assert_contains "$S" 'stop with `blocked: round-comment.sh exit <code>: <stderr line>`.' "a failed round-comment.sh call stops blocked"
 assert_eq "$(exit_action 7)" 'Wait for it. Never `--rerun` over it.' "exit 7 waits and never reruns"
 S="$(exit_action 8)"
