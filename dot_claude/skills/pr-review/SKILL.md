@@ -39,8 +39,7 @@ that holds the PR branch. It is not the `owner/name` slug.
 
 A round runs for 15 to 80 minutes or more, and a killed call kills the
 round. The round's log goes beside the round dir, not in it, and that
-directory does not exist before round 1. Create it first, on either
-path below:
+directory does not exist before round 1. Create it first:
 
 ```bash
 mkdir -p "$HOME/.cache/pr-loop/<owner/repo>/pr-<n>"
@@ -49,23 +48,9 @@ mkdir -p "$HOME/.cache/pr-loop/<owner/repo>/pr-<n>"
 Use the harness's own background run when it has one that outlives the
 tool call's time limit and reports the exit (Claude Code's Bash
 `run_in_background`). End the command with `echo "exit=$?" >>"<log>"`.
-
-Only when the harness has no such run (opencode's bash tool stops a
-call after 120 seconds by default), start the round in a detached tmux
-session. A tmux session survives the end of the tool call; a background
-`&` job of the call can die with it. A tmux session gets the tmux
-server's environment, not yours (a PATH without `gh` exits 127), so
-pass your PATH:
-
-```bash
-tmux new-session -d -e PATH="$PATH" \
-  -e LOG="$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/round-<N>.log" \
-  -s pr-round-<n>-<N> sh -c \
-  '$HOME/.claude/skills/issue-to-pr/tools/pr-round.sh <args> >"$LOG" 2>&1; echo "exit=$?" >>"$LOG"'
-```
-
-Then poll. Each poll is one tool call with a sleep shorter than the
-tool's limit (`sleep 100` under opencode's default). Either way, the
+Only when the harness has no such run, read
+[`background-run.md`](background-run.md) and start the round in a
+detached tmux session. Either way, the
 round is done when the log's last line is `exit=<code>`. While it runs,
 the round dir has a `round-<N>.lock` file beside it.
 
@@ -129,55 +114,16 @@ loop, the pane stops instead: the brief is the orchestrator's to
 condense. A convergence round
 runs no reviewer, so it writes no `background.md` and checks no limit.
 
-From round 2 on, `round.json` carries `range.prior_head` (the previous
-round's head) and the round directory holds `delta.txt`, the
-`path:start-end` hunks changed since that head. The reviewer then
-reviews only the delta, from `range.reviewed_from` (the prior head) to
-the PR head: a finding outside it can only be a follow-up, except a
-high. High severity blocks anywhere, in the delta or out, and the
-caller counts it under Findings. An empty
-delta (the same head again) reviews the
-whole PR from the merge base instead, never an empty range. A change
-that adds or modifies no lines (a deletion) also reviews the whole PR,
-with the scope `full: the change since the prior round adds no lines`
-and no `delta.txt`, so every finding blocks as new.
+From round 2 on, the reviewer reviews only the delta since the prior
+round's head, and `round.json`'s `range.review_scope` says which:
+`delta`, `full: <why>`, or `none: <why>`. High severity blocks
+anywhere, in the delta or out, and the caller counts it under Findings.
+Read [`ranges.md`](ranges.md) when a round's scope is not `full: round 1`
+or `delta`, or when it follows a `partial` round.
 
-The delta stands in for the whole PR only when the new head descends
-from the prior round's head. After a rebase the round reviews the whole
-PR from the merge base and writes no `delta.txt`, so every finding
-blocks as new. `round.json`'s `range.review_scope` says which: `delta`,
-or `full: <why>`.
-
-A merge of the base branch into the PR keeps the delta to the PR's own
-code. When the merge base moved since the prior round,
-`range.reviewed_from` is a baseline commit instead of the prior head:
-the prior head merged onto the new merge base. `delta.txt`, the
-reviewer's range, and the critic's diff then hold only the PR's own
-changes since the prior round, conflict resolutions included, and none
-of the base's. A finding on the base's lines reads `reviewed`.
-
-When the base merge is the only change since the prior round (the
-head's tree equals the baseline's), a round other than the convergence
-round (below) reviews nothing:
-`range.review_scope` starts with `none:`, `runs` is empty,
-`reviewer_complete` is `false`, and nothing is billed. A PR change
-with no added lines (a deletion) is still a change and reviews the
-whole PR.
-
-The convergence round passes `--convergence`. It runs no reviewer and
-no per-commit retry, so nothing is billed for the reviewer. The critic
-and your own read review the whole PR at the head. `round.json`
-records the scope `full: this is the convergence round` (the whole PR,
-from the merge base to the head), empty `runs`, and
-`reviewer_skipped: "convergence"`, also after a base merge.
-`delta.txt` stays as the round computed it, so a finding blocks or
-follows up as it did when the reviewer ran. Round 1 refuses
-`--convergence` with exit 2: round 1 keeps the reviewer.
-
-A `partial` prior round does not send the next round back to the whole
-PR: the same caps re-fail the same files. Its unfinished files go to
-`prior-unfinished.txt`, and `critic-input.sh` hands the critic their
-whole-PR diff, where only a high finding blocks.
+The convergence round passes `--convergence`. It runs no reviewer. The
+critic and your own read review the whole PR at the head. Round 1
+refuses `--convergence` with exit 2: round 1 keeps the reviewer.
 
 `--expect-branch` binds the round to this loop's branch: a PR whose
 head is any other branch is a hallucinated number, and the script exits
@@ -197,10 +143,6 @@ empty-retry policy once per commit in that range, and prints the round
 directory
 whose `round.json` carries the range, the identity, every run (mode,
 directory, status, session id, exit code), and `reviewer_complete`.
-The reviewer's range is `origin/<base>..<headRefOid>` in merge-base
-mode on a full-scope round, and `<range.reviewed_from>..<headRefOid>`
-on a delta round. After a base merge it runs from the baseline to a
-commit that has the head's tree and only the baseline as parent.
 
 The script exits 4 when the PR is missing, not open, or not
 resolvable, 5 when the repository, its refs, the changed-file

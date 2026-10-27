@@ -116,25 +116,8 @@ Every step below spells the full `<branch-name>` it printed; there is no
 shorter form to substitute.
 
 An existing PR means a previous run: do not create anything. Verify its
-state and resume the loop at step 5. If no pane runs on the worktree,
-reopen it with `workmux open <handle>` and the dispatch prompt from
-[`dispatch-prompt-template.md`](dispatch-prompt-template.md), with its
-"Resuming" section filled in: never a re-entry text of your own. Fill
-its refine-round count and its convergence flag from what this prints:
-
-```bash
-$HOME/.claude/skills/issue-to-pr/tools/resume-state.sh <owner/repo> <n>
-```
-
-`refine_rounds` is the count, and `newest_finished` is the kind of the
-newest finished round. When it exits 1 (the PR has no `rounds.txt`) or
-fails, use the template's unknown-count bullet and leave out its
-convergence-flag bullet. If the
-prior run left
-`$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/final-report.md`, read it and
-carry its verdict forward into the resume: a capped-unrecovered resume
-inherits the remaining findings instead of rediscovering them, and a
-blocked resume inherits its reason. A task whose source text was edited
+state and resume the loop at step 5: read [`resume.md`](resume.md)
+before you reopen a pane on it. A task whose source text was edited
 re-keys the hash; if an older PR for the same source surfaces, say so in
 the final report rather than orphaning it silently.
 
@@ -340,7 +323,8 @@ report; the file is its durable copy, the exact text, no summary layer.
 - **Pane death or failed pane check:** redispatch once by reopening the
   surviving worktree (`workmux open <handle>`, worktree and branch
   persist), with the dispatch prompt from the template again: its
-  "Resuming" section filled in when the PR exists. Second failure:
+  "Resuming" section filled in per [`resume.md`](resume.md) when the PR
+  exists. Second failure:
   blocked.
 - **No gate found:** the round reports blocked. Never invent one.
 - **Scan hit on a comment body:** do not post it. Record the finding; it
