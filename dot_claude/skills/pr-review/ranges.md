@@ -11,12 +11,11 @@ round's head) and the round directory holds `delta.txt`, the
 `path:start-end` hunks changed since that head. The reviewer then
 reviews only the delta, from `range.reviewed_from` (the prior head) to
 the PR head: a finding outside it can only be a follow-up, except a
-high. An empty
-delta (the same head again) reviews the
-whole PR from the merge base instead, never an empty range. A change
-that adds or modifies no lines (a deletion) also reviews the whole PR,
-with the scope `full: the change since the prior round adds no lines`
-and no `delta.txt`, so every finding blocks as new.
+high. An empty delta (the same head again) reviews the whole PR from
+the merge base instead, never an empty range. A change that adds or
+modifies no lines (a deletion) also reviews the whole PR, with the
+scope `full: the change since the prior round adds no lines` and no
+`delta.txt`, so every finding blocks as new.
 
 ## A rebase
 
