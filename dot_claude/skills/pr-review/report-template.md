@@ -21,7 +21,7 @@ reads quickly and loses nothing.
     blocking finding. On a convergence round, where no reviewer runs,
     the sources are the critic and the caller's read. Follow-ups, if
     any, are listed below it.
-  - `**Verdict:** <n> finding(s).` — <n> blocking findings, counted
+  - `**Verdict:** <n> finding(s).` — <n> blocking findings, one per gap
     across the sources that ran. Follow-ups never count.
   - `**Verdict:** partial (the reviewer's coverage has a gap).` — the
     reviewer produced review text but left part of the range unreviewed,
@@ -84,15 +84,18 @@ Visible, in this order:
 **Cost:** <cumulative_tokens> reviewer tokens to date, across rounds 1..N (from round.json); critic <n> tokens this round (from the harness's reported usage, or "critic tokens not reported")
 
 **Findings:**
-<N. **[reviewer|critic|read] category/severity** `file:line`: claim>   (blocking only)
+<N. **[<source tags>] category/severity** `file:line`: claim>   (blocking only)
 
 **Follow-ups:**   (only when any exist)
-<N. **[reviewer|critic|read] category/severity** `file:line`: claim>
+<N. **[<source tags>] category/severity** `file:line`: claim>
 ```
 
 Each finding is one line, tagged with its source: `[reviewer]` for the
 reviewer binding's output, `[critic]` for the adversarial subagent,
-`[read]` for the caller's own read. Number across all sources, highest
+`[read]` for the caller's own read. A gap that more than one source
+reports is one line with each source's tag, for example
+`[reviewer, critic]` (pr-review §6). Its Dispositions line carries the
+same tags. Number across all sources, highest
 severity first, follow-ups continuing the numbering. Follow-ups are
 never fixed in the loop and never dispositioned. A named finding's disposition is a record, not a
 preference: fixed carries the commit and what proves it, rejected
@@ -124,9 +127,9 @@ GitHub renders the content as literal text):
 
 <details><summary>Dispositions</summary>   (whenever a named finding was fixed, rejected, or accepted; never silently dropped)
 
-- Fixed: [reviewer|critic|read] <finding, one line> — in <short-sha>, <the test or gate result that proves it>
-- Rejected: [reviewer|critic|read] <finding, one line> — <the reason, with the evidence>
-- Accepted: [reviewer|critic|read] <finding, one line> — <the reason>
+- Fixed: [<source tags>] <finding, one line> — in <short-sha>, <the test or gate result that proves it>
+- Rejected: [<source tags>] <finding, one line> — <the reason, with the evidence>
+- Accepted: [<source tags>] <finding, one line> — <the reason>
 
 </details>
 

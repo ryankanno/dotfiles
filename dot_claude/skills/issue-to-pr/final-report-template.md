@@ -20,6 +20,7 @@
 | 3. The round's comment is on the PR (or its scanned draft, on a repository that is not owned) | <holds, or what failed> |
 | 4. The gate is green on the PR's code | <holds, or what failed> |
 | 5. Every Rejected and Accepted disposition holds | <holds, or what failed> |
+| 6. The orchestrator's own read of the diff | <holds, or each problem it found> |
 
 Overruled dispositions: <each finding and the reason, or "None.">
 

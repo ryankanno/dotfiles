@@ -11,13 +11,17 @@ a subagent that has seen the code being reviewed: the critic's value is
 a context with no investment in the diff. Clean context means no prior
 discussion and no stake, not file-blindness.
 
-The subagent's prompt is the output of this directory's
-`critic-input.sh`, passed verbatim: no paraphrase, no summary, no
-added or removed instruction, no input left on disk for it to read.
+The subagent's input is the output of this directory's
+`critic-input.sh`, unchanged: no paraphrase, no summary, no added or
+removed instruction. The script writes it to
+`<round-dir>/critic-input.md`. The subagent's prompt is one
+instruction: read `<round-dir>/critic-input.md` in full and follow it.
+The caller copies nothing by hand. No input but `critic-input.md` is
+left on disk for it to read.
 
 ```bash
 $HOME/.claude/skills/issue-to-pr/tools/subagent/critic-input.sh \
-  --repo <checkout-dir> --round-dir <round-dir> --brief <brief-file>
+  --repo <checkout-dir> --round-dir <round-dir> --brief <brief-file> >/dev/null
 ```
 
 The script emits `critic-prompt.md` verbatim, then inline: the brief,
@@ -27,9 +31,8 @@ the repository path for verifying claims, and the unified diff the
 reviewer reviewed (the whole PR in round 1 or on an empty delta, the
 delta since the prior round's head otherwise). Follow-ups never reach
 the critic: a follow-up cannot block, so a critic handed them re-raises
-them and spends turns that change nothing. The script also keeps the
-prompt as `critic-input.md` in the round directory, so the round's
-record shows what the critic was told.
+them and spends turns that change nothing. The same file is the
+round's record of what the critic was told.
 
 Why a script and not a recipe: a caller writing its own prompt drifted
 from the rules (measured on PR 40, round 11: the refine dropped the
@@ -37,7 +40,9 @@ high-only rule for code outside the delta, wrote that re-raising
 follow-ups is "not out of bounds", and pointed the critic at a
 dispositions file three rounds stale), and every input left on disk
 cost the critic a turn over its whole context (round 9: 32k tokens on
-the first turn, 98k by the fourteenth).
+the first turn, 98k by the fourteenth). `critic-input.md` costs one
+such turn: neither harness's subagent tool takes a file, and a hand
+copy of the prompt drifted (PR 84, round 1: one test line mistyped).
 
 The critic's token usage goes on the round comment's Cost line. Under
 opencode, read it from the opencode database by the subagent's session
