@@ -332,6 +332,20 @@ if ! take_lock; then
   fi
 fi
 
+# A resume reads the refine count from this ledger (resume-state.sh). A
+# refine pushed its fix before this run, so the line goes in once the
+# round holds its lock, before the checks that can stop it. A rerun redoes
+# a round already on it, so it adds no line.
+if [[ -z "$rerun" ]]; then
+  kind=refine
+  if [[ $((10#$round)) -eq 1 ]]; then kind=review; elif [[ -n "$convergence" ]]; then kind=convergence; fi
+  rounds_file="$HOME/.cache/pr-loop/$owner_repo/pr-$pr/rounds.txt"
+  printf '%s %s\n' "$round" "$kind" >>"$rounds_file" || {
+    printf 'cannot append round %s to %s\n' "$round" "$rounds_file" >&2
+    exit 2
+  }
+fi
+
 # The refs resolve before any prior evidence is touched: a network or
 # resolution failure must leave the round dir exactly as it was, not
 # half-superseded with the old round.json already moved away.
@@ -569,18 +583,6 @@ if [[ ${#leftovers[@]} -gt 0 ]]; then
   keep="$round_dir/superseded-$(date +%Y%m%d-%H%M%S)-$$"
   mkdir -p "$keep"
   mv "${leftovers[@]}" "$keep/"
-fi
-
-# A resume reads the refine count from this ledger (resume-state.sh). A
-# rerun redoes a round already on it, so it adds no line.
-if [[ -z "$rerun" ]]; then
-  kind=refine
-  if [[ $((10#$round)) -eq 1 ]]; then kind=review; elif [[ -n "$convergence" ]]; then kind=convergence; fi
-  rounds_file="${round_dir%/*}/rounds.txt"
-  printf '%s %s\n' "$round" "$kind" >>"$rounds_file" || {
-    printf 'cannot append round %s to %s\n' "$round" "$rounds_file" >&2
-    exit 2
-  }
 fi
 
 # Each round reviews the whole PR afresh and keeps finding new edge cases

@@ -3588,7 +3588,7 @@ finish_round 2
 run_prr --repo "$repo" --pr 39 --round 3 --convergence >/dev/null
 assert_eq "$(cat "$pd/rounds.txt" 2>/dev/null)" $'1 review\n2 refine\n3 convergence' "round 1 is review, a later round is refine, and --convergence is convergence"
 
-echo "pr-round: a --rerun or a refused run adds no line to rounds.txt"
+echo "pr-round: a --rerun adds no line to rounds.txt, and a refused run repeats the round's line"
 new_sandbox
 make_pr_round_env
 make_fixture_repo
@@ -3598,7 +3598,20 @@ run_prr --repo "$repo" --pr 39 --round 1 >/dev/null 2>&1; RC=$?
 assert_eq "$RC" 6 "the second run is refused"
 run_prr --repo "$repo" --pr 39 --round 1 --rerun >/dev/null; RC=$?
 assert_eq "$RC" 0 "the rerun runs"
-assert_eq "$(cat "$pd/rounds.txt" 2>/dev/null)" "1 review" "the round has its one line"
+assert_eq "$(cat "$pd/rounds.txt" 2>/dev/null)" $'1 review\n1 review' "the refused run repeats the line, and the rerun adds none"
+
+# A refine has pushed its fix before its round runs, so a round that
+# stops early is still a refine the cap counts.
+echo "pr-round: a round that stops after its round dir exists keeps its line"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+advance_head g.txt 'refined\n'
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null 2>&1; RC=$?
+assert_eq "$RC" 9 "round 2 stops: round 1 has no comment"
+assert_eq "$(cat "$pd/rounds.txt" 2>/dev/null)" $'1 review\n2 refine' "the stopped refine round has its line"
 
 echo "pr-round: a rounds.txt that cannot take the line stops the round before any review"
 new_sandbox
