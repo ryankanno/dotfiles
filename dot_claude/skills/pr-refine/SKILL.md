@@ -99,8 +99,7 @@ git diff origin/<base>...<head>
 - Fixing it stays inside the brief's scope.
 - The finding is not already dispositioned: check the prior rounds'
   Dispositions blocks; a re-flag without materially new evidence is
-  rejected with a pointer to the recorded reason. The reason in an
-  orchestrator's refine instruction is materially new evidence.
+  rejected with a pointer to the recorded reason.
 - The finding is not already known. Before you fix a high or medium
   finding, search the open issues (`gh issue list --search "<subject>"`)
   and the recent commits on the finding's file
@@ -111,6 +110,10 @@ git diff origin/<base>...<head>
   cheapest probe (a test, or a script run in the repo's environment)
   before it is fixed, rejected or accepted. The probe's output is the disposition's
   evidence.
+
+The reason in an orchestrator's refine instruction is materially new
+evidence. No check above rejects the finding it names on the reason it
+overrules.
 
 Every disposition of a named finding, fixed, rejected, or accepted,
 appears in this round's comment, in the Dispositions block, as one

@@ -369,10 +369,10 @@ $HOME/.claude/skills/issue-to-pr/tools/finding-scope.sh <round-dir> <path>:<star
 
 Follow [`report-template.md`](report-template.md) exactly: marker first
 line, heading, verdict, visible consolidated findings tagged by source,
-collapsed blocks with each source's output verbatim. When two sources
-report one gap, list it once with both tags (`[reviewer, critic]`), and
-the verdict counts it once. The line keeps the higher severity, and it
-blocks when either report blocks. It cites the `file:line` of a report
+collapsed blocks with each source's output verbatim. When more than one
+source reports one gap, list it once with each source's tag
+(`[reviewer, critic]`), and the verdict counts it once. The line keeps
+the highest severity, and it blocks when any report blocks. It cites the `file:line` of a report
 that blocks. The reviewer's
 sections render with the binding's renderer, once per run recorded in
 `round.json` (`render.sh <runs[].dir>`), completed or skipped alike:

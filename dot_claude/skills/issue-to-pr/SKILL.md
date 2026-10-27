@@ -202,8 +202,9 @@ reused, or the pane's earlier run of that round died before its
 Watch the pane with `workmux status` / `capture`. Verify each round's
 push with `gh pr view`. Verify each round's comment on the PR (on a
 repository that is not owned, its `comment.md`) by its heading and
-verdict line only: read its findings in §6, after the read in item 6.
-Never run a review round yourself, and never send the pane a round it
+verdict line only. That is the one read of a round comment before the
+read in §6 item 6. §6 item 5 reads its Dispositions blocks after that
+read. Never run a review round yourself, and never send the pane a round it
 did not ask for.
 
 ## 6. Ratification
