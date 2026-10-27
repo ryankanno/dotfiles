@@ -148,15 +148,5 @@ blocks when they contain markup.
 
 ## Scan before posting
 
-Write the body to `<round-dir>/comment.md`, never a temp folder: the next round and /pr-refine read it there before the PR.
-
-```bash
-$HOME/.claude/skills/issue-to-pr/tools/scan.sh <file>
-```
-
-The script replaces home-directory paths with `~` in place. Exit 1
-means a hit remains (another home path, a temp path, a token): do not
-post; record the printed lines and surface them in the loop's final
-report. Exit 2 means a usage error, or the scan itself failed: do not
-post; record its stderr the same way. In an interactive round, show
-the lines and wait instead.
+Write the body to `<round-dir>/comment.md` and scan it before posting,
+as pr-review §7 says.

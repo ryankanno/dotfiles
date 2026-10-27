@@ -90,6 +90,7 @@ flowchart LR
 | Round comment (read before the PR copy) | `$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/round-<N>/comment.md` |
 | Finding classifier | `$HOME/.claude/skills/issue-to-pr/tools/finding-scope.sh` |
 | Critic prompt builder | `$HOME/.claude/skills/issue-to-pr/tools/subagent/critic-input.sh` |
+| Resume state (refine count, newest finished round) | `$HOME/.claude/skills/issue-to-pr/tools/resume-state.sh` |
 | Round artifacts | `$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/round-<N>/` |
 | Final report | `$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/final-report.md` |
 | workmux layouts | `~/.config/workmux/config.yaml` (chezmoi: `dot_config/workmux/config.yaml`) |

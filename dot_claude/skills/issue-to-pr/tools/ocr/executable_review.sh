@@ -4,11 +4,15 @@
 # new directory with the same interface, plus one manifest line.
 #
 # Interface in: --repo, --out, optional --brief, optional --effort
-# (low|medium|high, default medium), --timeout (minutes, default 80),
+# (low|medium|high, default medium: the review passes per file group, low
+# 1, medium 2, high 3; a pass after the first runs only when the one
+# before added a finding), --timeout (minutes, default 80; ocr multiplies
+# it by the passes, so the default gives each group 160 minutes),
 # --max-tools (tool rounds per group, 50 or more, default 200),
-# --max-tokens-budget (tokens per ocr run, default 25000000) and --exclude
-# (comma-separated gitignore-style globs, merged with rule.json's
-# excludes), and either
+# --max-tokens-budget (tokens per ocr run, not per group, default
+# 25000000; a group over it gets one final round and fails as budget,
+# and ocr starts no more groups) and --exclude (comma-separated
+# gitignore-style globs, merged with rule.json's excludes), and either
 # --base/--head (range mode) or --commit (per-commit mode, the
 # empty-result retry).
 # Interface out: <out>/review.json (the tool's own output), stdout.txt,

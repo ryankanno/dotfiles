@@ -25,12 +25,9 @@ The objective is the reader's value, not the critic's zero.
   new machinery, no defensive clauses beyond what the finding requires.
 - When fixing a finding would make the artifact worse (bloat,
   over-formalization, complexity the brief never asked for), do not fix
-  it. Record it as a judgment call with the reason. Measured live
-  (2026-10-03): adversarial findings ran 4, 6,
-  6, 4 across four rounds while severity slid from real defects to
-  definitional regress; the critic on prose is asymptotic, and a loop
-  that optimizes its zero grows the artifact until the human reverts
-  the whole set.
+  it. Record it as a judgment call with the reason: the critic on prose
+  never reaches zero, and a loop that optimizes its zero grows the
+  artifact until the human reverts the whole set.
 - Prose targets (docs, rule files, prompts) converge on the human's
   judgment. When the remaining findings are matters of taste or
   formalization, say so and stop; the report marks them as judgment
@@ -165,8 +162,11 @@ never force.
 Write this round's Rejected and Accepted lines, as §2 records them, to
 `refine-dispositions.md` in the new round's directory before you run
 the round: `$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/round-<N>/`, with
-`<N>` the new round's number. Create the directory when it is missing.
-Write the lines as `report-template.md`'s Dispositions block writes them:
+`<N>` the new round's number. Create the directory when it is missing,
+also when you have no such lines. A resume counts a refine whose round
+stopped before its `rounds.txt` line by that directory
+(`resume-state.sh`). Write the lines as `report-template.md`'s
+Dispositions block writes them:
 `- Rejected:` or `- Accepted:` at column 0, wrapped text indented.
 A `- Fixed:` line stays out of the file: the round reads only the other
 two, and the scan reads the whole file. The file's Rejected and
@@ -183,11 +183,8 @@ SHA — once, at the end, over the final head, never once per
 intermediate head. Pass `--expect-head` with the SHA you pushed
 (`git rev-parse HEAD`). Pass the `--effort`, `--timeout`, `--max-tools`,
 `--max-tokens-budget` and `--exclude` the loop's rounds use, when the dispatch prompt or
-the caller names them. Write the
-round's comment per `report-template.md`
-with the round number incremented, the Dispositions block, and the
-cumulative cost line from round.json. Post the round's comment per
-pr-review §8: on a repository that is not owned, it stays a draft.
+the caller names them. Write, scan and post the round's comment per
+pr-review §6 to §8.
 
 ## 7. Report back
 
@@ -199,11 +196,5 @@ ratification declares the loop clean or converged.
 
 ## Never
 
-- Never fix a finding that neither the previous round's comment named
-  as blocking nor an orchestrator's refine instruction named.
-- Never re-run the reviewer twice in one round.
-- Never fix a finding by adding machinery beyond it.
 - Never force-push, and never push before the round's gate is green.
-- Never report an empty reviewer result as clean or as a failure.
 - Never post a comment that failed the scan.
-- Never suppress a failure to pass the gate.

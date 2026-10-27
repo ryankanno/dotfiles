@@ -3573,6 +3573,185 @@ assert_eq "$RC" 2 "the round exits 2"
 assert_contains "$OUT" "the scan itself failed" "stderr says the scan failed"
 assert_not_contains "$OUT" "the file carries a hit" "stderr does not blame the file"
 
+# A resume reads the refine count from rounds.txt, so the round script
+# keeps it, not the pane by hand (issue #182).
+echo "pr-round: each round it starts appends its number and kind to rounds.txt"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
+advance_head g.txt 'refined\n'
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+finish_round 2
+run_prr --repo "$repo" --pr 39 --round 3 --convergence >/dev/null
+assert_eq "$(cat "$pd/rounds.txt" 2>/dev/null)" $'1 review\n2 refine\n3 convergence' "round 1 is review, a later round is refine, and --convergence is convergence"
+
+echo "pr-round: a --rerun adds no line to rounds.txt, and neither does a refused run"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null 2>&1; RC=$?
+assert_eq "$RC" 6 "the second run is refused"
+run_prr --repo "$repo" --pr 39 --round 1 --rerun >/dev/null; RC=$?
+assert_eq "$RC" 0 "the rerun runs"
+assert_eq "$(cat "$pd/rounds.txt" 2>/dev/null)" "1 review" "the refused run and the rerun add no line"
+
+# A refine has pushed its fix before its round runs, so a round that
+# stops early is still a refine the cap counts.
+echo "pr-round: a round that stops after its round dir exists keeps its line"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+advance_head g.txt 'refined\n'
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null 2>&1; RC=$?
+assert_eq "$RC" 9 "round 2 stops: round 1 has no comment"
+assert_eq "$(cat "$pd/rounds.txt" 2>/dev/null)" $'1 review\n2 refine' "the stopped refine round has its line"
+
+echo "pr-round: a rounds.txt that cannot take the line stops the round before any review"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+mkdir -p "$pd/rounds.txt"
+ERR="$(run_prr --repo "$repo" --pr 39 --round 1 2>&1 >/dev/null)"; RC=$?
+assert_eq "$RC" 2 "the round exits 2"
+assert_contains "$ERR" "cannot append round 1 to $pd/rounds.txt" "stderr names the ledger"
+assert_eq "$(ls -A "$pd/round-1" 2>/dev/null)" "" "the round dir holds no evidence: no review ran"
+
+RST="$TOOLS/executable_resume-state.sh"
+run_rst() { # args -> OUT, ERR, RC
+  OUT="$(HOME="$WS/home" PATH="$stub:$PATH" "$RST" "$@" 2>"$WS/rst.err")"; RC=$?
+  ERR="$(cat "$WS/rst.err")"
+}
+
+echo "resume-state: prints the refine count and the newest finished round's kind"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
+advance_head g.txt 'refined\n'
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+finish_round 2
+run_prr --repo "$repo" --pr 39 --round 3 --convergence >/dev/null
+run_rst test-owner/test-repo 39
+assert_eq "$RC" 0 "exits 0"
+assert_eq "$OUT" $'refine_rounds=1\nnewest_finished=refine' "a convergence round with no comment is not finished"
+finish_round 3
+run_rst test-owner/test-repo 39
+assert_eq "$OUT" $'refine_rounds=1\nnewest_finished=convergence' "the convergence round with its comment is the newest finished"
+
+echo "resume-state: a hand-kept rounds.txt counts a number once, by its last line, and only with its folder"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
+advance_head g.txt 'refined\n'
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+finish_round 2
+run_prr --repo "$repo" --pr 39 --round 3 --convergence >/dev/null
+finish_round 3
+# A pane that died before its round started left a line for round 4.
+printf '1 review\n2 refine\n2 refine\n3 refine\n3 convergence\n4 refine\n' >"$pd/rounds.txt"
+run_rst test-owner/test-repo 39
+assert_eq "$OUT" $'refine_rounds=1\nnewest_finished=convergence' "round 3 counts by its last line, and round 4 never ran"
+
+echo "resume-state: a refused run of a finished round keeps that round's kind"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
+advance_head g.txt 'refined\n'
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+finish_round 2
+run_prr --repo "$repo" --pr 39 --round 2 --convergence >/dev/null 2>&1; RC=$?
+assert_eq "$RC" 6 "the run on the finished round is refused"
+run_rst test-owner/test-repo 39
+assert_eq "$OUT" $'refine_rounds=1\nnewest_finished=refine' "round 2 is still the refine it ran as"
+
+# A refine pushes its fix and makes round-<N>/ before its round runs, also
+# when it fixed every finding and has no refine-dispositions.md, so a round
+# that stops before pr-round.sh writes its line is still a refine.
+echo "resume-state: a refine whose round stopped before its line still counts"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
+old_json="$GH_PR_JSON"
+advance_head g.txt 'refined\n'
+export GH_PR_JSON="$old_json"
+mkdir -p "$pd/round-2"
+PR_ROUND_HEAD_WAIT=1 run_prr --repo "$repo" --pr 39 --round 2 --expect-head "$FR_NEXT" >/dev/null 2>&1; RC=$?
+assert_eq "$RC" 8 "GitHub does not report the pushed head"
+run_rst test-owner/test-repo 39
+assert_eq "$OUT" $'refine_rounds=1\nnewest_finished=review' "the stopped refine counts, and round 1 is the newest finished"
+
+echo "resume-state: a refine that has its line and stopped before round.json counts once"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+advance_head g.txt 'refined\n'
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null 2>&1; RC=$?
+assert_eq "$RC" 9 "round 2 stops: round 1 has no comment"
+run_rst test-owner/test-repo 39
+assert_eq "$OUT" $'refine_rounds=1\nnewest_finished=none' "the stopped refine counts once"
+
+# pr-round.sh makes round-<N>/ only after the line, so a round that stops
+# at the lock leaves no folder that a resume reads as a refine.
+echo "resume-state: a convergence round refused at the lock is not a refine"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
+advance_head g.txt 'refined\n'
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+finish_round 2
+sleep 30 &
+holder=$!
+printf '%s\n' "$holder" >"$pd/round-3.lock"
+run_prr --repo "$repo" --pr 39 --round 3 --convergence >/dev/null 2>&1; RC=$?
+kill "$holder" 2>/dev/null; wait "$holder" 2>/dev/null
+assert_eq "$RC" 7 "a live holder refuses the round"
+run_rst test-owner/test-repo 39
+assert_eq "$OUT" $'refine_rounds=1\nnewest_finished=refine' "the refused convergence round adds no refine"
+
+echo "resume-state: a round comment it cannot read exits 5, not a guess"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+mkdir -p "$WS/failgh"
+printf '#!/usr/bin/env bash\nexit 1\n' >"$WS/failgh/gh"
+chmod +x "$WS/failgh/gh"
+OUT="$(HOME="$WS/home" PATH="$WS/failgh:$stub:$PATH" "$RST" test-owner/test-repo 39 2>"$WS/rst.err")"; RC=$?
+assert_eq "$RC" 5 "exits 5"
+assert_eq "$OUT" "" "prints nothing"
+assert_contains "$(cat "$WS/rst.err")" "round-comment.sh exit 5" "stderr names the failed read"
+
+echo "resume-state: a PR with no rounds.txt exits 1, and a bad call exits 2"
+new_sandbox
+make_pr_round_env
+run_rst test-owner/test-repo 39
+assert_eq "$RC" 1 "no rounds.txt exits 1"
+assert_eq "$OUT" "" "prints nothing"
+assert_contains "$ERR" "rounds.txt" "stderr names the missing file"
+run_rst test-owner/test-repo
+assert_eq "$RC" 2 "a missing PR number is a usage error"
+
 # Claude Code replaces these placeholders in a skill's text with the
 # invocation's arguments, so the model reads a different command.
 echo "skills: no skill text holds a positional placeholder"
@@ -3600,15 +3779,15 @@ echo "skills: pr-refine and issue-to-pr follow pr-review on a repository not own
 S="$(skill_section pr-refine/SKILL.md '## 1. Read the round')"
 assert_contains "$S" 'On a repository that is not owned (pr-review §8), read the round from `comment.md` only' "pr-refine reads the round from disk"
 S="$(skill_section pr-refine/SKILL.md '## 6. Re-run the round')"
-assert_contains "$S" 'Post the round'"'"'s comment per pr-review §8: on a repository that is not owned, it stays a draft.' "pr-refine leaves a draft where pr-review does"
+assert_contains "$S" 'Write, scan and post the round'"'"'s comment per pr-review §6 to §8.' "pr-refine leaves a draft where pr-review does"
 S="$(skill_section issue-to-pr/SKILL.md '## 5. The implementer')"
 assert_contains "$S" 'each round'"'"'s comment on the PR (on a repository that is not owned, its `comment.md`)' "the round loop checks the drafts"
 S="$(skill_section issue-to-pr/SKILL.md '## 6. Ratification')"
 assert_contains "$S" 'On a repository that is not owned (pr-review §8), check `comment.md` in the round directory instead, and `scan.sh <comment.md>` exits 0' "ratification item 3 checks a scanned draft"
 assert_contains "$S" 'On a repository that is not owned, read them from each round directory'"'"'s `comment.md`.' "ratification item 5 audits the drafts"
-S="$(skill_section issue-to-pr/SKILL.md '## 7. The final report')"
+S="$(tr -s ' \n' ' ' <"$ROOT/dot_claude/skills/issue-to-pr/final-report-template.md")"
 assert_contains "$S" 'critic'"'"'s tokens summed from every round comment'"'"'s Cost line (on a repository that is not owned, each round'"'"'s `comment.md`)' "the critic-token sum reads the drafts"
-assert_contains "$S" 'the PR comment links, one per round (on a repository that is not owned, the draft paths for the human to post)' "the report lists the draft paths"
+assert_contains "$S" '<comment URL, or the draft path on a repository that is not owned>' "the report lists the draft paths"
 
 # A clean round 1 is final, and the gate is judged by its exit code (issue #102).
 echo "skills: issue-to-pr's clean verdict covers a clean round 1 and the gate's exit code"
@@ -3658,6 +3837,7 @@ assert_contains "$S" 'before you run the round' "pr-refine §6 writes it first"
 assert_contains "$S" 'as `report-template.md`'"'"'s Dispositions block writes them' "pr-refine §6 pins the line format"
 assert_contains "$S" 'a hit stops the round with exit 2' "pr-refine §6 says the file must pass the scan"
 assert_contains "$S" 'A `- Fixed:` line stays out of the file' "pr-refine §6 keeps Fixed lines out of the file"
+assert_contains "$S" 'Create the directory when it is missing, also when you have no such lines.' "pr-refine §6 makes the round dir for a refine that fixed every finding"
 S="$(skill_section pr-review/SKILL.md '## 1. Run the round')"
 assert_contains "$S" 'refine-dispositions.md' "pr-review §1 names the file"
 assert_contains "$S" 'adds its Rejected and Accepted lines' "pr-review §1 says the round reads it"
@@ -3676,6 +3856,11 @@ S="$(skill_section issue-to-pr/dispatch-prompt-template.md '## Review rounds')"
 assert_contains "$S" 'no usable comment (that call exits 1), finish it from pr-review §2' "the exit 6 row keys an unfinished round on exit 1"
 assert_contains "$S" "On an exit 2 of that call, $RCRETRY" "the exit 6 row retries an exit 2 once"
 assert_contains "$S" "On a second exit 2, or an exit of that call other than 0, 1 or 2, $RCSTOP" "the exit 6 row stops on its other failures"
+
+echo "skills: resume.md retries a resume-state.sh exit 2 once and stops only on an exit other than 0, 1 or 2"
+S="$(skill_section issue-to-pr/resume.md '# Resuming a PR')"
+assert_contains "$S" "On exit 2, $RCRETRY" "resume.md retries an exit 2 once"
+assert_contains "$S" 'On a second exit 2, or an exit other than 0, 1 or 2, open no pane' "resume.md keeps exit 1 off the blocked path"
 
 # pr-refine §1 is round-comment.sh's third caller: it retries an exit 2 once and gives the pane a stop (issue #181).
 echo "skills: pr-refine §1 retries a round-comment.sh exit 2 once and names the pane's stop"
@@ -3718,8 +3903,6 @@ S="$(skill_section issue-to-pr/dispatch-prompt-template.md '## Review rounds')"
 assert_contains "$S" 'It names a disposition the orchestrator overrules, or a problem the orchestrator'"'"'s own read found.' "the pane knows a refine instruction can carry the read's problem"
 S="$(skill_section pr-refine/SKILL.md '## 3. Fix under TDD')"
 assert_contains "$S" 'or the one finding an orchestrator'"'"'s refine instruction names (issue-to-pr §6)' "pr-refine fixes the finding a refine instruction names"
-S="$(skill_section pr-refine/SKILL.md '## Never')"
-assert_contains "$S" 'Never fix a finding that neither the previous round'"'"'s comment named as blocking nor an orchestrator'"'"'s refine instruction named.' "pr-refine's Never rule admits the refine instruction"
 
 # A gap that more than one source reports counts once, and the read starts with its own defect pass (issue #174).
 echo "skills: pr-review counts a gap once across sources and reads the diff before the other sources"

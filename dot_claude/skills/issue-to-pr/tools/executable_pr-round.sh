@@ -53,9 +53,15 @@
 #                and which no --rerun moves; newest first within the
 #                manifest's reviewer_background_limit; a convergence
 #                round runs no reviewer, so it assembles none and
-#                checks no limit), and the directory path on stdout.
+#                checks no limit), one "<N> review|refine|convergence"
+#                line appended to rounds.txt beside the round dirs when
+#                the round takes its lock (review for round 1, convergence
+#                with --convergence, refine otherwise; none with --rerun
+#                or when the number already has a line), and
+#                the directory path on stdout.
 # Exit codes: 0 the round ran; 2 usage, the environment is unusable
-# (HOME unset, or the round lock cannot be created), or, outside a
+# (HOME unset, the round lock cannot be created, or rounds.txt cannot be
+# appended to), or, outside a
 # convergence round, the brief cannot fit the reviewer's background limit,
 # alone or once the standing dispositions assemble into it, or the round
 # dir's refine-dispositions.md fails the scan; 3 identity
@@ -268,7 +274,9 @@ owner_repo=$(cd "$repo" && gh repo view --json nameWithOwner --jq .nameWithOwner
   exit 5
 }
 round_dir="$HOME/.cache/pr-loop/$owner_repo/pr-$pr/round-$round"
-mkdir -p "$round_dir"
+# resume-state.sh reads a round-<N>/ with no line as a refine, so this run
+# makes the round dir only after its line.
+mkdir -p "${round_dir%/*}"
 
 # Two callers once ran the same round at once, and one's --rerun moved the
 # other's in-flight evidence (PRs 137, 230). The lock sits beside the round
@@ -326,6 +334,22 @@ if ! take_lock; then
     take_lock || lock_busy "another caller took over its lock"
   fi
 fi
+
+# A resume reads the refine count from this ledger (resume-state.sh). A
+# refine pushed its fix before this run, so the line goes in once the
+# round holds its lock, before the later checks that can stop it. A rerun
+# redoes a round already on it, and a refused run's flag can differ from
+# the run that made the round, so a number already on it adds no line.
+rounds_file="$HOME/.cache/pr-loop/$owner_repo/pr-$pr/rounds.txt"
+if [[ -z "$rerun" ]] && ! awk -v r="$((10#$round))" '$1 + 0 == r { found = 1; exit } END { exit !found }' "$rounds_file" 2>/dev/null; then
+  kind=refine
+  if [[ $((10#$round)) -eq 1 ]]; then kind=review; elif [[ -n "$convergence" ]]; then kind=convergence; fi
+  printf '%s %s\n' "$round" "$kind" >>"$rounds_file" || {
+    printf 'cannot append round %s to %s\n' "$round" "$rounds_file" >&2
+    exit 2
+  }
+fi
+mkdir -p "$round_dir"
 
 # The refs resolve before any prior evidence is touched: a network or
 # resolution failure must leave the round dir exactly as it was, not
