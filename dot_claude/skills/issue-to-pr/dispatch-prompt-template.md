@@ -30,16 +30,19 @@ PR, and do not redo work the branch already holds.
   with `blocked: round-comment.sh exit <code>: <stderr line>`.
   Any other round is unfinished: finish that same
   round with the pr-review skill, by the exit 6 and exit 7 rules below.
-- The PR has had <refine count> refine rounds. Count them against the
-  cap of 3 refine rounds below. Do not get the count from the round
-  numbers: a convergence round takes a round number of its own.
-<or, only when the PR has no rounds.txt, in place of the bullet above:>
+- The PR has had <refine_rounds from resume-state.sh> refine rounds.
+  Count them against the cap of 3 refine rounds below. Do not get the
+  count from the round numbers: a convergence round takes a round
+  number of its own.
+<or, only when resume-state.sh exits non-zero, in place of the bullet
+above:>
 - The PR's refine-round count is unknown. Run at most 1 more refine
   round.
-<omit this bullet when the PR has no rounds.txt:>
-- The newest finished round <was | was not> a convergence round. When
-  it was a convergence round with no blocking finding, do not run
-  another convergence round: stop, and report its stop state.
+<omit this bullet when resume-state.sh exits non-zero:>
+- The newest finished round <was (newest_finished=convergence) | was
+  not> a convergence round. When it was a convergence round with no
+  blocking finding, do not run another convergence round: stop, and
+  report its stop state.
 <only when the prior run left a final report:>
 - The prior run's final report is `<path of final-report.md>`: its
   verdict and remaining findings carry forward.
@@ -110,11 +113,6 @@ The orchestrator runs no review. It ratifies your rounds when you stop.
 Every round has a unique number, and every round posts its comment per
 pr-review §8: on a repository that is not owned, the comment stays a
 draft in the round directory.
-Before you start a round, add one line to `rounds.txt` in the PR's
-round folder, the folder that holds `round-<N>/` (make it as
-pr-review §1 says when it is missing): `<N> review` (round 1), `<N> refine` (a pr-refine run), or
-`<N> convergence`. A resume reads the refine count from this file. A
-rerun of a round adds no line.
 
 1. **Round 1:** right after the PR is filed, run the pr-review skill on
    the PR, with `--expect-branch <branch-name>` and

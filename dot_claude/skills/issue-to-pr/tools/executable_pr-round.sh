@@ -53,9 +53,14 @@
 #                and which no --rerun moves; newest first within the
 #                manifest's reviewer_background_limit; a convergence
 #                round runs no reviewer, so it assembles none and
-#                checks no limit), and the directory path on stdout.
+#                checks no limit), one "<N> review|refine|convergence"
+#                line appended to rounds.txt beside the round dirs when
+#                the round starts (review for round 1, convergence with
+#                --convergence, refine otherwise; none with --rerun), and
+#                the directory path on stdout.
 # Exit codes: 0 the round ran; 2 usage, the environment is unusable
-# (HOME unset, or the round lock cannot be created), or, outside a
+# (HOME unset, the round lock cannot be created, or rounds.txt cannot be
+# appended to), or, outside a
 # convergence round, the brief cannot fit the reviewer's background limit,
 # alone or once the standing dispositions assemble into it, or the round
 # dir's refine-dispositions.md fails the scan; 3 identity
@@ -564,6 +569,18 @@ if [[ ${#leftovers[@]} -gt 0 ]]; then
   keep="$round_dir/superseded-$(date +%Y%m%d-%H%M%S)-$$"
   mkdir -p "$keep"
   mv "${leftovers[@]}" "$keep/"
+fi
+
+# A resume reads the refine count from this ledger (resume-state.sh). A
+# rerun redoes a round already on it, so it adds no line.
+if [[ -z "$rerun" ]]; then
+  kind=refine
+  if [[ $((10#$round)) -eq 1 ]]; then kind=review; elif [[ -n "$convergence" ]]; then kind=convergence; fi
+  rounds_file="${round_dir%/*}/rounds.txt"
+  printf '%s %s\n' "$round" "$kind" >>"$rounds_file" || {
+    printf 'cannot append round %s to %s\n' "$round" "$rounds_file" >&2
+    exit 2
+  }
 fi
 
 # Each round reviews the whole PR afresh and keeps finding new edge cases

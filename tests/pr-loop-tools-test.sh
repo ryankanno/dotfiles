@@ -3573,6 +3573,107 @@ assert_eq "$RC" 2 "the round exits 2"
 assert_contains "$OUT" "the scan itself failed" "stderr says the scan failed"
 assert_not_contains "$OUT" "the file carries a hit" "stderr does not blame the file"
 
+# A resume reads the refine count from rounds.txt, so the round script
+# keeps it, not the pane by hand (issue #182).
+echo "pr-round: each round it starts appends its number and kind to rounds.txt"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
+advance_head g.txt 'refined\n'
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+finish_round 2
+run_prr --repo "$repo" --pr 39 --round 3 --convergence >/dev/null
+assert_eq "$(cat "$pd/rounds.txt" 2>/dev/null)" $'1 review\n2 refine\n3 convergence' "round 1 is review, a later round is refine, and --convergence is convergence"
+
+echo "pr-round: a --rerun or a refused run adds no line to rounds.txt"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null 2>&1; RC=$?
+assert_eq "$RC" 6 "the second run is refused"
+run_prr --repo "$repo" --pr 39 --round 1 --rerun >/dev/null; RC=$?
+assert_eq "$RC" 0 "the rerun runs"
+assert_eq "$(cat "$pd/rounds.txt" 2>/dev/null)" "1 review" "the round has its one line"
+
+echo "pr-round: a rounds.txt that cannot take the line stops the round before any review"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+mkdir -p "$pd/rounds.txt"
+ERR="$(run_prr --repo "$repo" --pr 39 --round 1 2>&1 >/dev/null)"; RC=$?
+assert_eq "$RC" 2 "the round exits 2"
+assert_contains "$ERR" "cannot append round 1 to $pd/rounds.txt" "stderr names the ledger"
+assert_eq "$(ls -A "$pd/round-1" 2>/dev/null)" "" "the round dir holds no evidence: no review ran"
+
+RST="$TOOLS/executable_resume-state.sh"
+run_rst() { # args -> OUT, ERR, RC
+  OUT="$(HOME="$WS/home" PATH="$stub:$PATH" "$RST" "$@" 2>"$WS/rst.err")"; RC=$?
+  ERR="$(cat "$WS/rst.err")"
+}
+
+echo "resume-state: prints the refine count and the newest finished round's kind"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
+advance_head g.txt 'refined\n'
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+finish_round 2
+run_prr --repo "$repo" --pr 39 --round 3 --convergence >/dev/null
+run_rst test-owner/test-repo 39
+assert_eq "$RC" 0 "exits 0"
+assert_eq "$OUT" $'refine_rounds=1\nnewest_finished=refine' "a convergence round with no comment is not finished"
+finish_round 3
+run_rst test-owner/test-repo 39
+assert_eq "$OUT" $'refine_rounds=1\nnewest_finished=convergence' "the convergence round with its comment is the newest finished"
+
+echo "resume-state: a hand-kept rounds.txt counts a number once, by its last line, and only with its folder"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
+advance_head g.txt 'refined\n'
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+finish_round 2
+run_prr --repo "$repo" --pr 39 --round 3 --convergence >/dev/null
+finish_round 3
+# A pane that died before its round started left a line for round 4.
+printf '1 review\n2 refine\n2 refine\n3 refine\n3 convergence\n4 refine\n' >"$pd/rounds.txt"
+run_rst test-owner/test-repo 39
+assert_eq "$OUT" $'refine_rounds=1\nnewest_finished=convergence' "round 3 counts by its last line, and round 4 never ran"
+
+echo "resume-state: a round comment it cannot read exits 5, not a guess"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+mkdir -p "$WS/failgh"
+printf '#!/usr/bin/env bash\nexit 1\n' >"$WS/failgh/gh"
+chmod +x "$WS/failgh/gh"
+OUT="$(HOME="$WS/home" PATH="$WS/failgh:$stub:$PATH" "$RST" test-owner/test-repo 39 2>"$WS/rst.err")"; RC=$?
+assert_eq "$RC" 5 "exits 5"
+assert_eq "$OUT" "" "prints nothing"
+assert_contains "$(cat "$WS/rst.err")" "round-comment.sh exit 5" "stderr names the failed read"
+
+echo "resume-state: a PR with no rounds.txt exits 1, and a bad call exits 2"
+new_sandbox
+make_pr_round_env
+run_rst test-owner/test-repo 39
+assert_eq "$RC" 1 "no rounds.txt exits 1"
+assert_eq "$OUT" "" "prints nothing"
+assert_contains "$ERR" "rounds.txt" "stderr names the missing file"
+run_rst test-owner/test-repo
+assert_eq "$RC" 2 "a missing PR number is a usage error"
+
 # Claude Code replaces these placeholders in a skill's text with the
 # invocation's arguments, so the model reads a different command.
 echo "skills: no skill text holds a positional placeholder"
