@@ -3878,6 +3878,27 @@ assert_contains "$S" '**A `pr-round.sh` or `round-comment.sh` exit:**' "the fail
 assert_contains "$S" 'the pane acts on a `pr-round.sh` exit by the exit-code table' "the failure policy sends a pr-round.sh exit to the table"
 assert_contains "$S" 'It acts on a `round-comment.sh` exit in a resume by that template'"'"'s "Resuming" section, and in a refine round by pr-refine §1.' "the failure policy scopes the Resuming section and pr-refine §1 to round-comment.sh"
 
+# The pane ends with the table's stop strings, and the orchestrator reads them (issue #184).
+# Only the "What you do" cell is read: the "What it means" prose is free to change.
+echo "skills: each row of the dispatch template's pr-round.sh exit-code table keeps its action"
+exit_action() { awk -F' [|] ' -v e="| $1" '$1 == e { sub(/ [|]$/, "", $NF); print $NF }' "$ROOT/dot_claude/skills/issue-to-pr/dispatch-prompt-template.md"; }
+assert_eq "$(exit_action 0)" 'Continue the round with pr-review §2.' "exit 0 continues the round"
+assert_eq "$(exit_action 2)" 'Stop with `blocked: pr-round.sh exit 2: <stderr line>`.' "exit 2 stops blocked"
+assert_eq "$(exit_action 3)" 'Stop with `blocked: identity mismatch: <stderr line>`.' "exit 3 stops on the identity mismatch"
+assert_eq "$(exit_action 4)" 'Stop with `blocked: pr-round.sh exit 4: <stderr line>`.' "exit 4 stops blocked"
+assert_eq "$(exit_action 5)" 'Stop with `blocked: pr-round.sh exit 5: <stderr line>`.' "exit 5 stops blocked"
+S="$(exit_action 6)"
+assert_contains "$S" 'When it has no `round.json`, your earlier run of that round died: pass `--rerun` once.' "exit 6 without round.json reruns once"
+assert_contains "$S" 'On an exit 6 after that `--rerun`, stop with `blocked: pr-round.sh exit 6: <stderr line>`.' "exit 6 after the rerun stops blocked"
+assert_contains "$S" 'stop with `blocked: round-comment.sh exit <code>: <stderr line>`.' "a failed round-comment.sh call stops blocked"
+assert_eq "$(exit_action 7)" 'Wait for it. Never `--rerun` over it.' "exit 7 waits and never reruns"
+S="$(exit_action 8)"
+assert_contains "$S" 'Run the round again once, without `--rerun`.' "exit 8 runs once more without --rerun"
+assert_contains "$S" 'On a second exit 8, stop with `blocked: pr-round.sh exit 8: <stderr line>`.' "a second exit 8 stops blocked"
+assert_contains "$(exit_action 9)" 'Stop with `blocked: round <N> has no comment`' "exit 9 stops on the round with no comment"
+assert_eq "$(exit_action 127)" 'Stop with `blocked: pr-round.sh exit 127: <stderr line>`.' "exit 127 stops blocked"
+assert_eq "$(exit_action 'Any other')" 'Stop with `blocked: pr-round.sh exit <code>: <stderr line>`.' "any other exit stops blocked with its code"
+
 # An own-command mistake with a read-only fix needs no stop (issue #176).
 echo "claude.md: the failure rule has one exception for the agent's own command"
 S="$(tr -s ' \n' ' ' <"$ROOT/dot_claude/CLAUDE.md")"
