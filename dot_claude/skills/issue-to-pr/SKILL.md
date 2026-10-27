@@ -262,11 +262,10 @@ Then decide:
   prints, plus 1. On exit 2, fix the call or the environment and run it
   once more. On a second exit 2, or any other non-zero exit, send
   nothing: the loop ends `blocked` with the script's stderr line. Add
-  nothing beyond the finding and the reason: no fix directions and no
-  retry policy. `workmux send` prints
-  nothing when it succeeds. Verify the delivery with
-  `workmux capture <handle>`, and send again only when the capture does
-  not show the instruction.
+  nothing to the instruction beyond the finding and the reason: no fix
+  directions and no retry policy. `workmux send` prints nothing when it
+  succeeds. Verify the delivery with `workmux capture <handle>`, and
+  send again only when the capture does not show the instruction.
 
 - A disposition does not hold and the cap is spent, or the pane
   stopped on `cap spent`: the loop ends `capped-unrecovered`, with the
@@ -296,9 +295,8 @@ why. The template names every field. The verdict is one of these:
   section) or on a `round-comment.sh` exit in a resume (its "Resuming"
   section) or in a refine round (pr-refine §1), a `resume-state.sh`
   stop in a resume ([`resume.md`](resume.md)) or before a refine
-  instruction (§6), or a partial,
-  nothing-reviewable or unrecovered reviewer with nothing from any
-  source)
+  instruction (§6), or a partial, nothing-reviewable or unrecovered
+  reviewer with nothing from any source)
 
 Before the final message is spoken, write the report verbatim to
 `$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/final-report.md`, the same
