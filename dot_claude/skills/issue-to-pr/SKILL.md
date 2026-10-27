@@ -7,7 +7,8 @@ description: >-
   through to a PR". Covers intake, implementation in a fresh workmux window,
   the PR, two independent reviews, a findings comment on the PR, refine
   rounds, and a final report. Not for a single review round (/pr-review) or
-  for fixing findings (/pr-refine).
+  for fixing findings (/pr-refine). Not for a fix you do in this session
+  without the loop.
 ---
 
 # issue-to-pr
@@ -20,8 +21,8 @@ unattended; the human gets the report and nothing else.
 
 **The implementer owns every review round; the orchestrator owns the
 verdict.** The orchestrator runs no review; it ratifies the pane's
-rounds (step 6). Two owners of rounds collided in the logs: duplicate
-round comments and `pr-round.sh` exit 6.
+rounds (step 6): two owners of rounds post duplicate round comments and
+reuse round numbers.
 
 The final message of a run IS the report. A future queue runner invokes
 this skill once per task and reads that message. Keep it self-contained.
@@ -71,17 +72,15 @@ One interactive moment. Collect and confirm, then go silent:
    the gate: a formatter the gate skips aborts each commit after a green
    gate.
 5. **The reviewer.** Default from the manifest. Override only if asked.
-   The same holds for its effort, timeout, tool cap and token budget:
-   the binding's defaults (ocr: `medium`, `80` minutes, `200` tool
-   rounds, `25000000` tokens) unless the human sets them. A set value
-   goes to `pr-round.sh` as `--effort` / `--timeout` / `--max-tools` /
-   `--max-tokens-budget` in every round of
-   the loop, all run by the implementer through the dispatch prompt.
-   The same holds for a per-run exclude: comma-separated,
-   gitignore-style globs the reviewer skips, passed as
-   `--exclude <globs>`. Without it, the rounds pass no exclude. For
-   example, a docs-only workflow such as
-   /doc-cleanup passes `--exclude '**/*.md'`.
+   The same holds for its effort, timeout, tool cap, token budget and
+   exclude: the binding's defaults, and no exclude, unless the human
+   sets them. A set value goes to `pr-round.sh` as `--effort` /
+   `--timeout` / `--max-tools` / `--max-tokens-budget` / `--exclude` in
+   every round of the loop, all run by the implementer through the
+   dispatch prompt. The binding's header
+   (`$HOME/.claude/skills/issue-to-pr/tools/<reviewer>/review.sh`)
+   gives their meaning and defaults. For example, a docs-only workflow
+   such as /doc-cleanup passes `--exclude '**/*.md'`.
 6. **The grill.** On or off. On when the task leaves decisions to the
    human (product calls, open questions in the source): the implementer
    writes its plan, then grills it with the human in the workmux window,
@@ -277,17 +276,16 @@ Then decide:
 The last message of the run, verbatim to the future runner. Fill in
 [`final-report-template.md`](final-report-template.md): every field
 stays, also after a context compaction, and a field you cannot fill says
-why.
+why. The template names every field. The verdict is one of these:
 
-- task ref (source locator and title), PR link, and whether the PR is
-  still a draft
-- verdict: `clean` (the newest round, a clean round 1 or the
+- `clean` (the newest round, a clean round 1 or the
   convergence round after a refine, found nothing, ratification held,
-  and the gate exited 0), `converged` (blocking findings existed but the convergence
+  and the gate exited 0)
+- `converged` (blocking findings existed but the convergence
   round found every one low and dispositioned; the accepted judgment
-  calls are listed), `capped-unrecovered` (blocking findings remain
-  after 3 refine rounds), or
-  `blocked` (pane death after redispatch, no gate found, scan hit, a
+  calls are listed)
+- `capped-unrecovered` (blocking findings remain after 3 refine rounds)
+- `blocked` (pane death after redispatch, no gate found, scan hit, a
   PR that is not `OPEN` before a refine, a convergence round with no
   critic, the pane's `Stop: blocked: <reason>` on a `pr-round.sh` exit
   (the exit-code table in the dispatch template's "Review rounds"
@@ -295,23 +293,6 @@ why.
   section) or in a refine round (pr-refine §1), or a partial,
   nothing-reviewable or unrecovered reviewer with nothing from any
   source)
-- per-round one-liners: round number, short SHA, verdict, who ran it
-- the ratification: each item of step 6 and its result, and every
-  disposition you overruled, with the reason
-- the follow-ups from the final round's comment, verbatim: findings on
-  reviewed code the loop left for the human
-- the gate: the command and its final printed result
-- anything a scan blocked, with the line it caught
-- reviewer session ids and token totals (the newest round comment's
-  Cost line: the `cumulative_tokens` its round.json carried when it was
-  written; a rerun of an earlier round afterwards does not recompute
-  later rounds' round.json, so say so plainly when one happened), the
-  critic's tokens summed from every round comment's Cost line (on a
-  repository that is not owned, each round's `comment.md`) (naming
-  any round whose critic tokens were not reported), reviewer and critic
-  bindings used, ocr version
-- the PR comment links, one per round (on a repository that is not
-  owned, the draft paths for the human to post)
 
 Before the final message is spoken, write the report verbatim to
 `$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/final-report.md`, the same
@@ -349,11 +330,7 @@ report; the file is its durable copy, the exact text, no summary layer.
 
 ## Never
 
-- Never review `HEAD` instead of the PR's range.
 - Never close the issue, tick a source checkbox, or merge the PR.
-- Never force-push, and never push before the round's gate is green.
-- Never post a comment that failed the scan.
-- Never trust an agent's self-report where a command can verify.
 - Never type a branch name or a handle by hand: copy `branch-name.sh`'s
   output and `workmux status`'s window name.
 - Never do the implementer's work (commit, push, file the PR) in its

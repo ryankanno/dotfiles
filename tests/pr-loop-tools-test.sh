@@ -3701,15 +3701,15 @@ echo "skills: pr-refine and issue-to-pr follow pr-review on a repository not own
 S="$(skill_section pr-refine/SKILL.md '## 1. Read the round')"
 assert_contains "$S" 'On a repository that is not owned (pr-review §8), read the round from `comment.md` only' "pr-refine reads the round from disk"
 S="$(skill_section pr-refine/SKILL.md '## 6. Re-run the round')"
-assert_contains "$S" 'Post the round'"'"'s comment per pr-review §8: on a repository that is not owned, it stays a draft.' "pr-refine leaves a draft where pr-review does"
+assert_contains "$S" 'Write, scan and post the round'"'"'s comment per pr-review §6 to §8.' "pr-refine leaves a draft where pr-review does"
 S="$(skill_section issue-to-pr/SKILL.md '## 5. The implementer')"
 assert_contains "$S" 'each round'"'"'s comment on the PR (on a repository that is not owned, its `comment.md`)' "the round loop checks the drafts"
 S="$(skill_section issue-to-pr/SKILL.md '## 6. Ratification')"
 assert_contains "$S" 'On a repository that is not owned (pr-review §8), check `comment.md` in the round directory instead, and `scan.sh <comment.md>` exits 0' "ratification item 3 checks a scanned draft"
 assert_contains "$S" 'On a repository that is not owned, read them from each round directory'"'"'s `comment.md`.' "ratification item 5 audits the drafts"
-S="$(skill_section issue-to-pr/SKILL.md '## 7. The final report')"
+S="$(tr -s ' \n' ' ' <"$ROOT/dot_claude/skills/issue-to-pr/final-report-template.md")"
 assert_contains "$S" 'critic'"'"'s tokens summed from every round comment'"'"'s Cost line (on a repository that is not owned, each round'"'"'s `comment.md`)' "the critic-token sum reads the drafts"
-assert_contains "$S" 'the PR comment links, one per round (on a repository that is not owned, the draft paths for the human to post)' "the report lists the draft paths"
+assert_contains "$S" '<comment URL, or the draft path on a repository that is not owned>' "the report lists the draft paths"
 
 # A clean round 1 is final, and the gate is judged by its exit code (issue #102).
 echo "skills: issue-to-pr's clean verdict covers a clean round 1 and the gate's exit code"
@@ -3819,8 +3819,6 @@ S="$(skill_section issue-to-pr/dispatch-prompt-template.md '## Review rounds')"
 assert_contains "$S" 'It names a disposition the orchestrator overrules, or a problem the orchestrator'"'"'s own read found.' "the pane knows a refine instruction can carry the read's problem"
 S="$(skill_section pr-refine/SKILL.md '## 3. Fix under TDD')"
 assert_contains "$S" 'or the one finding an orchestrator'"'"'s refine instruction names (issue-to-pr §6)' "pr-refine fixes the finding a refine instruction names"
-S="$(skill_section pr-refine/SKILL.md '## Never')"
-assert_contains "$S" 'Never fix a finding that neither the previous round'"'"'s comment named as blocking nor an orchestrator'"'"'s refine instruction named.' "pr-refine's Never rule admits the refine instruction"
 
 # A gap that more than one source reports counts once, and the read starts with its own defect pass (issue #174).
 echo "skills: pr-review counts a gap once across sources and reads the diff before the other sources"

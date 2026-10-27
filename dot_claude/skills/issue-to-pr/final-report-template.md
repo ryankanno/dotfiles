@@ -43,8 +43,13 @@ Overruled dispositions: <each finding and the reason, or "None.">
 
 ## Cost
 
-- **Reviewer:** <cumulative_tokens from the newest round.json>; sessions
-  <session ids>. <Say so when an earlier round was rerun afterwards.>
-- **Critic:** <sum of every round comment's critic tokens>. <Name any
-  round whose critic tokens were not reported.>
+- **Reviewer:** <the newest round comment's Cost line: the
+  `cumulative_tokens` its round.json carried when it was written>;
+  sessions <session ids>. <A rerun of an earlier round afterwards does
+  not recompute later rounds' round.json: say so plainly when one
+  happened.>
+- **Critic:** <the critic's tokens summed from every round comment's
+  Cost line (on a repository that is not owned, each round's
+  `comment.md`)>. <Name any round whose critic tokens were not
+  reported.>
 - **Bindings:** reviewer <binding>, critic <binding>, ocr <version>
