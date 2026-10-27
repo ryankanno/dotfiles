@@ -3892,7 +3892,7 @@ assert_contains "$S" 'When it has no `round.json`, your earlier run of that roun
 assert_contains "$S" 'On an exit 6 after that `--rerun`, stop with `blocked: pr-round.sh exit 6: <stderr line>`.' "exit 6 after the rerun stops blocked"
 assert_contains "$S" 'the round is finished: continue the loop from it.' "exit 6 with a usable comment continues the loop"
 assert_contains "$S" 'no usable comment (that call exits 1), finish it from pr-review §2' "exit 6 without a usable comment finishes from pr-review §2"
-assert_contains "$S" 'stop with `blocked: round-comment.sh exit <code>: <stderr line>`.' "a failed round-comment.sh call stops blocked"
+assert_contains "$S" "$RCSTOP" "a failed round-comment.sh call stops blocked"
 assert_eq "$(exit_action 7)" 'Wait for it. Never `--rerun` over it.' "exit 7 waits and never reruns"
 S="$(exit_action 8)"
 assert_contains "$S" 'Run the round again once, without `--rerun`.' "exit 8 runs once more without --rerun"
