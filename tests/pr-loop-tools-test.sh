@@ -4052,6 +4052,8 @@ assert_contains "$S" 'When it was a convergence round with no blocking finding, 
 assert_contains "$S" '- The base is merged at <new headRefOid>. Treat this bullet as the convergence instruction that "After you stop" names.' "a reopened pane gets the convergence instruction in its prompt"
 S="$(skill_section issue-to-pr/SKILL.md '## 6. Ratification')"
 assert_contains "$S" '- The pane stopped on `blocked: PR <n> conflicts with <base>`: decide this before the rulings below.' "the conflict stop is decided before clean or converged"
+assert_contains "$S" 'Follow [`send.md`](send.md)'"'"'s convergence instruction.' "step 6 links to the convergence instruction"
+assert_contains "$S" 'Read [`send.md`](send.md)'"'"'s refine instruction before you send it.' "step 6 links to the refine instruction"
 S="$(skill_section issue-to-pr/send.md '## A convergence instruction')"
 assert_contains "$S" 'The loop ends `blocked`, and the PR stays a draft. A later run resumes the loop after the human merges the base. It reads `gh pr view <n> --json state,mergeStateStatus,headRefOid`.' "a conflict stop ends the run blocked, and a later run reads the merge state"
 assert_contains "$S" 'It sends the instruction only when the PR is `OPEN` and its `mergeStateStatus` is not `DIRTY`. Otherwise it sends nothing, and the loop stays `blocked`.' "the orchestrator checks that the merge landed"
