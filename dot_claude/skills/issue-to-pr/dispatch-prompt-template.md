@@ -143,14 +143,17 @@ draft in the round directory.
    `<range.head>` from the newest `round.json`, is a merge whose second
    parent is on `origin/<base>`
    (`git merge-base --is-ancestor <commit>^2 origin/<base>` exits 0).
+   Run `git fetch origin <base> pull/<n>/head` first, and use the
+   PR's `headRefOid` in place of `HEAD`. An empty list is not a base
+   merge.
 4. **Stop** and report one stop state: `clean` (after a clean round 1
    or the convergence round), `converged candidate` (after the
    convergence round), `cap spent`, or `blocked: <reason>`.
 
 After each push, and before you report a stop state, read
 `gh pr view <n> --json mergeStateStatus,baseRefName`. Before a stop,
-while it reads `UNKNOWN`, read it again about 30 seconds later, at
-most 5 times. On a fifth `UNKNOWN`, stop with
+while it reads `UNKNOWN`, read it again about 30 seconds later, up to
+4 more times. When the fifth read is still `UNKNOWN`, stop with
 `blocked: PR <n> merge state is UNKNOWN`. On `DIRTY`,
 stop with `blocked: PR <n> conflicts with <base>`, with `<base>` its
 `baseRefName`. Do not wait on CI that cannot start. Never resolve a
@@ -188,7 +191,7 @@ human merges the base into a PR that conflicted with it. Run the
 convergence round at the head it names, by step 3. When the newest
 round still has blocking findings, run step 2 first, while refine
 rounds remain. When no refine rounds remain, stop with `cap spent`.
-Then stop as step 4 says.
+Otherwise stop as step 4 says.
 <only when intake set the reviewer's effort, timeout, tool cap, token
 budget, concurrency or exclude; omit this line otherwise, and keep only
 the flags intake set:>

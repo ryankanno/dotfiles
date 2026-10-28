@@ -237,20 +237,22 @@ newest round directory is
 
 Then decide:
 
-- The pane stopped on `blocked: PR <n> conflicts with <base>`: decide
-  this before the rulings below. Report the loop `blocked` now, and the
-  PR stays a draft. Record its `headRefOid` from
-  `gh pr view <n> --json headRefOid` at the stop. After the human
-  merges the base and resumes the loop, read
-  `gh pr view <n> --json state,mergeStateStatus,headRefOid`. Send the
-  instruction only when the PR is `OPEN`, its `mergeStateStatus` is
-  neither `DIRTY` nor `UNKNOWN`, and its head is not the recorded head.
-  Otherwise send nothing, and the loop stays `blocked`. Verify the
-  delivery as for a refine instruction. When the pane stops again,
-  ratify again from item 1.
+- The pane stopped on `blocked: PR <n> conflicts with <base>` or
+  `blocked: PR <n> merge state is UNKNOWN`: decide this before the
+  rulings below. The loop ends `blocked`, and the PR stays a draft.
+  The final report's blocked reason carries the PR's `headRefOid` at
+  the stop. A later run resumes the loop after the human merges the
+  base. It reads
+  `gh pr view <n> --json state,mergeStateStatus,headRefOid`, and
+  re-reads `UNKNOWN` as the pane does. It sends the instruction only
+  when the PR is `OPEN`, its `mergeStateStatus` is neither `DIRTY` nor
+  `UNKNOWN`, and its `headRefOid` is not the head that report names.
+  Otherwise it sends nothing, and the loop stays `blocked`. Send it
+  with `<new headRefOid>` from that read, and verify the delivery as
+  for a refine instruction.
 
   ```bash
-  workmux send <handle> "Convergence round on PR <n>: the base is merged at <headRefOid>. Run the convergence round at this head."
+  workmux send <handle> "Convergence round on PR <n>: the base is merged at <new headRefOid>. Run the convergence round at this head."
   ```
 
 - All six hold and the newest round (a clean round 1 or the
