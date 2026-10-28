@@ -165,10 +165,11 @@ names a disposition the orchestrator overrules, or a problem the
 orchestrator's own read found. Run the pr-refine skill
 on that finding, then the convergence round again, then stop.
 <only when intake set the reviewer's effort, timeout, tool cap, token
-budget or exclude; omit this line otherwise, and keep only the flags
-intake set:>
+budget, concurrency or exclude; omit this line otherwise, and keep only
+the flags intake set:>
 Every review round passes `--effort <level> --timeout <minutes>
---max-tools <n> --max-tokens-budget <n> --exclude '<globs>'` to
+--max-tools <n> --max-tokens-budget <n> --concurrency <n>
+--exclude '<globs>'` to
 `pr-round.sh`.
 
 ## When you are done

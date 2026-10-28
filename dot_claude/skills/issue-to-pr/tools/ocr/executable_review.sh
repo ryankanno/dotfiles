@@ -9,6 +9,7 @@
 # before added a finding), --timeout (minutes, default 80; ocr multiplies
 # it by the passes, so the default gives each group 160 minutes),
 # --max-tools (tool rounds per group, 50 or more, default 200),
+# --concurrency (file groups ocr reviews at once, default 2),
 # --max-tokens-budget (tokens per ocr run, not per group, default
 # 25000000; a group over it gets one final round and fails as budget,
 # and ocr starts no more groups) and --exclude (comma-separated
@@ -22,11 +23,11 @@
 set -euo pipefail
 
 usage() {
-  printf 'usage: review.sh --repo <dir> --out <dir> [--brief <file>] [--effort low|medium|high] [--timeout <minutes>] [--max-tools <n>] [--max-tokens-budget <n>] [--exclude <globs>] (--base <ref> --head <ref> | --commit <sha>)\n' >&2
+  printf 'usage: review.sh --repo <dir> --out <dir> [--brief <file>] [--effort low|medium|high] [--timeout <minutes>] [--max-tools <n>] [--max-tokens-budget <n>] [--concurrency <n>] [--exclude <globs>] (--base <ref> --head <ref> | --commit <sha>)\n' >&2
   exit 2
 }
 
-repo="" out="" brief="" base="" head="" commit="" effort="medium" timeout="80" max_tools="200" budget="25000000" exclude=""
+repo="" out="" brief="" base="" head="" commit="" effort="medium" timeout="80" max_tools="200" budget="25000000" concurrency="2" exclude=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     # The value guards keep a missing option value a usage error (exit 2)
@@ -41,6 +42,7 @@ while [[ $# -gt 0 ]]; do
     --timeout) [[ $# -ge 2 ]] || usage; timeout="$2"; shift 2 ;;
     --max-tools) [[ $# -ge 2 ]] || usage; max_tools="$2"; shift 2 ;;
     --max-tokens-budget) [[ $# -ge 2 ]] || usage; budget="$2"; shift 2 ;;
+    --concurrency) [[ $# -ge 2 ]] || usage; concurrency="$2"; shift 2 ;;
     --exclude) [[ $# -ge 2 ]] || usage; exclude="$2"; shift 2 ;;
     *) usage ;;
   esac
@@ -54,6 +56,7 @@ case "$effort" in low|medium|high) ;; *) usage ;; esac
 # wraps in bash arithmetic and slips past the floor.
 [[ "$max_tools" =~ ^[1-9][0-9]{0,8}$ ]] && (( max_tools >= 50 )) || usage
 [[ "$budget" =~ ^[1-9][0-9]{0,17}$ ]] || usage
+[[ "$concurrency" =~ ^[1-9][0-9]{0,8}$ ]] || usage
 # The wrapper cds into the repo before invoking the tool, so relative
 # output and brief paths would resolve against the wrong directory.
 case "$out" in /*) ;; *) printf 'out must be an absolute path\n' >&2; exit 2 ;; esac
@@ -82,9 +85,11 @@ mkdir -p "$out"
 # no review of either (issue #165). No setting below acts on it, and
 # render.sh names it as each failed file's reason.
 # The model provider serves 6 requests at once and queues the
-# rest, so the default 8 parallel groups wait out the 15-minute task
-# timeout. These are the settings under which the earlier refine loop
-# converged: one group at a time, and a task deadline of --timeout times
+# rest, so ocr's default 8 parallel groups wait out the 15-minute task
+# timeout. Loops that run at the same time share those 6, so the default
+# is 2 groups, not 6; one group at a time (issue #42) ran a 3-group round
+# for 3h52m (issue #186). The cap is the provider's, not ocr's, so the
+# code does not enforce it. The task deadline is --timeout times
 # the review rounds (ocr multiplies them), so the default 80 gives each
 # group 160 minutes at the default medium.
 # Effort sets only the review rounds per group (high 3, medium 2); a
@@ -109,7 +114,7 @@ mkdir -p "$out"
 rule="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/rule.json"
 [[ -f "$rule" ]] || { printf 'rule.json not found: %s\n' "$rule" >&2; exit 2; }
 args=(review --format json --output "$out/review.json"
-      --concurrency 1 --max-tools "$max_tools" --max-tokens-budget "$budget"
+      --concurrency "$concurrency" --max-tools "$max_tools" --max-tokens-budget "$budget"
       --timeout "$timeout" --effort "$effort" --rule "$rule")
 if [[ -n "$brief" ]]; then
   [[ -f "$brief" ]] || { printf 'brief not found: %s\n' "$brief" >&2; exit 2; }

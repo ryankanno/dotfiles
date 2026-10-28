@@ -311,7 +311,7 @@ assert_contains "$(cat "$WS/args.txt")" "--background-file" "passes the brief"
 assert_contains "$(cat "$WS/out/cmd.txt")" 'ocr review' "records the tool invocation"
 assert_contains "$(cat "$WS/out/cmd.txt")" '--from aaa --to bbb' "records the range"
 assert_eq "$(cat "$WS/out/session.txt")" "abc-123" "extracts the session id"
-assert_contains "$(cat "$WS/args.txt")" "--concurrency 1" "one file group at a time: the provider queues the rest until they time out"
+assert_contains "$(cat "$WS/args.txt")" "--concurrency 2" "two file groups at a time: the provider serves 6 requests, and loops that run at once share them"
 assert_contains "$(cat "$WS/args.txt")" "--max-tools 200" "room for a group to finish its tool rounds"
 assert_contains "$(cat "$WS/args.txt")" "--max-tokens-budget 25000000" "a ceiling on a runaway review's tokens"
 assert_contains "$(cat "$WS/args.txt")" "--timeout 80" "room for a group to finish in time"
@@ -367,6 +367,31 @@ PATH="$WS/stub:$PATH" "$REVIEW" --repo "$WS/repo" --out "$WS/out" --max-tools 99
 assert_eq "$?" 2 "a tool cap past bash's integer range exits 2, not a wrapped value"
 PATH="$WS/stub:$PATH" "$REVIEW" --repo "$WS/repo" --out "$WS/out" --max-tokens-budget 99999999999999999999 --commit x >/dev/null 2>&1
 assert_eq "$?" 2 "a budget past ocr's integer range exits 2"
+assert_not_contains "$(cat "$WS/args.txt")" "review" "never invoked the tool"
+
+echo "wrapper: --concurrency replaces the default, and a bad value is a usage error"
+new_sandbox
+make_stub
+mkdir -p "$WS/repo" "$WS/out"
+PATH="$WS/stub:$PATH" "$REVIEW" --repo "$WS/repo" --out "$WS/out" --concurrency 3 --commit x
+assert_eq "$?" 0 "exits 0"
+assert_contains "$(cat "$WS/args.txt")" "--concurrency 3" "the given concurrency reaches ocr"
+assert_not_contains "$(cat "$WS/args.txt")" "--concurrency 2" "the default concurrency is gone"
+new_sandbox
+make_stub
+mkdir -p "$WS/repo" "$WS/out"
+PATH="$WS/stub:$PATH" "$REVIEW" --repo "$WS/repo" --out "$WS/out" --concurrency 0 --commit x >/dev/null 2>&1
+rc1=$?
+PATH="$WS/stub:$PATH" "$REVIEW" --repo "$WS/repo" --out "$WS/out" --concurrency two --commit x >/dev/null 2>&1
+rc2=$?
+PATH="$WS/stub:$PATH" "$REVIEW" --repo "$WS/repo" --out "$WS/out" --concurrency 02 --commit x >/dev/null 2>&1
+rc3=$?
+PATH="$WS/stub:$PATH" "$REVIEW" --repo "$WS/repo" --out "$WS/out" --concurrency 99999999999999999999 --commit x >/dev/null 2>&1
+rc4=$?
+assert_eq "$rc1" 2 "a zero concurrency exits 2"
+assert_eq "$rc2" 2 "a non-numeric concurrency exits 2"
+assert_eq "$rc3" 2 "a leading-zero concurrency exits 2"
+assert_eq "$rc4" 2 "a concurrency past bash's integer range exits 2"
 assert_not_contains "$(cat "$WS/args.txt")" "review" "never invoked the tool"
 
 echo "wrapper: --effort and --timeout replace the defaults"
@@ -913,6 +938,7 @@ run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
 assert_contains "$(cat "$rd/cmd.txt")" "--timeout 80 --effort medium" "medium effort, 80 minutes"
 assert_contains "$(cat "$rd/cmd.txt")" "--max-tools 200 --max-tokens-budget 25000000" "200 tool rounds, 25M tokens"
+assert_contains "$(cat "$rd/cmd.txt")" "--concurrency 2" "two file groups at a time"
 assert_not_contains "$(cat "$rd/cmd.txt")" "--exclude" "without --exclude ocr gets no exclude"
 
 echo "pr-round: --exclude reaches every review run"
@@ -935,6 +961,31 @@ run_prr --repo "$repo" --pr 39 --round 1 --max-tools 150 --max-tokens-budget 900
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
 assert_contains "$(cat "$rd/cmd.txt")" "--max-tools 150 --max-tokens-budget 9000000" "the range run gets them"
 assert_contains "$(cat "$rd/commit-1/cmd.txt")" "--max-tools 150 --max-tokens-budget 9000000" "the per-commit retry gets them"
+
+echo "pr-round: --concurrency reaches every review run"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+export STUB_RANGE_STATUS=missing STUB_COMMIT_STATUS=complete
+run_prr --repo "$repo" --pr 39 --round 1 --concurrency 4 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1"
+assert_contains "$(cat "$rd/cmd.txt")" "--concurrency 4" "the range run gets it"
+assert_contains "$(cat "$rd/commit-1/cmd.txt")" "--concurrency 4" "the per-commit retry gets it"
+
+echo "pr-round: a bad --concurrency stops before the round dir exists"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 --concurrency 0 >/dev/null 2>&1
+rc1=$?
+run_prr --repo "$repo" --pr 39 --round 1 --concurrency two >/dev/null 2>&1
+rc2=$?
+run_prr --repo "$repo" --pr 39 --round 1 --concurrency 99999999999999999999 >/dev/null 2>&1
+rc3=$?
+assert_eq "$rc1" 2 "a zero concurrency exits 2"
+assert_eq "$rc2" 2 "a non-numeric concurrency exits 2"
+assert_eq "$rc3" 2 "a concurrency past bash's integer range exits 2"
+assert_eq "$([[ -e "$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1" ]] && printf exists || printf absent)" "absent" "no round dir to --rerun past"
 
 echo "pr-round: a round with prior dispositions keeps the token budget"
 new_sandbox

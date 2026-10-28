@@ -72,10 +72,11 @@ One interactive moment. Collect and confirm, then go silent:
    the gate: a formatter the gate skips aborts each commit after a green
    gate.
 5. **The reviewer.** Default from the manifest. Override only if asked.
-   The same holds for its effort, timeout, tool cap, token budget and
-   exclude: the binding's defaults, and no exclude, unless the human
-   sets them. A set value goes to `pr-round.sh` as `--effort` /
-   `--timeout` / `--max-tools` / `--max-tokens-budget` / `--exclude` in
+   The same holds for its effort, timeout, tool cap, token budget,
+   concurrency and exclude: the binding's defaults, and no exclude,
+   unless the human sets them. A set value goes to `pr-round.sh` as
+   `--effort` / `--timeout` / `--max-tools` / `--max-tokens-budget` /
+   `--concurrency` / `--exclude` in
    every round of the loop, all run by the implementer through the
    dispatch prompt. The binding's header
    (`$HOME/.claude/skills/issue-to-pr/tools/<reviewer>/review.sh`)

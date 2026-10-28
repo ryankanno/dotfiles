@@ -32,7 +32,8 @@ $HOME/.claude/skills/issue-to-pr/tools/pr-round.sh \
   --repo <checkout-dir> --pr <n> --round <N> \
   --brief <brief-file> --expect-branch <branch-name> \
   [--expect-head <pushed-sha>] [--effort low|medium|high] [--timeout <minutes>] \
-  [--max-tools <n>] [--max-tokens-budget <n>] [--exclude <globs>]
+  [--max-tools <n>] [--max-tokens-budget <n>] [--concurrency <n>] \
+  [--exclude <globs>]
 ```
 
 `<checkout-dir>` is the absolute path of the local clone or worktree
@@ -57,11 +58,11 @@ detached tmux session. Either way, the
 round is done when the log's last line is `exit=<code>`. While it runs,
 the round dir has a `round-<N>.lock` file beside it.
 
-`--effort`, `--timeout`, `--max-tools`, `--max-tokens-budget` and
-`--exclude` go to every review run of the round. Pass them only when
-the caller gives them; without them the binding's defaults apply, and
-the round passes no exclude. The active reviewer binding's header gives
-their meaning and defaults:
+`--effort`, `--timeout`, `--max-tools`, `--max-tokens-budget`,
+`--concurrency` and `--exclude` go to every review run of the round.
+Pass them only when the caller gives them; without them the binding's
+defaults apply, and the round passes no exclude. The active reviewer
+binding's header gives their meaning and defaults:
 `$HOME/.claude/skills/issue-to-pr/tools/<reviewer>/review.sh`, with the
 manifest's `reviewer` (ocr). When the exclude removes every changed
 file, the round has no clean verdict, and the human marks that PR
