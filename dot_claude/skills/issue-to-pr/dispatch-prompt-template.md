@@ -39,11 +39,16 @@ PR, and do not redo work the branch already holds.
   round.
 <omit this bullet when resume-state.sh exits 1:>
 - The newest finished round <was | was not> a convergence round. When
-  it was a convergence round with no blocking finding, do not run
-  another convergence round: stop, and report its stop state.
+  it was a convergence round with no blocking finding, and the PR's
+  head is the round's head, do not run another convergence round:
+  stop, and report its stop state.
 <only when the prior run left a final report:>
 - The prior run's final report is `<path of final-report.md>`: its
   verdict and remaining findings carry forward.
+<only when the prior run ended `blocked: PR <n> conflicts with <base>`
+and issue-to-pr §6 sends the convergence instruction:>
+- The base is merged at <new headRefOid>. Treat this bullet as the
+  convergence instruction that "After you stop" names.
 
 <Only when the grill is on and no PR exists yet; omit this section
 entirely otherwise:>
@@ -123,7 +128,7 @@ draft in the round directory.
    `blocked: PR <n> is <state>`.
 3. **The convergence round:** after a refine round, when the newest
    round is `No issues found.` or a converged candidate, run the
-   pr-review skill once more on the same head, and pass `--convergence`
+   pr-review skill once more on the PR's head, and pass `--convergence`
    to `pr-round.sh`. It takes the next free round number. The round
    runs no reviewer: the critic and your read review the whole PR at
    this head. A blocking
@@ -133,9 +138,19 @@ draft in the round directory.
    critic and does not send it back to the reviewer with `--rerun`,
    stop with
    `blocked: the convergence round has no critic: <the script's stderr line>`.
+   When the newest round is `No issues found.` or a converged
+   candidate, and a convergence instruction names a new head after a
+   base merge, run the convergence round at that head, not a normal
+   round. This holds after a clean round 1 too.
 4. **Stop** and report one stop state: `clean` (after a clean round 1
    or the convergence round), `converged candidate` (after the
    convergence round), `cap spent`, or `blocked: <reason>`.
+
+After each push, and before you report a stop state, read
+`gh pr view <n> --json mergeStateStatus,baseRefName`. On `DIRTY`,
+stop with `blocked: PR <n> conflicts with <base>`, with `<base>` its
+`baseRefName`. Do not wait on CI that cannot start. Never resolve a
+merge conflict yourself.
 
 Every review round passes `--brief <the brief file above>` to
 `pr-round.sh` and `critic-input.sh`.
@@ -164,6 +179,13 @@ After you stop, a refine instruction can arrive by `workmux send`. It
 names a disposition the orchestrator overrules, or a problem the
 orchestrator's own read found. Run the pr-refine skill
 on that finding, then the convergence round again, then stop.
+A convergence instruction can also arrive by `workmux send`, after the
+human merges the base into a PR that conflicted with it. Run the
+convergence round at the head it names, by step 3. When no round has
+a `round.json` yet, run round 1 at that head instead, by step 1. When the newest
+round still has blocking findings, run step 2 first, while refine
+rounds remain. When no refine rounds remain, stop with `cap spent`.
+Otherwise stop as step 4 says.
 <only when intake set the reviewer's effort, timeout, tool cap, token
 budget, concurrency or exclude; omit this line otherwise, and keep only
 the flags intake set:>

@@ -3843,7 +3843,7 @@ assert_contains "$S" '<comment URL, or the draft path on a repository that is no
 # A clean round 1 is final, and the gate is judged by its exit code (issue #102).
 echo "skills: issue-to-pr's clean verdict covers a clean round 1 and the gate's exit code"
 S="$(skill_section issue-to-pr/SKILL.md '## 7. The final report')"
-assert_contains "$S" '`clean` (the newest round, a clean round 1 or the convergence round after a refine, found nothing, ratification held, and the gate exited 0)' "clean names round 1, ratification and the exit code"
+assert_contains "$S" '`clean` (the newest round, a clean round 1 or the convergence round after a refine or a base merge, found nothing, ratification held, and the gate exited 0)' "clean names round 1, ratification and the exit code"
 assert_not_contains "$S" 'printed green' "the gate is not judged by its output"
 
 # The PR stays an open draft while the loop runs (issue #76).
@@ -4031,5 +4031,40 @@ assert_contains "$S" 'A claim about runtime or framework semantics is settled wi
 assert_contains "$S" 'The probe'"'"'s output is the disposition'"'"'s evidence.' "the probe's output is the evidence"
 S="$(skill_section issue-to-pr/SKILL.md '## 1. Intake')"
 assert_contains "$S" 'For a gh-issue source, the brief lists related open issues as `Related, out of scope: #N`.' "a gh-issue brief lists related issues"
+
+# A base merge after a clean or converged round gets the convergence round, and a conflicting PR stops the pane (issue #190).
+echo "skills: a base merge after the newest round runs the convergence round, and a DIRTY PR stops the pane"
+DIRTYSTOP='stop with `blocked: PR <n> conflicts with <base>`'
+CONVSEND='Convergence round on PR <n>: the base is merged at <new headRefOid>. Run the convergence round at this head.'
+S="$(skill_section issue-to-pr/dispatch-prompt-template.md '## Review rounds')"
+assert_contains "$S" 'When the newest round is `No issues found.` or a converged candidate, and a convergence instruction names a new head after a base merge, run the convergence round at that head, not a normal round. This holds after a clean round 1 too.' "a base merge after the newest round runs the convergence round"
+assert_not_contains "$S" 'git rev-list --first-parent' "the pane runs no base-merge check of its own"
+assert_not_contains "$S" 'UNKNOWN' "the pane has no UNKNOWN merge-state stop"
+assert_contains "$S" 'After each push, and before you report a stop state, read `gh pr view <n> --json mergeStateStatus,baseRefName`.' "the pane reads the merge state after each push and before a stop"
+assert_contains "$S" "On \`DIRTY\`, $DIRTYSTOP, with \`<base>\` its \`baseRefName\`. Do not wait on CI that cannot start." "a DIRTY PR stops the pane blocked"
+assert_contains "$S" 'Never resolve a merge conflict yourself.' "the pane never resolves a conflict alone"
+assert_contains "$S" 'A convergence instruction can also arrive by `workmux send`, after the human merges the base into a PR that conflicted with it.' "the pane knows the convergence instruction"
+assert_contains "$S" 'Run the convergence round at the head it names, by step 3. When no round has a `round.json` yet, run round 1 at that head instead, by step 1.' "a convergence instruction before round 1 runs round 1"
+assert_contains "$S" 'When the newest round still has blocking findings, run step 2 first, while refine rounds remain. When no refine rounds remain, stop with `cap spent`. Otherwise stop as step 4 says.' "a convergence instruction over open findings refines first, or stops on the cap"
+assert_contains "$S" 'pr-review skill once more on the PR'"'"'s head, and pass `--convergence`' "step 3 runs at the PR's head, not only the same head"
+S="$(skill_section issue-to-pr/dispatch-prompt-template.md '## Resuming PR')"
+assert_contains "$S" 'When it was a convergence round with no blocking finding, and the PR'"'"'s head is the round'"'"'s head, do not run another convergence round' "a resumed pane skips the convergence round only at that round's head"
+assert_contains "$S" '- The base is merged at <new headRefOid>. Treat this bullet as the convergence instruction that "After you stop" names.' "a reopened pane gets the convergence instruction in its prompt"
+S="$(skill_section issue-to-pr/SKILL.md '## 6. Ratification')"
+assert_contains "$S" '- The pane stopped on `blocked: PR <n> conflicts with <base>`: decide this before the rulings below.' "the conflict stop is decided before clean or converged"
+assert_contains "$S" 'The loop ends `blocked`, and the PR stays a draft. A later run resumes the loop after the human merges the base. It reads `gh pr view <n> --json state,mergeStateStatus,headRefOid`.' "a conflict stop ends the run blocked, and a later run reads the merge state"
+assert_contains "$S" 'It sends the instruction only when the PR is `OPEN` and its `mergeStateStatus` is not `DIRTY`. Otherwise it sends nothing, and the loop stays `blocked`.' "the orchestrator checks that the merge landed"
+assert_not_contains "$S" 'UNKNOWN' "the orchestrator has no UNKNOWN merge-state ruling"
+assert_not_contains "$S" 'the head that report names' "the orchestrator compares no recorded stop head"
+assert_contains "$S" 'with `<new headRefOid>` from that read' "the instruction names the merged head"
+assert_contains "$S" "workmux send <handle> \"$CONVSEND\"" "the orchestrator sends the convergence instruction"
+assert_contains "$S" 'When a resume reopens the pane, put the instruction in its dispatch prompt'"'"'s "Resuming" section instead of a send.' "a reopened pane gets the instruction in its dispatch prompt"
+S="$(skill_section issue-to-pr/SKILL.md '## 7. The final report')"
+assert_contains "$S" 'a PR that conflicts with its base, a convergence round with no critic' "step 7's blocked causes name the conflict"
+assert_not_contains "$S" 'UNKNOWN' "step 7 names no UNKNOWN stop"
+S="$(skill_section issue-to-pr/SKILL.md '## 5. The implementer')"
+assert_contains "$S" 'A clean round 1 is final at its head: it already reviewed the whole PR.' "a clean round 1 is final only at its head"
+S="$(cat "$ROOT/dot_claude/skills/issue-to-pr/flow.md")"
+assert_contains "$S" '"No issues found, round 1, head unmoved"' "the map routes a clean round 1 to ratification only at its head"
 
 report

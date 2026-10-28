@@ -177,8 +177,9 @@ round script re-checks with `--expect-branch` before any review runs.
 
 The dispatch prompt's "Review rounds" section is the loop: round 1
 after the PR, refine rounds capped at 3, the convergence round after
-a refine (`--convergence`, the whole PR on the final head), then a stop
-state. A clean round 1 is final: it already reviewed the whole PR.
+a refine or a base merge (`--convergence`, the whole PR on the final
+head), a stop on a PR that conflicts with its base, then a stop state.
+A clean round 1 is final at its head: it already reviewed the whole PR.
 Round numbers never repeat; `pr-round.sh` exit 6 means a number was
 reused, or the pane's earlier run of that round died before its
 `round.json`.
@@ -236,6 +237,23 @@ newest round directory is
 
 Then decide:
 
+- The pane stopped on `blocked: PR <n> conflicts with <base>`: decide
+  this before the rulings below. The loop ends `blocked`, and the PR
+  stays a draft. A later run resumes the loop after the human merges
+  the base. It reads
+  `gh pr view <n> --json state,mergeStateStatus,headRefOid`. It sends
+  the instruction only when the PR is `OPEN` and its
+  `mergeStateStatus` is not `DIRTY`. Otherwise it sends nothing, and
+  the loop stays `blocked`. Send it
+  with `<new headRefOid>` from that read, and verify the delivery as
+  for a refine instruction. When a resume reopens the pane, put the
+  instruction in its dispatch prompt's "Resuming" section instead of a
+  send.
+
+  ```bash
+  workmux send <handle> "Convergence round on PR <n>: the base is merged at <new headRefOid>. Run the convergence round at this head."
+  ```
+
 - All six hold and the newest round (a clean round 1 or the
   convergence round) is `No issues found.`: the
   loop ends `clean`.
@@ -283,14 +301,15 @@ stays, also after a context compaction, and a field you cannot fill says
 why. The template names every field. The verdict is one of these:
 
 - `clean` (the newest round, a clean round 1 or the
-  convergence round after a refine, found nothing, ratification held,
-  and the gate exited 0)
+  convergence round after a refine or a base merge, found nothing,
+  ratification held, and the gate exited 0)
 - `converged` (blocking findings existed but the convergence
   round found every one low and dispositioned; the accepted judgment
   calls are listed)
 - `capped-unrecovered` (blocking findings remain after 3 refine rounds)
 - `blocked` (pane death after redispatch, no gate found, scan hit, a
-  PR that is not `OPEN` before a refine, a convergence round with no
+  PR that is not `OPEN` before a refine, a PR that conflicts with its
+  base, a convergence round with no
   critic, the pane's `Stop: blocked: <reason>` on a `pr-round.sh` exit
   (the exit-code table in the dispatch template's "Review rounds"
   section) or on a `round-comment.sh` exit in a resume (its "Resuming"
