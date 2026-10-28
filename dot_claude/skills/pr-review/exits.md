@@ -1,21 +1,24 @@
 # pr-round.sh exits
 
-pr-review §1 links here when `pr-round.sh` exits other than 0. In the
-issue-to-pr loop, the pane acts by the exit-code table in the dispatch
-template's "Review rounds" section instead.
+pr-review §1 links here when `pr-round.sh` exits other than 0 or 7.
+In the issue-to-pr loop, the pane acts by the exit-code table in the
+dispatch template's "Review rounds" section instead.
 
-## Exit 2: a brief over the background limit
+## Exit 2
 
-A brief over the limit on its own, or one whose
-assembled background overflows once the standing dispositions join it,
-stops the round with exit 2 before any review runs, leaving the round
-dir untouched: condense it to the
-task (its asks,
-the settled decisions, the constraints) and rerun, never pass a
-dispatch prompt or loop instructions as the brief. In the issue-to-pr
-loop, the pane stops instead: the brief is the orchestrator's to
-condense. A convergence round
-runs no reviewer, so it writes no `background.md` and checks no limit.
+Exit 2 is a usage error, an unusable environment, a
+`refine-dispositions.md` that fails the scan (pr-review §1), or a brief
+over the background limit. Its stderr line names which.
+
+A brief over the limit on its own, or one whose assembled background
+overflows once the standing dispositions join it, stops the round with
+exit 2 before any review runs, leaving the round dir untouched:
+condense it to the task (its asks, the settled decisions, the
+constraints) and rerun, never pass a dispatch prompt or loop
+instructions as the brief. In the issue-to-pr loop, the pane stops
+instead: the brief is the orchestrator's to condense. A convergence
+round runs no reviewer, so it writes no `background.md` and checks no
+limit.
 
 ## Exits 4, 5, 6, 8 and 127
 

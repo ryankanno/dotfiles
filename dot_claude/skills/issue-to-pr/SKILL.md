@@ -13,8 +13,9 @@ description: >-
 
 # issue-to-pr
 
-One command per task. After intake, everything runs unattended; the
-human gets the report and nothing else.
+One command per task. The run's last message is the report a future
+runner reads, so it stays self-contained. After intake, everything runs
+unattended; the human gets the report and nothing else.
 
 **The implementer owns every review round; the orchestrator owns the
 verdict.** The orchestrator runs no review; it ratifies the pane's
@@ -57,9 +58,10 @@ One interactive moment. Collect and confirm, then go silent:
    by: documented command, task runner combined recipe, language tooling
    by manifest. Still nothing: later rounds report blocked rather than
    inventing one. Also read the commit hooks (`.pre-commit-config.yaml`,
-   and the directory `git rev-parse --git-path hooks` prints) and name
-   their checks when you confirm the gate: a formatter the gate skips
-   aborts each commit after a green gate.
+   and the directory `git rev-parse --git-path hooks` prints, which
+   follows `core.hooksPath` and linked worktrees) and name their checks
+   when you confirm the gate: a formatter the gate skips aborts each
+   commit after a green gate.
 5. **The reviewer.** Default from the manifest. Override only if asked.
    The same holds for the round flags of pr-review §1 (effort, timeout,
    tool cap, token budget, concurrency, exclude): a value the human sets
@@ -138,9 +140,10 @@ The pane must name the chosen harness's binary. Monitor with
 
 ## 4. The PR, verified and bound to this loop
 
-The implementer pushes and files the PR. Verify it yourself; never trust the self-report. A real number pointing
-at someone else's PR is the hallucination to catch here, so bind the
-identity, not just the existence:
+The implementer pushes and files the PR. Verify it yourself; never
+trust the self-report. A real number pointing at someone else's PR is
+the hallucination to catch here, so bind the identity, not just the
+existence:
 
 ```bash
 gh pr list --state open --head <branch-name>
@@ -167,8 +170,7 @@ pane a round it did not ask for.
 ## 6. Ratification
 
 When the pane stops, verify every item below. The newest round
-directory is
-`$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/round-<N>/`.
+directory is `$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/round-<N>/`.
 
 1. **The reviewed head is the PR's head.** `range.head` in the newest
    `round.json` equals `headRefOid` from

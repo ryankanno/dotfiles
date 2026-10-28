@@ -126,8 +126,7 @@ whose `round.json` carries the range, the identity, every run (mode,
 directory, status, session id, exit code), and `reviewer_complete`.
 
 When the script exits other than 0 or 7, read [`exits.md`](exits.md).
-The
-script exits 7 when another live process runs the same round. Wait for
+The script exits 7 when another live process runs the same round. Wait for
 that round. Never pass `--rerun` over it: `--rerun` moves the live
 round's evidence away while it writes. Start no other round of the PR
 while one runs: the lock holds one round only, and a later round finds
@@ -142,8 +141,9 @@ which skips steps 3 to 5.
 **`reviewer_skipped: "convergence"`** is a convergence round: no
 reviewer ran, by design. Steps 3 to 5 run as usual. The round is clean
 when the critic ran and neither the critic nor your read has a blocking
-finding. It is not partial and not unrecovered: the reviewer shapes do not
-apply to it. When `critic-input.sh` exits 2, fix it as §3 says and run
+finding. It is not partial and not unrecovered: the reviewer shapes in
+[`ranges.md`](ranges.md)'s "A reviewer that did not finish" section do
+not apply to it. When `critic-input.sh` exits 2, fix it as §3 says and run
 it again. Any other non-zero exit leaves the round with no
 critic, and the round posts nothing. On exit 4 with `range.head` equal
 to `range.prior_head`, run the round again with `--rerun` and without
@@ -162,7 +162,9 @@ see what the loop has spent to date. The critic's tokens are not in
 `round.json` (the critic is a subagent, not the reviewer binding): take
 them from the usage the harness reports when the subagent returns, and
 put them on the Cost line beside the reviewer's. Under opencode, read
-[`opencode-tokens.md`](opencode-tokens.md). When neither source has a number, the line says so; a guessed number is
+[`opencode-tokens.md`](opencode-tokens.md).
+
+When neither source has a number, the line says so; a guessed number is
 never written.
 
 ## 3. The adversarial critic

@@ -46,8 +46,7 @@ whole PR.
 On a `none:` scope, skip pr-review steps 3 to 5: no source runs. Post a
 comment per report-template.md with the verdict line its list gives
 for a `none:` scope and the round dir's `prior-findings.md`, verbatim,
-as its `**Findings:**` section when the file exists. The prior round's
-blocking findings then stand for /pr-refine and for the next round.
+as its `**Findings:**` section when the file exists.
 
 ## The convergence round
 
@@ -85,9 +84,7 @@ With nothing from any source, each shape has its own verdict line in
 report-template.md's verdict list.
 In every shape, findings from any source make the verdict count them,
 and the visible `**Reviewer:**` line names the gap per
-report-template.md. No shape is clean and none is a failure:
-/pr-refine reads each as nothing to fix, and the loop cannot declare
-the branch clean off that round.
+report-template.md.
 
 ## The reviewer's range
 
