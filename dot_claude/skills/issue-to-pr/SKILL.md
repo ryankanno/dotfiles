@@ -237,17 +237,14 @@ newest round directory is
 
 Then decide:
 
-- The pane stopped on `blocked: PR <n> conflicts with <base>` or
-  `blocked: PR <n> merge state is UNKNOWN`: decide this before the
-  rulings below. The loop ends `blocked`, and the PR stays a draft.
-  The final report's blocked reason carries the PR's `headRefOid` at
-  the stop. A later run resumes the loop after the human merges the
-  base. It reads
-  `gh pr view <n> --json state,mergeStateStatus,headRefOid`, and
-  re-reads `UNKNOWN` as the pane does. It sends the instruction only
-  when the PR is `OPEN`, its `mergeStateStatus` is neither `DIRTY` nor
-  `UNKNOWN`, and its `headRefOid` is not the head that report names.
-  Otherwise it sends nothing, and the loop stays `blocked`. Send it
+- The pane stopped on `blocked: PR <n> conflicts with <base>`: decide
+  this before the rulings below. The loop ends `blocked`, and the PR
+  stays a draft. A later run resumes the loop after the human merges
+  the base. It reads
+  `gh pr view <n> --json state,mergeStateStatus,headRefOid`. It sends
+  the instruction only when the PR is `OPEN` and its
+  `mergeStateStatus` is not `DIRTY`. Otherwise it sends nothing, and
+  the loop stays `blocked`. Send it
   with `<new headRefOid>` from that read, and verify the delivery as
   for a refine instruction.
 
@@ -310,7 +307,7 @@ why. The template names every field. The verdict is one of these:
 - `capped-unrecovered` (blocking findings remain after 3 refine rounds)
 - `blocked` (pane death after redispatch, no gate found, scan hit, a
   PR that is not `OPEN` before a refine, a PR that conflicts with its
-  base or whose merge state stays `UNKNOWN`, a convergence round with no
+  base, a convergence round with no
   critic, the pane's `Stop: blocked: <reason>` on a `pr-round.sh` exit
   (the exit-code table in the dispatch template's "Review rounds"
   section) or on a `round-comment.sh` exit in a resume (its "Resuming"

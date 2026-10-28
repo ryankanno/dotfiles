@@ -134,27 +134,16 @@ draft in the round directory.
    critic and does not send it back to the reviewer with `--rerun`,
    stop with
    `blocked: the convergence round has no critic: <the script's stderr line>`.
-   When the newest round is `No issues found.` or a converged candidate
-   and the head moved only by a base merge, with or without a conflict
-   resolution, run the convergence round at the new head, not a normal
-   round. This holds after a clean round 1 too. The head moved only by
-   a base merge when every commit that
-   `git rev-list --first-parent <range.head>..HEAD` prints, with
-   `<range.head>` from the newest `round.json`, is a merge whose second
-   parent is on `origin/<base>`
-   (`git merge-base --is-ancestor <commit>^2 origin/<base>` exits 0).
-   Run `git fetch origin <base> pull/<n>/head` first, and use the
-   PR's `headRefOid` in place of `HEAD`. An empty list is not a base
-   merge.
+   When the newest round is `No issues found.` or a converged
+   candidate, and a convergence instruction names a new head after a
+   base merge, run the convergence round at that head, not a normal
+   round. This holds after a clean round 1 too.
 4. **Stop** and report one stop state: `clean` (after a clean round 1
    or the convergence round), `converged candidate` (after the
    convergence round), `cap spent`, or `blocked: <reason>`.
 
 After each push, and before you report a stop state, read
-`gh pr view <n> --json mergeStateStatus,baseRefName`. Before a stop,
-while it reads `UNKNOWN`, read it again about 30 seconds later, up to
-4 more times. When the fifth read is still `UNKNOWN`, stop with
-`blocked: PR <n> merge state is UNKNOWN`. On `DIRTY`,
+`gh pr view <n> --json mergeStateStatus,baseRefName`. On `DIRTY`,
 stop with `blocked: PR <n> conflicts with <base>`, with `<base>` its
 `baseRefName`. Do not wait on CI that cannot start. Never resolve a
 merge conflict yourself.
