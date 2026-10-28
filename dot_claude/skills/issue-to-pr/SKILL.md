@@ -238,22 +238,8 @@ newest round directory is
 Then decide:
 
 - The pane stopped on `blocked: PR <n> conflicts with <base>`: decide
-  this before the rulings below. The loop ends `blocked`, and the PR
-  stays a draft. A later run resumes the loop after the human merges
-  the base. It reads
-  `gh pr view <n> --json state,mergeStateStatus,headRefOid`. It sends
-  the instruction only when the PR is `OPEN` and its
-  `mergeStateStatus` is not `DIRTY`. Otherwise it sends nothing, and
-  the loop stays `blocked`. Send it
-  with `<new headRefOid>` from that read, and verify the delivery as
-  for a refine instruction. When a resume reopens the pane, put the
-  instruction in its dispatch prompt's "Resuming" section instead of a
-  send.
-
-  ```bash
-  workmux send <handle> "Convergence round on PR <n>: the base is merged at <new headRefOid>. Run the convergence round at this head."
-  ```
-
+  this before the rulings below. Follow [`send.md`](send.md)'s
+  convergence instruction.
 - All six hold and the newest round (a clean round 1 or the
   convergence round) is `No issues found.`: the
   loop ends `clean`.
@@ -266,26 +252,8 @@ Then decide:
   Draft line carries its error, so the human marks the PR ready.
 - A disposition does not hold, and refine rounds remain: send one
   refine instruction that names the finding and why the reason fails.
-  The pane fixes it, then runs the convergence round again.
-  Before you send a refine instruction, check that the PR is `OPEN`
-  (`gh pr view <n> --json state -q .state`). When it is not, send
-  nothing, and the loop ends `blocked` with the reason "PR <n> is
-  <state>".
-
-  ```bash
-  workmux send <handle> "Refine round <k> on PR <n>: the orchestrator overrules <finding>: <reason>. Run the pr-refine skill on it, then the convergence round."
-  ```
-
-  `<k>` is the `refine_rounds` that
-  `$HOME/.claude/skills/issue-to-pr/tools/resume-state.sh <owner/repo> <n>`
-  prints, plus 1. On exit 2, fix the call or the environment and run it
-  once more. On a second exit 2, or any other non-zero exit, send
-  nothing: the loop ends `blocked` with the script's stderr line. Add
-  nothing to the instruction beyond the finding and the reason: no fix
-  directions and no retry policy. `workmux send` prints nothing when it
-  succeeds. Verify the delivery with `workmux capture <handle>`, and
-  send again only when the capture does not show the instruction.
-
+  The pane fixes it, then runs the convergence round again. Read
+  [`send.md`](send.md)'s refine instruction before you send it.
 - A disposition does not hold and the cap is spent, or the pane
   stopped on `cap spent`: the loop ends `capped-unrecovered`, with the
   remaining findings quoted in the report.

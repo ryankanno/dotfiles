@@ -2,7 +2,7 @@
 
 How `pr-round.sh` picks a round's range, and what `round.json` records
 for it. The script computes all of it, and `finding-scope.sh`
-classifies each finding against it. pr-review §1 links here.
+classifies each finding against it. pr-review §1 and §2 link here.
 
 ## The delta
 
@@ -43,6 +43,12 @@ round (below) reviews nothing:
 with no added lines (a deletion) is still a change and reviews the
 whole PR.
 
+On a `none:` scope, skip pr-review steps 3 to 5: no source runs. Post a
+comment per report-template.md with the verdict line its list gives
+for a `none:` scope and the round dir's `prior-findings.md`, verbatim,
+as its `**Findings:**` section when the file exists. The prior round's
+blocking findings then stand for /pr-refine and for the next round.
+
 ## The convergence round
 
 The convergence round runs no reviewer and no per-commit retry, so
@@ -58,6 +64,30 @@ A `partial` prior round does not send the next round back to the whole
 PR: the same caps re-fail the same files. Its unfinished files go to
 `prior-unfinished.txt`, and `critic-input.sh` hands the critic their
 whole-PR diff, where only a high finding blocks.
+
+## A reviewer that did not finish
+
+`reviewer_complete: false` takes one of three shapes, read from
+`runs[].status`:
+
+- **Partial** (a run is `partial`, or a `commit:` run is `complete`):
+  the reviewer produced review text,
+  but part of the range went unreviewed (failed files, a group that
+  lost a review pass, or commits whose retry produced no review text).
+  Its findings count like any other source's.
+- **Nothing reviewable** (the range run is `skipped`): the reviewer
+  selected no file in the range (docs, tests, lockfiles), so it had
+  nothing to review, and no per-commit retry runs.
+- **Unrecovered** (none of these): the reviewer produced no
+  review text, whatever runs it attempted.
+
+With nothing from any source, each shape has its own verdict line in
+report-template.md's verdict list.
+In every shape, findings from any source make the verdict count them,
+and the visible `**Reviewer:**` line names the gap per
+report-template.md. No shape is clean and none is a failure:
+/pr-refine reads each as nothing to fix, and the loop cannot declare
+the branch clean off that round.
 
 ## The reviewer's range
 

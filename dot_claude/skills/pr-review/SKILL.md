@@ -96,16 +96,8 @@ a shorter background drops the brief's asks and the standing
 dispositions, and a reviewer without the dispositions re-flags settled
 findings. The dispositions fill the
 room the brief leaves, newest first, and the background says how many
-older ones gave way. A brief over the limit on its own, or one whose
-assembled background overflows once the standing dispositions join it,
-stops the round with exit 2 before any review runs, leaving the round
-dir untouched: condense it to the
-task (its asks,
-the settled decisions, the constraints) and rerun, never pass a
-dispatch prompt or loop instructions as the brief. In the issue-to-pr
-loop, the pane stops instead: the brief is the orchestrator's to
-condense. A convergence round
-runs no reviewer, so it writes no `background.md` and checks no limit.
+older ones gave way. A brief that overflows the limit stops the round
+with exit 2 ([`exits.md`](exits.md)).
 
 From round 2 on, the reviewer reviews only the delta since the prior
 round's head when it can. `round.json`'s `range.review_scope` says
@@ -127,8 +119,7 @@ Pass `--expect-head <pushed-sha>` when the round starts right after a
 push (`git rev-parse HEAD` after the push). Right after a push,
 `gh pr view` can still report the previous head. The script waits up to
 about a minute until GitHub reports the pushed head, then reviews only
-that head. When GitHub never reports it, the script exits 8 before it
-creates or changes any round evidence: run the round again once. The script
+that head. The script
 resolves the range from the PR (never the checkout's `HEAD`), fetches
 the refs, runs the active reviewer binding over the round's range,
 applies the per-commit
@@ -137,16 +128,7 @@ directory
 whose `round.json` carries the range, the identity, every run (mode,
 directory, status, session id, exit code), and `reviewer_complete`.
 
-The script exits 4 when the PR is missing, not open, or not
-resolvable, 5 when the repository, its refs, the changed-file
-listing, the gh user, or the PR comments cannot be read, and 127 when
-`gh`, `jq`, or `git` is
-missing. It exits 6 when the round directory already holds evidence:
-`--rerun` moves that evidence into a `superseded-*/` subdirectory, then
-runs the round. Pass `--rerun` only when the earlier run of this round
-died and left no `round.json` (a harness timeout kills it), or when §2
-sends a convergence round back to the reviewer. A round dir with a
-`round.json` and a usable comment (below) is a finished round: use it.
+When the script exits other than 0 or 7, read [`exits.md`](exits.md).
 The
 script exits 7 when another live process runs the same round. Wait for
 that round. Never pass `--rerun` over it: `--rerun` moves the live
@@ -154,29 +136,16 @@ round's evidence away while it writes. Start no other round of the PR
 while one runs: the lock holds one round only, and a later round finds
 no prior head on record and reviews the whole PR.
 
-The script exits 9 before any review when an earlier round in the PR's
-round folder has a `round.json` and no usable comment. A usable comment
-is a whole, scan-clean `comment.md` in that round's directory, or a
-round comment of yours on the PR with that round's heading. A round
-whose `round.json` is under `superseded-*/` does not count. The stderr
-line names the round, and the round dir holds no evidence. In the
-issue-to-pr loop, the pane stops with
-`blocked: round <N> has no comment`.
-
 ## 2. Read round.json
 
 **`range.review_scope` starting with `none:`** is a base merge with no
-PR change. Skip steps 3 to 5: no source runs. Post a comment per
-report-template.md with the verdict line its list gives for a `none:`
-scope and the round dir's `prior-findings.md`, verbatim, as its
-`**Findings:**` section when the file exists. The
-prior round's blocking findings then stand for /pr-refine and for the
-next round.
+PR change: follow [`ranges.md`](ranges.md)'s "A base merge" section,
+which skips steps 3 to 5.
 
 **`reviewer_skipped: "convergence"`** is a convergence round: no
 reviewer ran, by design. Steps 3 to 5 run as usual. The round is clean
 when the critic ran and neither the critic nor your read has a blocking
-finding. It is not partial and not unrecovered: the shapes below do not
+finding. It is not partial and not unrecovered: the reviewer shapes do not
 apply to it. When `critic-input.sh` exits 2, fix it as §3 says and run
 it again. Any other non-zero exit leaves the round with no
 critic, and the round posts nothing. On exit 4 with `range.head` equal
@@ -186,43 +155,17 @@ case, stop with
 `blocked: the convergence round has no critic: <the script's stderr line>`.
 
 **`reviewer_complete: true`** with zero findings is a clean review:
-report it as clean. **`reviewer_complete: false`** takes one of three
-shapes, read from `runs[].status`:
-
-- **Partial** (a run is `partial`, or a `commit:` run is `complete`):
-  the reviewer produced review text,
-  but part of the range went unreviewed (failed files, a group that
-  lost a review pass, or commits whose retry produced no review text).
-  Its findings count like any other source's.
-- **Nothing reviewable** (the range run is `skipped`): the reviewer
-  selected no file in the range (docs, tests, lockfiles), so it had
-  nothing to review, and no per-commit retry runs.
-- **Unrecovered** (none of these): the reviewer produced no
-  review text, whatever runs it attempted.
-
-With nothing from any source, each shape has its own verdict line in
-report-template.md's verdict list.
-In every shape, findings from any source make the verdict count them,
-and the visible `**Reviewer:**` line names the gap per
-report-template.md. No shape is clean and none is a failure:
-/pr-refine reads each as nothing to fix, and the loop cannot declare
-the branch clean off that round.
+report it as clean. **`reviewer_complete: false`** is a partial,
+nothing reviewable, or unrecovered reviewer: read
+[`ranges.md`](ranges.md)'s "A reviewer that did not finish" section.
 
 The round's cost is a fact the comment carries: `round.json`'s
 `cumulative_tokens` becomes the template's Cost line, so a reader can
 see what the loop has spent to date. The critic's tokens are not in
 `round.json` (the critic is a subagent, not the reviewer binding): take
 them from the usage the harness reports when the subagent returns, and
-put them on the Cost line beside the reviewer's. opencode's task tool
-reports no usage, but its result starts with `<task id="ses_...">`, and
-the opencode database holds that session's tokens:
-
-```bash
-sqlite3 -readonly "file:$HOME/.local/share/opencode/opencode.db?mode=ro" \
-  "select tokens_input + tokens_output + tokens_reasoning + tokens_cache_read + tokens_cache_write from session where id = '<ses_id>'"
-```
-
-When neither source has a number, the line says so; a guessed number is
+put them on the Cost line beside the reviewer's. Under opencode, read
+[`opencode-tokens.md`](opencode-tokens.md). When neither source has a number, the line says so; a guessed number is
 never written.
 
 ## 3. The adversarial critic
