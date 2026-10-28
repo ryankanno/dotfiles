@@ -69,7 +69,7 @@ whole-PR diff, where only a high finding blocks.
 
 `reviewer_complete: false` takes one of three shapes, read from
 `runs[].status`. A convergence round (`reviewer_skipped:
-"convergence"`) is none of them.
+"convergence"`) and a `none:` scope round (above) are none of them.
 
 - **Partial** (a run is `partial`, or a `commit:` run is `complete`):
   the reviewer produced review text,

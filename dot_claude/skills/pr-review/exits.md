@@ -10,7 +10,8 @@ Exit 2 is a usage error, an unusable environment, a
 `refine-dispositions.md` that fails the scan (pr-review §1), or a
 background over the limit: the brief alone, the brief with the
 standing dispositions, or the standing dispositions alone. Its stderr
-line names which and what to condense.
+line names which and what to condense: the brief (below), or the
+dispositions to fewer entries or trimmed evidence.
 
 A brief over the limit on its own, or one whose assembled background
 overflows once the standing dispositions join it, stops the round with
