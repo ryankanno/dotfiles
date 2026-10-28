@@ -46,7 +46,8 @@ whole PR.
 On a `none:` scope, skip pr-review steps 3 to 5: no source runs. Post a
 comment per report-template.md with the verdict line its list gives
 for a `none:` scope and the round dir's `prior-findings.md`, verbatim,
-as its `**Findings:**` section when the file exists.
+as its `**Findings:**` section when the file exists. The prior round's
+blocking findings then stand for /pr-refine and for the next round.
 
 ## The convergence round
 
@@ -67,7 +68,8 @@ whole-PR diff, where only a high finding blocks.
 ## A reviewer that did not finish
 
 `reviewer_complete: false` takes one of three shapes, read from
-`runs[].status`:
+`runs[].status`. A convergence round (`reviewer_skipped:
+"convergence"`) is none of them.
 
 - **Partial** (a run is `partial`, or a `commit:` run is `complete`):
   the reviewer produced review text,
