@@ -75,6 +75,8 @@ Rules:
    Another agent works in that checkout. To test a claim by changing
    code, export the head into a temporary directory and work there:
    `git -C <repo> archive <head SHA> | tar -x -C "$(mktemp -d)"`.
+10. Your answer is posted verbatim, and a temporary path in it stops
+    the post. Cite a file outside the repository as `<scratch>/<name>`, never by its absolute path.
 
 Return numbered findings, highest severity first, each with file,
 line, the claim, the input or state that reaches it, the harm,
