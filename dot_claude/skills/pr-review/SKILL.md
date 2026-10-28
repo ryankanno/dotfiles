@@ -24,9 +24,6 @@ unpersuaded.
 
 ## 1. Run the round
 
-The range mechanics live in the slot's tested script, not in this
-skill's prose:
-
 ```bash
 $HOME/.claude/skills/issue-to-pr/tools/pr-round.sh \
   --repo <checkout-dir> --pr <n> --round <N> \
