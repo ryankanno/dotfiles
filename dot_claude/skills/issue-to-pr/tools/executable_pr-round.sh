@@ -14,8 +14,8 @@
 #                and review only it]
 #                [--effort low|medium|high] [--timeout <minutes>]
 #                [--max-tools <n>] [--max-tokens-budget <n>]
-#                [--concurrency <n>] [--exclude <globs>] (passed to every review run; the
-#                binding owns the defaults)
+#                [--concurrency <n>] [--exclude <globs>] (passed to
+#                every review run; the binding owns the defaults)
 #                [--rerun] [--convergence: from round 2 on, run no
 #                reviewer; the critic and the caller's read review the
 #                whole PR]
