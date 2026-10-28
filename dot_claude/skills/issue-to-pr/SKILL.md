@@ -246,7 +246,9 @@ Then decide:
   `mergeStateStatus` is not `DIRTY`. Otherwise it sends nothing, and
   the loop stays `blocked`. Send it
   with `<new headRefOid>` from that read, and verify the delivery as
-  for a refine instruction.
+  for a refine instruction. When a resume reopens the pane, put the
+  instruction in its dispatch prompt's "Resuming" section instead of a
+  send.
 
   ```bash
   workmux send <handle> "Convergence round on PR <n>: the base is merged at <new headRefOid>. Run the convergence round at this head."

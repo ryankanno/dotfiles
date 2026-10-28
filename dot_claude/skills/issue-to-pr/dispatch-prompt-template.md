@@ -45,6 +45,10 @@ PR, and do not redo work the branch already holds.
 <only when the prior run left a final report:>
 - The prior run's final report is `<path of final-report.md>`: its
   verdict and remaining findings carry forward.
+<only when the prior run ended `blocked: PR <n> conflicts with <base>`
+and issue-to-pr §6 sends the convergence instruction:>
+- The base is merged at <new headRefOid>. Treat this bullet as the
+  convergence instruction that "After you stop" names.
 
 <Only when the grill is on and no PR exists yet; omit this section
 entirely otherwise:>
@@ -177,7 +181,8 @@ orchestrator's own read found. Run the pr-refine skill
 on that finding, then the convergence round again, then stop.
 A convergence instruction can also arrive by `workmux send`, after the
 human merges the base into a PR that conflicted with it. Run the
-convergence round at the head it names, by step 3. When the newest
+convergence round at the head it names, by step 3. When no round has
+a `round.json` yet, run round 1 at that head instead, by step 1. When the newest
 round still has blocking findings, run step 2 first, while refine
 rounds remain. When no refine rounds remain, stop with `cap spent`.
 Otherwise stop as step 4 says.
