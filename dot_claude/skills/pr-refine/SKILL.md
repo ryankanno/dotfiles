@@ -12,12 +12,9 @@ description: >-
 
 # pr-refine
 
-One refine round: read the round's findings, validate each against the
-diff, fix what is real, gate, commit, push, re-run the review round,
-post the next round's comment. The caller is the implementer pane in the
-issue-to-pr loop, or a human asking directly.
-
-The objective is the reader's value, not the critic's zero.
+The caller is the implementer pane in the issue-to-pr loop, or a human
+asking directly. The objective is the reader's value, not the critic's
+zero.
 
 ## The value brake
 
@@ -32,11 +29,6 @@ The objective is the reader's value, not the critic's zero.
   judgment. When the remaining findings are matters of taste or
   formalization, say so and stop; the report marks them as judgment
   calls instead of fixes.
-- Only blocking findings are refine work. Follow-ups sit on code an
-  earlier round already reviewed, or are low findings on test
-  assertions or comment wording that the previous refine added
-  (pr-review §5); they are listed for the human, never fixed or
-  dispositioned here.
 - Severity gates effort. High and medium findings are fixed or rejected
   with reasons; both outcomes are reported. Low findings are the
   implementer's recorded judgment: fix them when the fix is cheap and
@@ -51,19 +43,14 @@ The objective is the reader's value, not the critic's zero.
 
 ## 1. Read the round
 
-Print the newest round's comment. `pr-round.sh` reads earlier rounds
-with the same tool:
+Print the newest round's comment:
 
 ```bash
 $HOME/.claude/skills/issue-to-pr/tools/round-comment.sh <owner/repo> <n>
 ```
 
-It prints the comment of the newest round that has a usable one. A
-round's `comment.md` comes first: it is the scanned text the round
-posts, and it exists before the post, so the refine never waits for
-one. A `comment.md` that is not whole or fails `scan.sh` gives way to
-your newest round comment on the PR, read across every page of
-comments. The stderr says why a file gave way.
+It prints the newest usable comment: the round's `comment.md` first, so
+the refine never waits for the post, then your round comment on the PR.
 
 On a repository that is not owned (pr-review §8), read the round from
 `comment.md` only: no round comment is on the PR.
@@ -114,8 +101,7 @@ reason that the instruction overrules.
 
 Every disposition of a named finding, fixed, rejected, or accepted,
 appears in this round's comment, in the Dispositions block, as one
-structured line with its evidence — durable on the PR where every later
-round reads them — and in the loop's final report.
+structured line with its evidence.
 
 ## 3. Fix under TDD — only what the previous round named
 
@@ -143,19 +129,14 @@ flags. Judge it by its exit code, not by a summary line in its output:
 ```
 
 Read only the log's tail, and only when the exit is not 0. Run the gate
-once per push. The exit code decides whether you push. The review
-round's own read (pr-review §4) still scrutinizes the whole log. If
-none was confirmed, discover
-by: documented command, task runner combined recipe, language tooling
-by manifest, plus the checks the commit hooks run. None found: the
-round reports blocked. Never invent one,
-and never suppress a failure to pass.
+once per push. The exit code decides whether you push. With no
+confirmed gate, discover one as issue-to-pr §1 item 4 does. None found:
+the round reports blocked.
 
 ## 5. Commit and push
 
-Conventional commits (`type(scope): description`), behavioral and
-structural changes in separate commits, no attribution trailers. Push,
-never force.
+Conventional commits, behavioral and structural changes in separate
+commits, no attribution trailers. Push, never force.
 
 ## 6. Re-run the round — once
 
@@ -169,13 +150,8 @@ stopped before its `rounds.txt` line by that directory
 Dispositions block writes them:
 `- Rejected:` or `- Accepted:` at column 0, wrapped text indented.
 A `- Fixed:` line stays out of the file: the round reads only the other
-two, and the scan reads the whole file. The file's Rejected and
-Accepted lines join the standing dispositions for the reviewer and
-the critic (pr-review §1).
-The file passes `scan.sh` first: a hit stops the round with exit 2
-before any review. Fix the file, then run the round again. In the
-issue-to-pr loop, the pane stops instead, by the dispatch template's
-exit-code table.
+two, and the scan reads the whole file. The round scans the file: a hit
+stops the round with exit 2 (pr-review §1).
 
 Run the full review round exactly as
 `$HOME/.claude/skills/pr-review/SKILL.md` defines it, over the new head
@@ -190,11 +166,10 @@ post the round's comment per pr-review §6 to §8.
 
 Clean, findings-remaining, or converged candidate, with the judgment
 calls listed. In the issue-to-pr loop, the implementer continues its
-round loop on this result; a human caller gets it as the report. The
-loop's end state is never this skill's: only the orchestrator's
-ratification declares the loop clean or converged.
+round loop on this result; only the orchestrator's ratification
+declares the loop clean or converged.
 
 ## Never
 
-- Never force-push, and never push before the round's gate is green.
+- Never force-push.
 - Never post a comment that failed the scan.

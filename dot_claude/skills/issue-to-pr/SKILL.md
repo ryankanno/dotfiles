@@ -13,19 +13,14 @@ description: >-
 
 # issue-to-pr
 
-One command per task. Take a task from an intake source, implement it with
-TDD in a fresh workmux window, file a PR, run two independent reviews over
-the PR's ref range, post the findings as a comment, refine until clean or
-capped at 3 rounds, and end with a report. After intake, everything runs
+One command per task. The run's last message is the report a future
+runner reads, so it stays self-contained. After intake, everything runs
 unattended; the human gets the report and nothing else.
 
 **The implementer owns every review round; the orchestrator owns the
 verdict.** The orchestrator runs no review; it ratifies the pane's
 rounds (step 6): two owners of rounds post duplicate round comments and
 reuse round numbers.
-
-The final message of a run IS the report. A future queue runner invokes
-this skill once per task and reads that message. Keep it self-contained.
 
 The whole loop as one picture: [`flow.md`](flow.md).
 
@@ -50,13 +45,10 @@ One interactive moment. Collect and confirm, then go silent:
    gh-issue source, the brief lists related open issues as
    `Related, out of scope: #N`. Show it. Wait
    for confirmation. Extraction errors surface here or never. The
-   reviewer reads this brief as its background, under the manifest's
-   `reviewer_background_limit` (8000 characters for ocr), and later
-   rounds add the standing dispositions to the same budget: keep the
-   brief to about half the limit. A source too long for that (several
-   issues, long bodies) is condensed to its asks, decisions, and
-   constraints, not pasted whole. The brief is the task, never the
-   dispatch prompt: push and loop instructions are not the reviewer's.
+   brief is the reviewer's background (pr-review §1), so keep it to
+   about half the manifest's `reviewer_background_limit`: condense a
+   long source to its asks, decisions, and constraints. The brief is the
+   task, never the dispatch prompt.
 3. **The layout.** Harness plus prompt stack ride together in one workmux
    layout name: `claude-sp`, `claude-mp`, `opencode-sp`, `opencode-mp`
    (sp = superpowers, mp = mattpocock). Confirm which. The opencode
@@ -68,20 +60,13 @@ One interactive moment. Collect and confirm, then go silent:
    inventing one. Also read the commit hooks (`.pre-commit-config.yaml`,
    and the directory `git rev-parse --git-path hooks` prints, which
    follows `core.hooksPath` and linked worktrees) and name their checks
-   when you confirm
-   the gate: a formatter the gate skips aborts each commit after a green
-   gate.
+   when you confirm the gate: a formatter the gate skips aborts each
+   commit after a green gate.
 5. **The reviewer.** Default from the manifest. Override only if asked.
-   The same holds for its effort, timeout, tool cap, token budget,
-   concurrency and exclude: the binding's defaults, and no exclude,
-   unless the human sets them. A set value goes to `pr-round.sh` as
-   `--effort` / `--timeout` / `--max-tools` / `--max-tokens-budget` /
-   `--concurrency` / `--exclude` in
-   every round of the loop, all run by the implementer through the
-   dispatch prompt. The binding's header
-   (`$HOME/.claude/skills/issue-to-pr/tools/<reviewer>/review.sh`)
-   gives their meaning and defaults. For example, a docs-only workflow
-   such as /doc-cleanup passes `--exclude '**/*.md'`.
+   The same holds for the round flags of pr-review §1 (effort, timeout,
+   tool cap, token budget, concurrency, exclude): a value the human sets
+   goes to every round through the dispatch prompt. For example, a
+   docs-only workflow such as /doc-cleanup passes `--exclude '**/*.md'`.
 6. **The grill.** On or off. On when the task leaves decisions to the
    human (product calls, open questions in the source): the implementer
    writes its plan, then grills it with the human in the workmux window,
@@ -94,9 +79,8 @@ pane waits on the human: `workmux status` shows it waiting, and that is
 not pane death. Do not redispatch, nudge, or answer for the human; wait
 until the pane moves on to code or files the PR.
 
-**The loop never closes anything.** `Closes #<n>` goes in the PR body for
-gh sources and closes on merge. Markdown and HTML sources are never
-mutated; checkboxes stay unticked; the PR is the record.
+`Closes #<n>` goes in the PR body for gh sources and closes on merge.
+For markdown and HTML sources, the PR is the record.
 
 ## 2. Idempotency before creation
 
@@ -111,9 +95,6 @@ $HOME/.claude/skills/issue-to-pr/tools/branch-name.sh \
   < <item-text-file>
 gh pr list --state open --head <branch-name>
 ```
-
-Every step below spells the full `<branch-name>` it printed; there is no
-shorter form to substitute.
 
 An existing PR means a previous run: do not create anything. Verify its
 state and resume the loop at step 5: read [`resume.md`](resume.md)
@@ -159,10 +140,10 @@ The pane must name the chosen harness's binary. Monitor with
 
 ## 4. The PR, verified and bound to this loop
 
-The implementer pushes and files the PR (`Closes #<n>` for gh sources).
-Verify it yourself; never trust the self-report. A real number pointing
-at someone else's PR is the hallucination to catch here, so bind the
-identity, not just the existence:
+The implementer pushes and files the PR. Verify it yourself; never
+trust the self-report. A real number pointing at someone else's PR is
+the hallucination to catch here, so bind the identity, not just the
+existence:
 
 ```bash
 gh pr list --state open --head <branch-name>
@@ -175,14 +156,8 @@ round script re-checks with `--expect-branch` before any review runs.
 
 ## 5. The implementer's round loop
 
-The dispatch prompt's "Review rounds" section is the loop: round 1
-after the PR, refine rounds capped at 3, the convergence round after
-a refine or a base merge (`--convergence`, the whole PR on the final
-head), a stop on a PR that conflicts with its base, then a stop state.
+The dispatch prompt's "Review rounds" section is the loop.
 A clean round 1 is final at its head: it already reviewed the whole PR.
-Round numbers never repeat; `pr-round.sh` exit 6 means a number was
-reused, or the pane's earlier run of that round died before its
-`round.json`.
 
 Watch the pane with `workmux status` / `capture`. Verify each round's
 push with `gh pr view`. Verify each round's comment on the PR (on a
@@ -194,10 +169,8 @@ pane a round it did not ask for.
 
 ## 6. Ratification
 
-Only this skill declares the loop clean or converged, and only on its
-own evidence. When the pane stops, verify every item below. The
-newest round directory is
-`$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/round-<N>/`.
+When the pane stops, verify every item below. The newest round
+directory is `$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/round-<N>/`.
 
 1. **The reviewed head is the PR's head.** `range.head` in the newest
    `round.json` equals `headRefOid` from
@@ -238,22 +211,8 @@ newest round directory is
 Then decide:
 
 - The pane stopped on `blocked: PR <n> conflicts with <base>`: decide
-  this before the rulings below. The loop ends `blocked`, and the PR
-  stays a draft. A later run resumes the loop after the human merges
-  the base. It reads
-  `gh pr view <n> --json state,mergeStateStatus,headRefOid`. It sends
-  the instruction only when the PR is `OPEN` and its
-  `mergeStateStatus` is not `DIRTY`. Otherwise it sends nothing, and
-  the loop stays `blocked`. Send it
-  with `<new headRefOid>` from that read, and verify the delivery as
-  for a refine instruction. When a resume reopens the pane, put the
-  instruction in its dispatch prompt's "Resuming" section instead of a
-  send.
-
-  ```bash
-  workmux send <handle> "Convergence round on PR <n>: the base is merged at <new headRefOid>. Run the convergence round at this head."
-  ```
-
+  this before the rulings below. Follow [`send.md`](send.md)'s
+  convergence instruction.
 - All six hold and the newest round (a clean round 1 or the
   convergence round) is `No issues found.`: the
   loop ends `clean`.
@@ -266,26 +225,8 @@ Then decide:
   Draft line carries its error, so the human marks the PR ready.
 - A disposition does not hold, and refine rounds remain: send one
   refine instruction that names the finding and why the reason fails.
-  The pane fixes it, then runs the convergence round again.
-  Before you send a refine instruction, check that the PR is `OPEN`
-  (`gh pr view <n> --json state -q .state`). When it is not, send
-  nothing, and the loop ends `blocked` with the reason "PR <n> is
-  <state>".
-
-  ```bash
-  workmux send <handle> "Refine round <k> on PR <n>: the orchestrator overrules <finding>: <reason>. Run the pr-refine skill on it, then the convergence round."
-  ```
-
-  `<k>` is the `refine_rounds` that
-  `$HOME/.claude/skills/issue-to-pr/tools/resume-state.sh <owner/repo> <n>`
-  prints, plus 1. On exit 2, fix the call or the environment and run it
-  once more. On a second exit 2, or any other non-zero exit, send
-  nothing: the loop ends `blocked` with the script's stderr line. Add
-  nothing to the instruction beyond the finding and the reason: no fix
-  directions and no retry policy. `workmux send` prints nothing when it
-  succeeds. Verify the delivery with `workmux capture <handle>`, and
-  send again only when the capture does not show the instruction.
-
+  The pane fixes it, then runs the convergence round again. Read
+  [`send.md`](send.md)'s refine instruction before you send it.
 - A disposition does not hold and the cap is spent, or the pane
   stopped on `cap spent`: the loop ends `capped-unrecovered`, with the
   remaining findings quoted in the report.
@@ -298,7 +239,7 @@ Then decide:
 The last message of the run, verbatim to the future runner. Fill in
 [`final-report-template.md`](final-report-template.md): every field
 stays, also after a context compaction, and a field you cannot fill says
-why. The template names every field. The verdict is one of these:
+why. The verdict is one of these:
 
 - `clean` (the newest round, a clean round 1 or the
   convergence round after a refine or a base merge, found nothing,
@@ -318,10 +259,9 @@ why. The template names every field. The verdict is one of these:
   instruction (§6), or a partial, nothing-reviewable or unrecovered
   reviewer with nothing from any source)
 
-Before the final message is spoken, write the report verbatim to
-`$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/final-report.md`, the same
-directory that holds the round dirs. The final message remains the
-report; the file is its durable copy, the exact text, no summary layer.
+Before the final message, write the report verbatim to
+`$HOME/.cache/pr-loop/<owner/repo>/pr-<n>/final-report.md`, its
+durable copy.
 
 ## Failure policies
 
@@ -329,14 +269,7 @@ report; the file is its durable copy, the exact text, no summary layer.
   surviving worktree (`workmux open <handle>`, worktree and branch
   persist), with the dispatch prompt from the template again: its
   "Resuming" section filled in per [`resume.md`](resume.md) when the PR
-  exists. Second failure:
-  blocked.
-- **No gate found:** the round reports blocked. Never invent one.
-- **Scan hit on a comment body:** do not post it. Record the finding; it
-  surfaces in the final report. Unattended does not mean leaked.
-- **Empty reviewer result:** handled inside the review round (retry once
-  per-commit). Two empties: the round is unrecovered, never clean and
-  never failing.
+  exists. Second failure: blocked.
 - **A `pr-round.sh` or `round-comment.sh` exit:** the pane acts on a
   `pr-round.sh` exit by the exit-code table in the dispatch template's
   "Review rounds" section. It acts on a `round-comment.sh` exit in a
@@ -345,9 +278,8 @@ report; the file is its durable copy, the exact text, no summary layer.
   the loop ends `blocked`, and the final report carries that reason. A
   `pr-round.sh` exit 7 is a live round, not a failure.
 - **A convergence round with no critic:** when pr-review §2 leaves the
-  round with no critic and
-  does not send it back to the reviewer with `--rerun`,
-  the round posts nothing, and the pane stops with
+  round with no critic and does not send it back to the reviewer with
+  `--rerun`, the round posts nothing, and the pane stops with
   `blocked: the convergence round has no critic: <the script's stderr line>`.
 - **PR creation failed:** capture the pane's error, report blocked. Do
   not redispatch the whole task.
@@ -355,7 +287,5 @@ report; the file is its durable copy, the exact text, no summary layer.
 ## Never
 
 - Never close the issue, tick a source checkbox, or merge the PR.
-- Never type a branch name or a handle by hand: copy `branch-name.sh`'s
-  output and `workmux status`'s window name.
 - Never do the implementer's work (commit, push, file the PR) in its
   worktree.
