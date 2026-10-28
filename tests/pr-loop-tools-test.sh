@@ -3843,7 +3843,7 @@ assert_contains "$S" '<comment URL, or the draft path on a repository that is no
 # A clean round 1 is final, and the gate is judged by its exit code (issue #102).
 echo "skills: issue-to-pr's clean verdict covers a clean round 1 and the gate's exit code"
 S="$(skill_section issue-to-pr/SKILL.md '## 7. The final report')"
-assert_contains "$S" '`clean` (the newest round, a clean round 1 or the convergence round after a refine, found nothing, ratification held, and the gate exited 0)' "clean names round 1, ratification and the exit code"
+assert_contains "$S" '`clean` (the newest round, a clean round 1 or the convergence round after a refine or a base merge, found nothing, ratification held, and the gate exited 0)' "clean names round 1, ratification and the exit code"
 assert_not_contains "$S" 'printed green' "the gate is not judged by its output"
 
 # The PR stays an open draft while the loop runs (issue #76).
@@ -4035,14 +4035,22 @@ assert_contains "$S" 'For a gh-issue source, the brief lists related open issues
 # A base merge after a clean or converged round gets the convergence round, and a conflicting PR stops the pane (issue #190).
 echo "skills: a base merge after the newest round runs the convergence round, and a DIRTY PR stops the pane"
 DIRTYSTOP='stop with `blocked: PR <n> conflicts with <base>`'
-CONVSEND='Convergence round on PR <n>: the base is merged at <headRefOid>. Run the convergence round at this head, then stop.'
+CONVSEND='Convergence round on PR <n>: the base is merged at <headRefOid>. Run the convergence round at this head.'
 S="$(skill_section issue-to-pr/dispatch-prompt-template.md '## Review rounds')"
-assert_contains "$S" 'When the newest round is `No issues found.` or a converged candidate and the head moved only by a base merge, with or without a conflict resolution, run the convergence round at the new head, not a normal round.' "a base merge after the newest round runs the convergence round"
+assert_contains "$S" 'When the newest round is `No issues found.` or a converged candidate and the head moved only by a base merge, with or without a conflict resolution, run the convergence round at the new head, not a normal round. This holds after a clean round 1 too.' "a base merge after the newest round runs the convergence round"
+assert_contains "$S" 'The head moved only by a base merge when every commit after the newest round'"'"'s `range.head` is a merge of `origin/<base>`.' "the pane has a check for a base merge"
 assert_contains "$S" 'After each push, and before you report a stop state, read `gh pr view <n> --json mergeStateStatus,baseRefName`.' "the pane reads the merge state after each push and before a stop"
+assert_contains "$S" 'Before a stop, while it reads `UNKNOWN`, read it again, at most 5 times.' "the pane re-reads an UNKNOWN merge state before a stop"
 assert_contains "$S" "On \`DIRTY\`, $DIRTYSTOP, with \`<base>\` its \`baseRefName\`. Do not wait on CI that cannot start." "a DIRTY PR stops the pane blocked"
+assert_contains "$S" 'Never resolve a merge conflict yourself.' "the pane never resolves a conflict alone"
 assert_contains "$S" 'A convergence instruction can also arrive by `workmux send`, after the human merges the base into a PR that conflicted with it.' "the pane knows the convergence instruction"
+assert_contains "$S" 'When the newest round still has blocking findings, run step 2 first, while refine rounds remain.' "a convergence instruction over open findings refines first"
+S="$(skill_section issue-to-pr/dispatch-prompt-template.md '## Resuming PR')"
+assert_contains "$S" 'When it was a convergence round with no blocking finding, and the PR'"'"'s head is the round'"'"'s head, do not run another convergence round' "a resumed pane skips the convergence round only at that round's head"
 S="$(skill_section issue-to-pr/SKILL.md '## 6. Ratification')"
-assert_contains "$S" 'The pane stopped on `blocked: PR <n> conflicts with <base>`' "ratification handles the conflict stop"
+assert_contains "$S" '- The pane stopped on `blocked: PR <n> conflicts with <base>`: decide this before the rulings below.' "the conflict stop is decided before clean or converged"
+assert_contains "$S" 'The loop ends `blocked`, and the PR stays a draft.' "a conflict stop never ends clean"
+assert_contains "$S" 'Send the instruction only when the PR is `OPEN`, its `mergeStateStatus` is not `DIRTY`, and its head is not the head the pane stopped at.' "the orchestrator checks that the merge landed"
 assert_contains "$S" "workmux send <handle> \"$CONVSEND\"" "the orchestrator sends the convergence instruction"
 S="$(skill_section issue-to-pr/SKILL.md '## 7. The final report')"
 assert_contains "$S" 'a PR that conflicts with its base' "step 7's blocked causes name the conflict"

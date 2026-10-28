@@ -178,7 +178,8 @@ round script re-checks with `--expect-branch` before any review runs.
 The dispatch prompt's "Review rounds" section is the loop: round 1
 after the PR, refine rounds capped at 3, the convergence round after
 a refine or a base merge (`--convergence`, the whole PR on the final
-head), a stop on a PR that conflicts with its base, then a stop state. A clean round 1 is final: it already reviewed the whole PR.
+head), a stop on a PR that conflicts with its base, then a stop state.
+A clean round 1 is final: it already reviewed the whole PR.
 Round numbers never repeat; `pr-round.sh` exit 6 means a number was
 reused, or the pane's earlier run of that round died before its
 `round.json`.
@@ -236,6 +237,18 @@ newest round directory is
 
 Then decide:
 
+- The pane stopped on `blocked: PR <n> conflicts with <base>`: decide
+  this before the rulings below. The loop ends `blocked`, and the PR
+  stays a draft. After the human merges the base and resumes the loop,
+  read `gh pr view <n> --json state,mergeStateStatus,headRefOid`. Send
+  the instruction only when the PR is `OPEN`, its `mergeStateStatus`
+  is not `DIRTY`, and its head is not the head the pane stopped at.
+  Verify the delivery as for a refine instruction.
+
+  ```bash
+  workmux send <handle> "Convergence round on PR <n>: the base is merged at <headRefOid>. Run the convergence round at this head."
+  ```
+
 - All six hold and the newest round (a clean round 1 or the
   convergence round) is `No issues found.`: the
   loop ends `clean`.
@@ -268,16 +281,6 @@ Then decide:
   succeeds. Verify the delivery with `workmux capture <handle>`, and
   send again only when the capture does not show the instruction.
 
-- The pane stopped on `blocked: PR <n> conflicts with <base>`: the
-  human merges the base. Then send the pane one convergence
-  instruction, with `<headRefOid>` from
-  `gh pr view <n> --json headRefOid`. Verify the delivery as for a
-  refine instruction.
-
-  ```bash
-  workmux send <handle> "Convergence round on PR <n>: the base is merged at <headRefOid>. Run the convergence round at this head, then stop."
-  ```
-
 - A disposition does not hold and the cap is spent, or the pane
   stopped on `cap spent`: the loop ends `capped-unrecovered`, with the
   remaining findings quoted in the report.
@@ -293,8 +296,8 @@ stays, also after a context compaction, and a field you cannot fill says
 why. The template names every field. The verdict is one of these:
 
 - `clean` (the newest round, a clean round 1 or the
-  convergence round after a refine, found nothing, ratification held,
-  and the gate exited 0)
+  convergence round after a refine or a base merge, found nothing,
+  ratification held, and the gate exited 0)
 - `converged` (blocking findings existed but the convergence
   round found every one low and dispositioned; the accepted judgment
   calls are listed)
