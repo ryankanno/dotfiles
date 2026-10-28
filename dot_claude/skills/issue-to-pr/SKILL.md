@@ -177,8 +177,8 @@ round script re-checks with `--expect-branch` before any review runs.
 
 The dispatch prompt's "Review rounds" section is the loop: round 1
 after the PR, refine rounds capped at 3, the convergence round after
-a refine (`--convergence`, the whole PR on the final head), then a stop
-state. A clean round 1 is final: it already reviewed the whole PR.
+a refine or a base merge (`--convergence`, the whole PR on the final
+head), a stop on a PR that conflicts with its base, then a stop state. A clean round 1 is final: it already reviewed the whole PR.
 Round numbers never repeat; `pr-round.sh` exit 6 means a number was
 reused, or the pane's earlier run of that round died before its
 `round.json`.
@@ -268,6 +268,16 @@ Then decide:
   succeeds. Verify the delivery with `workmux capture <handle>`, and
   send again only when the capture does not show the instruction.
 
+- The pane stopped on `blocked: PR <n> conflicts with <base>`: the
+  human merges the base. Then send the pane one convergence
+  instruction, with `<headRefOid>` from
+  `gh pr view <n> --json headRefOid`. Verify the delivery as for a
+  refine instruction.
+
+  ```bash
+  workmux send <handle> "Convergence round on PR <n>: the base is merged at <headRefOid>. Run the convergence round at this head, then stop."
+  ```
+
 - A disposition does not hold and the cap is spent, or the pane
   stopped on `cap spent`: the loop ends `capped-unrecovered`, with the
   remaining findings quoted in the report.
@@ -290,7 +300,8 @@ why. The template names every field. The verdict is one of these:
   calls are listed)
 - `capped-unrecovered` (blocking findings remain after 3 refine rounds)
 - `blocked` (pane death after redispatch, no gate found, scan hit, a
-  PR that is not `OPEN` before a refine, a convergence round with no
+  PR that is not `OPEN` before a refine, a PR that conflicts with its
+  base, a convergence round with no
   critic, the pane's `Stop: blocked: <reason>` on a `pr-round.sh` exit
   (the exit-code table in the dispatch template's "Review rounds"
   section) or on a `round-comment.sh` exit in a resume (its "Resuming"

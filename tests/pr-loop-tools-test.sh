@@ -4032,4 +4032,19 @@ assert_contains "$S" 'The probe'"'"'s output is the disposition'"'"'s evidence.'
 S="$(skill_section issue-to-pr/SKILL.md '## 1. Intake')"
 assert_contains "$S" 'For a gh-issue source, the brief lists related open issues as `Related, out of scope: #N`.' "a gh-issue brief lists related issues"
 
+# A base merge after a clean or converged round gets the convergence round, and a conflicting PR stops the pane (issue #190).
+echo "skills: a base merge after the newest round runs the convergence round, and a DIRTY PR stops the pane"
+DIRTYSTOP='stop with `blocked: PR <n> conflicts with <base>`'
+CONVSEND='Convergence round on PR <n>: the base is merged at <headRefOid>. Run the convergence round at this head, then stop.'
+S="$(skill_section issue-to-pr/dispatch-prompt-template.md '## Review rounds')"
+assert_contains "$S" 'When the newest round is `No issues found.` or a converged candidate and the head moved only by a base merge, with or without a conflict resolution, run the convergence round at the new head, not a normal round.' "a base merge after the newest round runs the convergence round"
+assert_contains "$S" 'After each push, and before you report a stop state, read `gh pr view <n> --json mergeStateStatus,baseRefName`.' "the pane reads the merge state after each push and before a stop"
+assert_contains "$S" "On \`DIRTY\`, $DIRTYSTOP, with \`<base>\` its \`baseRefName\`. Do not wait on CI that cannot start." "a DIRTY PR stops the pane blocked"
+assert_contains "$S" 'A convergence instruction can also arrive by `workmux send`, after the human merges the base into a PR that conflicted with it.' "the pane knows the convergence instruction"
+S="$(skill_section issue-to-pr/SKILL.md '## 6. Ratification')"
+assert_contains "$S" 'The pane stopped on `blocked: PR <n> conflicts with <base>`' "ratification handles the conflict stop"
+assert_contains "$S" "workmux send <handle> \"$CONVSEND\"" "the orchestrator sends the convergence instruction"
+S="$(skill_section issue-to-pr/SKILL.md '## 7. The final report')"
+assert_contains "$S" 'a PR that conflicts with its base' "step 7's blocked causes name the conflict"
+
 report
