@@ -325,6 +325,15 @@ assert_json '.include | index("**/test_*.py")' "$rule" "the rule includes python
 assert_json '.include | index("**/*.md")' "$rule" "the rule includes Markdown files, so a Markdown-only PR gets a review"
 assert_json '[.include[] | select(endswith("/**") or test("\\.(json|ya?ml|lock|snap|csv)$"))] | length == 0' "$rule" "no include re-admits a whole directory, lockfiles or data files"
 assert_json '.exclude | index("**/fixtures/**") and index("**/testdata/**") and index("**/__snapshots__/**")' "$rule" "test data stays excluded, since exclude wins over include"
+# ocr reads the globs gitignore-style, so git check-ignore applies them the same way.
+jq -r '.exclude[]' "$rule" >"$WS/excludes"
+git init -q "$WS/globs"
+for md in dist/README.md web/.next/server/notes.md node_modules/pkg/README.md vendor/lib/CHANGELOG.md; do
+  git -C "$WS/globs" -c core.excludesFile="$WS/excludes" check-ignore -q --no-index "$md"
+  assert_eq "$?" 0 "Markdown under build output or vendored code stays excluded: $md"
+done
+git -C "$WS/globs" -c core.excludesFile="$WS/excludes" check-ignore -q --no-index docs/README.md
+assert_eq "$?" 1 "Markdown elsewhere still reaches the reviewer"
 
 echo "wrapper: a missing rule file is a clear error, not an ocr failure"
 new_sandbox

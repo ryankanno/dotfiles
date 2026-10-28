@@ -108,8 +108,9 @@ mkdir -p "$out"
 # Markdown-only PR gets a review (issue #108). Lockfiles, generated code, build
 # output and vendored code stay excluded, as a tool or a third party writes
 # them; test data stays excluded too, as it holds no logic to review. Its
-# exclude list repeats ocr's test-data globs, since an include re-admits
-# anything it matches and only an exclude wins over it.
+# exclude list repeats ocr's test-data, build-output and vendored folder
+# globs (ocr v1.13.3), since an include re-admits anything it matches and
+# only an exclude wins over it.
 # --rule also replaces a repo's own .opencodereview/rule.json.
 rule="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/rule.json"
 [[ -f "$rule" ]] || { printf 'rule.json not found: %s\n' "$rule" >&2; exit 2; }
