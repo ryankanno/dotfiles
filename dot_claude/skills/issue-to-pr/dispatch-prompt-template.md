@@ -124,7 +124,7 @@ draft in the round directory.
    `blocked: PR <n> is <state>`.
 3. **The convergence round:** after a refine round, when the newest
    round is `No issues found.` or a converged candidate, run the
-   pr-review skill once more on the same head, and pass `--convergence`
+   pr-review skill once more on the PR's head, and pass `--convergence`
    to `pr-round.sh`. It takes the next free round number. The round
    runs no reviewer: the critic and your read review the whole PR at
    this head. A blocking
@@ -138,15 +138,20 @@ draft in the round directory.
    and the head moved only by a base merge, with or without a conflict
    resolution, run the convergence round at the new head, not a normal
    round. This holds after a clean round 1 too. The head moved only by
-   a base merge when every commit after the newest round's
-   `range.head` is a merge of `origin/<base>`.
+   a base merge when every commit that
+   `git rev-list --first-parent <range.head>..HEAD` prints, with
+   `<range.head>` from the newest `round.json`, is a merge whose second
+   parent is on `origin/<base>`
+   (`git merge-base --is-ancestor <commit>^2 origin/<base>` exits 0).
 4. **Stop** and report one stop state: `clean` (after a clean round 1
    or the convergence round), `converged candidate` (after the
    convergence round), `cap spent`, or `blocked: <reason>`.
 
 After each push, and before you report a stop state, read
 `gh pr view <n> --json mergeStateStatus,baseRefName`. Before a stop,
-while it reads `UNKNOWN`, read it again, at most 5 times. On `DIRTY`,
+while it reads `UNKNOWN`, read it again about 30 seconds later, at
+most 5 times. On a fifth `UNKNOWN`, stop with
+`blocked: PR <n> merge state is UNKNOWN`. On `DIRTY`,
 stop with `blocked: PR <n> conflicts with <base>`, with `<base>` its
 `baseRefName`. Do not wait on CI that cannot start. Never resolve a
 merge conflict yourself.
@@ -182,7 +187,8 @@ A convergence instruction can also arrive by `workmux send`, after the
 human merges the base into a PR that conflicted with it. Run the
 convergence round at the head it names, by step 3. When the newest
 round still has blocking findings, run step 2 first, while refine
-rounds remain. Then stop as step 4 says.
+rounds remain. When no refine rounds remain, stop with `cap spent`.
+Then stop as step 4 says.
 <only when intake set the reviewer's effort, timeout, tool cap, token
 budget, concurrency or exclude; omit this line otherwise, and keep only
 the flags intake set:>

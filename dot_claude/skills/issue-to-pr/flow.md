@@ -37,7 +37,7 @@ flowchart TD
     S -- "hit: do not leak" --> Y["Abort the post, record it,<br/>the final report surfaces it"]
     S -- "clean" --> H["Post the round comment<br/>append per round"]
     H --> I{"Verdict"}
-    I -- "No issues found, round 1" --> N
+    I -- "No issues found, round 1, head unmoved" --> N
     I -- "No issues found, after a refine or a base merge" --> J["Convergence round, run by the pane<br/>pr-round.sh --convergence on the final head:<br/>the whole PR from the merge base"]
     I -- "blocking findings" --> K{"Refine rounds<br/>under the cap of 3?"}
     K -- "yes" --> L["The pane runs pr-refine<br/>named blocking findings only, one re-run,<br/>validate, value brake, severity gates,<br/>TDD fix, gate, commit, push"]

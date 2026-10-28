@@ -179,7 +179,7 @@ The dispatch prompt's "Review rounds" section is the loop: round 1
 after the PR, refine rounds capped at 3, the convergence round after
 a refine or a base merge (`--convergence`, the whole PR on the final
 head), a stop on a PR that conflicts with its base, then a stop state.
-A clean round 1 is final: it already reviewed the whole PR.
+A clean round 1 is final at its head: it already reviewed the whole PR.
 Round numbers never repeat; `pr-round.sh` exit 6 means a number was
 reused, or the pane's earlier run of that round died before its
 `round.json`.
@@ -238,12 +238,16 @@ newest round directory is
 Then decide:
 
 - The pane stopped on `blocked: PR <n> conflicts with <base>`: decide
-  this before the rulings below. The loop ends `blocked`, and the PR
-  stays a draft. After the human merges the base and resumes the loop,
-  read `gh pr view <n> --json state,mergeStateStatus,headRefOid`. Send
-  the instruction only when the PR is `OPEN`, its `mergeStateStatus`
-  is not `DIRTY`, and its head is not the head the pane stopped at.
-  Verify the delivery as for a refine instruction.
+  this before the rulings below. Report the loop `blocked` now, and the
+  PR stays a draft. Record its `headRefOid` from
+  `gh pr view <n> --json headRefOid` at the stop. After the human
+  merges the base and resumes the loop, read
+  `gh pr view <n> --json state,mergeStateStatus,headRefOid`. Send the
+  instruction only when the PR is `OPEN`, its `mergeStateStatus` is
+  neither `DIRTY` nor `UNKNOWN`, and its head is not the recorded head.
+  Otherwise send nothing, and the loop stays `blocked`. Verify the
+  delivery as for a refine instruction. When the pane stops again,
+  ratify again from item 1.
 
   ```bash
   workmux send <handle> "Convergence round on PR <n>: the base is merged at <headRefOid>. Run the convergence round at this head."
@@ -304,7 +308,7 @@ why. The template names every field. The verdict is one of these:
 - `capped-unrecovered` (blocking findings remain after 3 refine rounds)
 - `blocked` (pane death after redispatch, no gate found, scan hit, a
   PR that is not `OPEN` before a refine, a PR that conflicts with its
-  base, a convergence round with no
+  base or whose merge state stays `UNKNOWN`, a convergence round with no
   critic, the pane's `Stop: blocked: <reason>` on a `pr-round.sh` exit
   (the exit-code table in the dispatch template's "Review rounds"
   section) or on a `round-comment.sh` exit in a resume (its "Resuming"
