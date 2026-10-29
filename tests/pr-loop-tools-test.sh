@@ -4076,7 +4076,7 @@ assert_contains "$S" '"No issues found, round 1, head unmoved"' "the map routes 
 echo "skills: a convergence round on the same head blocks only on high findings and findings without a line"
 S="$(skill_section pr-review/SKILL.md '## 5. Blocking or follow-up')"
 assert_contains "$S" 'A convergence round on the same head as the prior round has an empty delta.' "pr-review says the convergence delta is empty"
-assert_contains "$S" 'It blocks only on high findings and on findings without a line.' "pr-review says what a convergence round blocks on"
+assert_contains "$S" 'The convergence round blocks only on high findings and on findings without a line.' "pr-review says what a convergence round blocks on"
 assert_contains "$S" 'a convergence round is `converged` only on a low finding without a line, so `converged` is rare.' "pr-review says converged is rare"
 S="$(skill_section issue-to-pr/SKILL.md '## 5. The implementer')"
 assert_contains "$S" 'A convergence round on the same head blocks only on high findings and on findings without a line (pr-review §5).' "issue-to-pr says what a convergence round blocks on"

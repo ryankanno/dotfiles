@@ -246,10 +246,10 @@ $HOME/.claude/skills/issue-to-pr/tools/finding-scope.sh <round-dir> <path>:<star
 
 A convergence round on the same head as the prior round has an empty
 delta. `finding-scope.sh` prints `reviewed` for every finding with a
-line, so a medium or low finding with a line is a follow-up. It blocks
-only on high findings and on findings without a line. Thus a
-convergence round is `converged` only on a low finding without a line,
-so `converged` is rare.
+line, so a medium or low finding with a line is a follow-up. The
+convergence round blocks only on high findings and on findings without
+a line. Thus a convergence round is `converged` only on a low finding
+without a line, so `converged` is rare.
 
 ## 6. Assemble the comment
 
