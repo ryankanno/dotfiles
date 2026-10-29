@@ -3012,10 +3012,10 @@ assert_eq "$RC" 0 "exits 0"
 assert_contains "$OUT" "$FR_BASE..$FR_HEAD" "round 1's diff is the whole PR from the merge base"
 assert_not_contains "$OUT" "The findings this diff answers" "no prior findings in round 1"
 assert_contains "$OUT" "No brief was given." "a missing brief is said, not invented"
-assert_contains "$OUT" 'Cite a file outside the repository as `<scratch>/<name>`,' "the critic is told how to cite a file outside the repository"
-assert_contains "$OUT" 'never by its absolute path.' "the critic is told not to cite its own temp paths"
-assert_contains "$OUT" 'Do not quote an absolute path from the' "the critic is told not to quote an absolute path from the code"
-assert_contains "$OUT" 'code: cite the file and line that hold it.' "the critic is told to cite where the code holds the path"
+# Joined into one line, so a rewrap of rule 10 with the same words still matches.
+J="$(printf '%s' "$OUT" | tr -s ' \n' ' ')"
+assert_contains "$J" 'Cite a file outside the repository as `<scratch>/<name>`, never by its absolute path.' "the critic is told how to cite a file outside the repository"
+assert_contains "$J" 'Do not quote an absolute path from the code: cite the file and line that hold it.' "the critic is told to cite where the code holds the path"
 
 echo "critic-input: a checkout at the PR head is offered for reading files"
 new_sandbox
@@ -4073,5 +4073,13 @@ S="$(skill_section issue-to-pr/SKILL.md '## 5. The implementer')"
 assert_contains "$S" 'A clean round 1 is final at its head: it already reviewed the whole PR.' "a clean round 1 is final only at its head"
 S="$(cat "$ROOT/dot_claude/skills/issue-to-pr/flow.md")"
 assert_contains "$S" '"No issues found, round 1, head unmoved"' "the map routes a clean round 1 to ratification only at its head"
+echo "skills: a convergence round on the same head blocks only on high findings and findings without a line"
+S="$(skill_section pr-review/SKILL.md '## 5. Blocking or follow-up')"
+assert_contains "$S" 'A convergence round on the same head as the prior round has an empty delta.' "pr-review says the convergence delta is empty"
+assert_contains "$S" 'The convergence round blocks only on high findings and on findings without a line.' "pr-review says what a convergence round blocks on"
+assert_contains "$S" 'a convergence round is `converged` only on a low finding without a line, so `converged` is rare.' "pr-review says converged is rare"
+S="$(skill_section issue-to-pr/SKILL.md '## 5. The implementer')"
+assert_contains "$S" 'A convergence round on the same head blocks only on high findings and on findings without a line (pr-review §5).' "issue-to-pr says what a convergence round blocks on"
+assert_contains "$S" 'A `converged` end is rare.' "issue-to-pr says converged is rare"
 
 report

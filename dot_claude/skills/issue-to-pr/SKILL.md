@@ -158,6 +158,8 @@ round script re-checks with `--expect-branch` before any review runs.
 
 The dispatch prompt's "Review rounds" section is the loop.
 A clean round 1 is final at its head: it already reviewed the whole PR.
+A convergence round on the same head blocks only on high findings and
+on findings without a line (pr-review §5). A `converged` end is rare.
 
 Watch the pane with `workmux status` / `capture`. Verify each round's
 push with `gh pr view`. Verify each round's comment on the PR (on a
