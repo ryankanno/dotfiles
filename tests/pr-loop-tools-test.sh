@@ -325,6 +325,15 @@ assert_json '.include | index("**/test_*.py")' "$rule" "the rule includes python
 assert_json '.include | index("**/*.md")' "$rule" "the rule includes Markdown files, so a Markdown-only PR gets a review"
 assert_json '[.include[] | select(endswith("/**") or test("\\.(json|ya?ml|lock|snap|csv)$"))] | length == 0' "$rule" "no include re-admits a whole directory, lockfiles or data files"
 assert_json '.exclude | index("**/fixtures/**") and index("**/testdata/**") and index("**/__snapshots__/**")' "$rule" "test data stays excluded, since exclude wins over include"
+# ocr reads the globs gitignore-style, so git check-ignore applies the brace-free ones the same way.
+jq -r '.exclude[]' "$rule" >"$WS/excludes"
+git init -q "$WS/globs"
+for md in dist/README.md web/.next/server/notes.md node_modules/pkg/README.md vendor/lib/CHANGELOG.md; do
+  git -C "$WS/globs" -c core.excludesFile="$WS/excludes" check-ignore -q --no-index "$md"
+  assert_eq "$?" 0 "Markdown under build output or vendored code stays excluded: $md"
+done
+git -C "$WS/globs" -c core.excludesFile="$WS/excludes" check-ignore -q --no-index docs/README.md
+assert_eq "$?" 1 "Markdown elsewhere still reaches the reviewer"
 
 echo "wrapper: a missing rule file is a clear error, not an ocr failure"
 new_sandbox
@@ -2858,6 +2867,20 @@ run_prr --repo "$repo" --pr 39 --round 3 >/dev/null
 rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-3"
 assert_eq "$(cat "$rd/delta.txt")" $'q"c\\d\te.txt:2-2' "only the edited line is new"
 
+# $1 runs in place of the changed-file listing; everything else is real git.
+stub_name_status() {
+  local real_git
+  real_git="$(command -v git)"
+  cat >"$stub/git" <<GITSTUB
+#!/usr/bin/env bash
+for a in "\$@"; do
+  if [[ "\$a" == "--name-status" ]]; then $1; fi
+done
+exec "$real_git" "\$@"
+GITSTUB
+  chmod +x "$stub/git"
+}
+
 echo "pr-round: a failed listing is a classified failure, not an unchanged head"
 new_sandbox
 make_pr_round_env
@@ -2865,16 +2888,7 @@ make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
 finish_round 1
 advance_head f.txt 'changed\n'
-real_git="$(command -v git)"
-cat >"$stub/git" <<GITSTUB
-#!/usr/bin/env bash
-# Fail only the changed-file listing; everything else is real git.
-for a in "\$@"; do
-  if [[ "\$a" == "--name-status" ]]; then exit 128; fi
-done
-exec "$real_git" "\$@"
-GITSTUB
-chmod +x "$stub/git"
+stub_name_status 'exit 128'
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null 2>&1
 rc=$?
 rm -f "$stub/git"
@@ -2889,16 +2903,8 @@ make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
 finish_round 1
 advance_head f.txt 'changed\n'
-real_git="$(command -v git)"
-cat >"$stub/git" <<GITSTUB
-#!/usr/bin/env bash
-# Cut the changed-file listing after a rename's old path; everything else is real git.
-for a in "\$@"; do
-  if [[ "\$a" == "--name-status" ]]; then printf 'R100\0old.txt\0'; exit 0; fi
-done
-exec "$real_git" "\$@"
-GITSTUB
-chmod +x "$stub/git"
+# Cut the listing after a rename's old path.
+stub_name_status "printf 'R100\0old.txt\0'; exit 0"
 err=$(run_prr --repo "$repo" --pr 39 --round 2 2>&1 >/dev/null)
 rc=$?
 rm -f "$stub/git"
@@ -2912,16 +2918,8 @@ make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
 finish_round 1
 advance_head f.txt 'changed\n'
-real_git="$(command -v git)"
-cat >"$stub/git" <<GITSTUB
-#!/usr/bin/env bash
-# Cut the changed-file listing after a status; everything else is real git.
-for a in "\$@"; do
-  if [[ "\$a" == "--name-status" ]]; then printf 'R100\0'; exit 0; fi
-done
-exec "$real_git" "\$@"
-GITSTUB
-chmod +x "$stub/git"
+# Cut the listing after a status.
+stub_name_status "printf 'R100\0'; exit 0"
 err=$(run_prr --repo "$repo" --pr 39 --round 2 2>&1 >/dev/null)
 rc=$?
 rm -f "$stub/git"
@@ -2935,16 +2933,8 @@ make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
 finish_round 1
 advance_head f.txt 'changed\n'
-real_git="$(command -v git)"
-cat >"$stub/git" <<GITSTUB
-#!/usr/bin/env bash
-# Cut the changed-file listing inside a status, before its NUL; everything else is real git.
-for a in "\$@"; do
-  if [[ "\$a" == "--name-status" ]]; then printf 'R10'; exit 0; fi
-done
-exec "$real_git" "\$@"
-GITSTUB
-chmod +x "$stub/git"
+# Cut the listing inside a status, before its NUL.
+stub_name_status "printf 'R10'; exit 0"
 err=$(run_prr --repo "$repo" --pr 39 --round 2 2>&1 >/dev/null)
 rc=$?
 rm -f "$stub/git"
