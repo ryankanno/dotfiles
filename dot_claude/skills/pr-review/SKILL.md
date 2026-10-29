@@ -109,7 +109,8 @@ refuses `--convergence` with exit 2: round 1 keeps the reviewer.
 
 `--expect-branch` binds the round to this loop's branch: a PR whose
 head is any other branch is a hallucinated number, and the script exits
-3 before anything reviews or posts. Omit it only when the caller
+3 before anything reviews or posts. A PR whose head is on a fork exits
+3 too, also when its branch name matches. Omit it only when the caller
 cannot know the branch (a human's standalone review).
 
 Pass `--expect-head <pushed-sha>` when the round starts right after a
