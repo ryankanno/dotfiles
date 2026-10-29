@@ -3022,7 +3022,10 @@ assert_eq "$RC" 0 "exits 0"
 assert_contains "$OUT" "$FR_BASE..$FR_HEAD" "round 1's diff is the whole PR from the merge base"
 assert_not_contains "$OUT" "The findings this diff answers" "no prior findings in round 1"
 assert_contains "$OUT" "No brief was given." "a missing brief is said, not invented"
-assert_contains "$OUT" 'Cite a file outside the repository as `<scratch>/<name>`, never by its absolute path.' "the critic is told not to cite its own temp paths"
+assert_contains "$OUT" 'Cite a file outside the repository as `<scratch>/<name>`,' "the critic is told how to cite a file outside the repository"
+assert_contains "$OUT" 'never by its absolute path.' "the critic is told not to cite its own temp paths"
+assert_contains "$OUT" 'Do not quote an absolute path from the' "the critic is told not to quote an absolute path from the code"
+assert_contains "$OUT" 'code: cite the file and line that hold it.' "the critic is told to cite where the code holds the path"
 
 echo "critic-input: a checkout at the PR head is offered for reading files"
 new_sandbox
