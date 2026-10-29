@@ -125,7 +125,7 @@ directory
 whose `round.json` carries the range, the identity, every run (mode,
 directory, status, session id, exit code), and `reviewer_complete`.
 
-When the script exits other than 0 or 7, read [`exits.md`](exits.md).
+When the script exits other than 0, 3 or 7, read [`exits.md`](exits.md).
 The script exits 7 when another live process runs the same round. Wait for
 that round. Never pass `--rerun` over it: `--rerun` moves the live
 round's evidence away while it writes. Start no other round of the PR

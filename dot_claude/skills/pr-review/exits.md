@@ -1,6 +1,6 @@
 # pr-round.sh exits
 
-pr-review §1 links here when `pr-round.sh` exits other than 0 or 7.
+pr-review §1 links here when `pr-round.sh` exits other than 0, 3 or 7.
 In the issue-to-pr loop, the pane acts by the exit-code table in the
 dispatch template's "Review rounds" section instead.
 
