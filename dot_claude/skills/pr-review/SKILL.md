@@ -109,7 +109,8 @@ refuses `--convergence` with exit 2: round 1 keeps the reviewer.
 
 `--expect-branch` binds the round to this loop's branch: a PR whose
 head is any other branch is a hallucinated number, and the script exits
-3 before anything reviews or posts. Omit it only when the caller
+3 before anything reviews or posts. A PR whose head is on a fork exits
+3 too, also when its branch name matches. Omit it only when the caller
 cannot know the branch (a human's standalone review).
 
 Pass `--expect-head <pushed-sha>` when the round starts right after a
@@ -125,7 +126,7 @@ directory
 whose `round.json` carries the range, the identity, every run (mode,
 directory, status, session id, exit code), and `reviewer_complete`.
 
-When the script exits other than 0 or 7, read [`exits.md`](exits.md).
+When the script exits other than 0, 3 or 7, read [`exits.md`](exits.md).
 The script exits 7 when another live process runs the same round. Wait for
 that round. Never pass `--rerun` over it: `--rerun` moves the live
 round's evidence away while it writes. Start no other round of the PR

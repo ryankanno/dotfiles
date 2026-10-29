@@ -150,7 +150,9 @@ After each push, and before you report a stop state, read
 `gh pr view <n> --json mergeStateStatus,baseRefName`. On `DIRTY`,
 stop with `blocked: PR <n> conflicts with <base>`, with `<base>` its
 `baseRefName`. Do not wait on CI that cannot start. Never resolve a
-merge conflict yourself.
+merge conflict yourself. When you are about to stop with another
+`blocked: <reason>`, keep that reason: a `DIRTY` read does not
+replace it.
 
 Every review round passes `--brief <the brief file above>` to
 `pr-round.sh` and `critic-input.sh`.
