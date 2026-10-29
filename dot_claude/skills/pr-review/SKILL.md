@@ -282,6 +282,10 @@ $HOME/.claude/skills/issue-to-pr/tools/scan.sh <file>
 ```
 
 The script rewrites home paths to `~` in place. Exit 0: post the file.
+It also rewrites the temp paths `/tmp/<x>`, `/private/tmp/<x>`,
+`/var/folders/<x>` and `/private/var/folders/<x>` to `/tmp/...` or
+`/var/folders/...`. These two rewrites are the only changes to
+verbatim text in the comment.
 Exit 1: it printed each remaining hit (another home path, a temp path,
 or a token); **do not post**. Record the lines. Exit 2: a usage
 error, or the scan itself failed; **do not post**. Record its stderr.

@@ -6,6 +6,10 @@
 # Interface in:  <file>, the comment body.
 # Interface out: the file rewritten in place with $HOME as ~; every hit that
 #                remains printed as <line>:<text>.
+#                The rewrite also turns /tmp/<x> and /private/tmp/<x> into
+#                /tmp/..., and /var/folders/<x> and /private/var/folders/<x>
+#                into /var/folders/...: like the home rewrite, it is the one
+#                change to text the comment otherwise posts verbatim.
 # Exit codes: 0 clean, post it; 1 hits, do not post; 2 usage, or the scan
 #              itself failed (an unreadable file, a broken pattern): also
 #              do not post.
@@ -44,7 +48,15 @@ dir="${file%/*}"; [[ "$dir" == "$file" ]] && dir=.
 tmp="$(mktemp "$dir/.scan.XXXXXXXX")" || { printf 'scan failed (cannot stage the rewrite)\n' >&2; exit 2; }
 home_prefix="$HOME/"
 redaction=$'~/'
-printf '%s\n' "${body//"$home_prefix"/$redaction}" >"$tmp"
+# Reviewer and critic text quotes temp paths as examples, and ocr's text is
+# posted verbatim, so blocking them stopped rounds for no leak (PR #175 and
+# PR #199 round 1). The whole path becomes the placeholder: a later segment
+# can carry a username, as /private/tmp/claude-501/-Users-<name>-... does.
+# The left boundary keeps a home's or a repo's tmp/ out of the rewrite, so
+# the patterns still block ~/tmp/<x>.
+temp_paths='(^|[^A-Za-z0-9._/~-])(/private)?(/tmp|/var/folders)/[A-Za-z0-9._@%+=~-][A-Za-z0-9._/@%+=~-]*'
+printf '%s\n' "${body//"$home_prefix"/$redaction}" | sed -E "s#$temp_paths#\\1\\3/...#g" >"$tmp" \
+  || { rm -f "$tmp"; printf 'scan failed (the temp path rewrite)\n' >&2; exit 2; }
 mv "$tmp" "$file"
 
 # Token patterns require the variable part (a key body). Home and temp
