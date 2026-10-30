@@ -562,10 +562,10 @@ for tok in "ghp_${b}012345" "github_pat_11${b}" "AKIA${up}" \
   assert_eq "$RC" 1 "blocks ${tok:0:12}"
 done
 
-echo "scan: other home and temp paths are caught"
-for p in /Users/other/x /home/other/x /private/tmp/x /var/folders/ab/x \
-  /tmp/agent-scratch-9f2/x /root/.ssh/id_ed25519 /run/user/1000/x \
-  /Volumes/scratch-9f2/x /mnt/data/x; do
+echo "scan: other home and mount paths are caught"
+for p in /Users/other/x /home/other/x /root/.ssh/id_ed25519 /run/user/1000/x \
+  /private/etc/x /private/var/db/x /Volumes/scratch-9f2/x /mnt/data/x \
+  \~/tmp/x repo/tmp/x; do
   new_sandbox
   scan "at $p"
   assert_eq "$RC" 1 "blocks $p"
@@ -580,9 +580,43 @@ for p in /Users/... /home/... /tmp/... /root/... /run/user/... /private/... \
   assert_eq "$RC" 0 "passes $p"
 done
 
-echo "scan: a real path beside a placeholder, a dotted one, or a bare macOS prefix still blocks"
-for line in 'see /tmp/... and /tmp/agent-scratch-9f2/x' 'at /tmp/.scratch-9f2/x' \
-  'at /private/.scratch-9f2' 'at /var/folders/..x' 'at /private/' 'at /var/folders/'; do
+# PR #199 round 1: an ocr finding wrote `/tmp/foo` as an example input, and the post blocked.
+echo "scan: a temp path becomes a placeholder and passes"
+for pair in 'see /tmp/foo|see /tmp/...' '/tmp/foo is the dir|/tmp/... is the dir' \
+  'at `/tmp/agent-scratch-9f2/x.log:4`, then|at `/tmp/...`, then' \
+  'at /tmp/a:b/x|at /tmp/...' 'at /tmp/foo#x/-Users-bob-x and|at /tmp/... and' \
+  'at "/tmp/a,b;c" then|at "/tmp/..." then' \
+  'at /tmp/.scratch-9f2/x|at /tmp/...' 'see /tmp/... and /tmp/agent-scratch-9f2/x|see /tmp/... and /tmp/...' \
+  'at /private/tmp/claude-501/-Users-someone-x/scratchpad|at /tmp/...' \
+  'at /var/folders/ab/cd12/T/x|at /var/folders/...' 'at /var/folders/..x|at /var/folders/...' \
+  '(/private/var/folders/ab/x)|(/var/folders/...)'; do
+  new_sandbox
+  scan "${pair%%|*}"
+  assert_eq "$RC" 0 "passes: ${pair%%|*}"
+  assert_eq "$BODY" "${pair#*|}" "rewritten: ${pair%%|*}"
+done
+
+echo "scan: a temp path beside another hit still blocks on that hit"
+new_sandbox
+scan 'see /tmp/foo and /Users/other/x'
+assert_eq "$RC" 1 "the home path blocks"
+assert_eq "$BODY" 'see /tmp/... and /Users/other/x' "the temp path is rewritten all the same"
+
+echo "scan: a byte that is not UTF-8 does not stop the temp path rewrite"
+new_sandbox
+printf 'bad \xff byte, see /tmp/foo\n' >"$WS/body.md"
+LC_ALL=en_US.UTF-8 HOME=/Users/someone "$SCAN" "$WS/body.md" >/dev/null 2>&1
+assert_eq "$?" 0 "exits 0"
+assert_eq "$(cat "$WS/body.md")" "$(printf 'bad \xff byte, see /tmp/...')" "the temp path is rewritten"
+
+echo "scan: a byte that is not UTF-8 does not hide a home path on its line"
+new_sandbox
+printf 'bad \xff byte, see /Users/other/x\n' >"$WS/body.md"
+LC_ALL=en_US.UTF-8 HOME=/Users/someone "$SCAN" "$WS/body.md" >/dev/null 2>&1
+assert_eq "$?" 1 "blocks"
+
+echo "scan: a dotted path or a bare macOS prefix still blocks"
+for line in 'at /private/.scratch-9f2' 'at /private/' 'at /var/folders/'; do
   new_sandbox
   scan "$line"
   assert_eq "$RC" 1 "blocks: $line"
@@ -1234,12 +1268,12 @@ make_pr_round_env
 make_fixture_repo
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
 pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
-round_comment 1 "disk finding" "seen at /var/folders/xy/leak" >"$pd/round-1/comment.md"
+round_comment 1 "disk finding" "seen at /Users/other/leak" >"$pd/round-1/comment.md"
 GH_COMMENTS_JSON="$(jq -cn --arg b "$(round_comment 1 "pr finding" "pr rejection")" '[{user: {login: "test-me"}, body: $b}]')"
 export GH_COMMENTS_JSON
 ERR="$(run_prr --repo "$repo" --pr 39 --round 2 2>&1 >/dev/null)"
 assert_eq "$(cat "$pd/round-2/settled.md" 2>/dev/null)" '- Rejected: [critic] pr rejection' "the PR copy settles"
-assert_not_contains "$(cat "$pd/round-2/background.md" 2>/dev/null)" "/var/folders/" "the blocked text stays out of the reviewer's background"
+assert_not_contains "$(cat "$pd/round-2/background.md" 2>/dev/null)" "/Users/other/" "the blocked text stays out of the reviewer's background"
 assert_contains "$ERR" "scan hits in $pd/round-1/comment.md; using the PR copy of round 1" "the scan hit is said, naming the file"
 
 echo "pr-round: a comment on disk without the marker on line 1 is not read"
@@ -1390,6 +1424,19 @@ export GH_COMMENTS_JSON
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
 assert_contains "$(cat "$pd/round-2/background.md" 2>/dev/null)" "seen at ~/x" "the scan's rewrite reaches the background"
 assert_not_contains "$(cat "$pd/round-2/background.md" 2>/dev/null)" "$WS/home/x" "the home path does not"
+
+echo "pr-round: a disk comment's temp path reaches the reviewer as a placeholder"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+round_comment 1 "disk finding" "seen at /var/folders/xy/leak" >"$pd/round-1/comment.md"
+GH_COMMENTS_JSON='[]'
+export GH_COMMENTS_JSON
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+assert_contains "$(cat "$pd/round-2/background.md" 2>/dev/null)" "seen at /var/folders/..." "the scan's rewrite reaches the background"
+assert_not_contains "$(cat "$pd/round-2/background.md" 2>/dev/null)" "/var/folders/xy" "the temp path does not"
 
 echo "pr-round: two rounds on disk both settle, oldest first"
 new_sandbox
@@ -3591,14 +3638,31 @@ pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
 round_comment 1 "the finding" "the earlier rejection" >"$pd/round-1/comment.md"
 advance_head g.txt 'refined\n'
 mkdir -p "$pd/round-2"
-printf -- '- Rejected: [critic] the refine rejected this one — see /tmp/evidence.log\n' >"$pd/round-2/refine-dispositions.md"
+printf -- '- Rejected: [critic] the refine rejected this one — see /Users/other/evidence.log\n' >"$pd/round-2/refine-dispositions.md"
 OUT="$(run_prr --repo "$repo" --pr 39 --round 2 --brief "$WS/brief.md" 2>&1)"; RC=$?
 rd="$pd/round-2"
 assert_eq "$RC" 2 "the round exits 2"
 assert_contains "$OUT" "refine-dispositions.md" "stderr names the file"
-assert_contains "$OUT" "/tmp/evidence.log" "stderr shows the scan's hit"
+assert_contains "$OUT" "/Users/other/evidence.log" "stderr shows the scan's hit"
 assert_contains "$OUT" "the file carries a hit" "stderr says the file is at fault"
 assert_eq "$(ls "$rd")" "refine-dispositions.md" "the round dir holds only the refine's file: nothing reviewed"
+
+echo "pr-round: a refine dispositions file with a temp path runs, and the path reaches the reviewer as a placeholder"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+printf 'make add safe\n' >"$WS/brief.md"
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+round_comment 1 "the finding" "the earlier rejection" >"$pd/round-1/comment.md"
+advance_head g.txt 'refined\n'
+mkdir -p "$pd/round-2"
+printf -- '- Rejected: [critic] the refine rejected this one — see /tmp/evidence.log\n' >"$pd/round-2/refine-dispositions.md"
+run_prr --repo "$repo" --pr 39 --round 2 --brief "$WS/brief.md" >/dev/null 2>&1; RC=$?
+rd="$pd/round-2"
+assert_eq "$RC" 0 "the round runs"
+assert_contains "$(cat "$rd/background.md" 2>/dev/null)" "see /tmp/..." "the background has the placeholder"
+assert_not_contains "$(cat "$rd/background.md" 2>/dev/null)" "/tmp/evidence.log" "the temp path does not"
 
 echo "pr-round: a scan that fails on the refine dispositions file says the scan failed, not the file"
 new_sandbox
