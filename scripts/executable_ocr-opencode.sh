@@ -31,8 +31,13 @@ if ! TOP="$(git rev-parse --show-toplevel 2>/dev/null)"; then
   exit 2
 fi
 if [[ $REUSE == 0 ]]; then
-  SRC_DIR="$2"
-  [[ -d $SRC_DIR ]] || SRC_DIR="$(dirname "$2")"
+  if [[ ! -e $2 ]]; then
+    echo "$2 does not exist" >&2
+    exit 2
+  fi
+  # A symlinked file lives in its target's repository, not the link's.
+  SRC_DIR="$(realpath "$2")"
+  [[ -d $SRC_DIR ]] || SRC_DIR="$(dirname "$SRC_DIR")"
   if [[ "$(git -C "$SRC_DIR" rev-parse --show-toplevel 2>/dev/null)" != "$TOP" ]]; then
     echo "$2 is not inside $TOP; run it inside the repository of $2" >&2
     exit 2

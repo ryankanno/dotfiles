@@ -58,6 +58,7 @@ OC
 
 echo "explore: scan, export, then opencode with the issue prompt"
 new_sandbox
+mkdir -p src
 bash "$SCRIPT" explore src >/dev/null 2>&1
 rc=$?
 calls="$(cat "$LOG")"
@@ -83,6 +84,7 @@ assert_contains "$calls" "$OUT/review-issues.md instead." "explore drafts go to 
 
 echo "fix: opencode gets the fix prompt"
 new_sandbox
+mkdir -p src
 bash "$SCRIPT" fix src >/dev/null 2>&1
 rc=$?
 calls="$(cat "$LOG")"
@@ -106,6 +108,7 @@ echo "an existing review.html without --reuse is scanned again"
 new_sandbox
 mkdir -p "$OUT"
 echo "old" >"$OUT/review.html"
+mkdir -p src
 bash "$SCRIPT" fix src >/dev/null 2>&1
 assert_eq "$?" "0" "exits 0"
 assert_eq "$(sed -n 1p "$LOG")" "ocr scan --path src" "scans again"
@@ -145,6 +148,7 @@ assert_eq "$(cat "$LOG")" "" "runs nothing"
 
 echo "scan failure stops the run"
 new_sandbox
+mkdir -p src
 OCR_SCAN_FAIL=1 bash "$SCRIPT" explore src >/dev/null 2>&1
 rc=$?
 assert_eq "$rc" "1" "exits non-zero"
@@ -154,6 +158,7 @@ assert_eq "$([[ -e "$OUT" ]] && echo yes)" "" "a failed scan leaves no .ocr-open
 
 echo "export failure stops the run"
 new_sandbox
+mkdir -p src
 OCR_EXPORT_FAIL=1 bash "$SCRIPT" explore src >/dev/null 2>&1
 rc=$?
 assert_eq "$rc" "1" "exits non-zero"
@@ -164,6 +169,7 @@ new_sandbox
 git -c user.name=t -c user.email=t@t commit -q --allow-empty -m init
 git worktree add -q "$WS/wt"
 cd "$WS/wt" || exit 1
+mkdir -p src
 bash "$SCRIPT" explore src >/dev/null 2>&1
 assert_eq "$(cat "$WS/wt/.ocr-opencode/review.html")" "new" "exports review.html into the worktree .ocr-opencode"
 assert_contains "$(sed -n 3p "$LOG")" "$WS/wt/.ocr-opencode/review.html." "the prompt names the worktree review.html"
@@ -218,6 +224,40 @@ mkdir -p "$WS/repo/src"
 bash "$SCRIPT" explore src/f.sh >/dev/null 2>&1
 assert_eq "$?" "0" "exits 0"
 assert_eq "$(sed -n 1p "$LOG")" "ocr scan --path src/f.sh" "scans the file"
+
+echo "a symlinked src file into another repository is refused"
+new_sandbox
+git init -q "$WS/other"
+: >"$WS/other/secret.sh"
+ln -s "$WS/other/secret.sh" "$WS/repo/link.sh"
+out="$(bash "$SCRIPT" explore link.sh 2>&1)"
+assert_eq "$?" "2" "exits 2"
+assert_contains "$out" "is not inside $WS/repo" "says the link is not inside the repository"
+assert_eq "$(ls -A "$WS/repo" | tr '\n' ' ')" ".git link.sh " "writes nothing into the current repository"
+assert_eq "$(ls -A "$WS/other" | tr '\n' ' ')" ".git secret.sh " "writes nothing into the other repository"
+assert_eq "$(cat "$LOG")" "" "runs nothing"
+
+echo "a symlinked src file in the current repository is scanned"
+new_sandbox
+mkdir -p "$WS/repo/src"
+: >"$WS/repo/src/f.sh"
+ln -s src/f.sh "$WS/repo/link.sh"
+bash "$SCRIPT" explore link.sh >/dev/null 2>&1
+assert_eq "$?" "0" "exits 0"
+assert_eq "$(sed -n 1p "$LOG")" "ocr scan --path link.sh" "scans the link"
+
+echo "a src path that does not exist is refused"
+new_sandbox
+out="$(bash "$SCRIPT" explore src/missing 2>&1)"
+assert_eq "$?" "2" "a missing parent exits 2"
+assert_contains "$out" "src/missing does not exist" "says the path does not exist"
+assert_not_contains "$out" "is not inside" "does not say the path is outside the repository"
+mkdir -p "$WS/repo/src"
+out="$(bash "$SCRIPT" fix src/missing 2>&1)"
+assert_eq "$?" "2" "a missing file exits 2"
+assert_contains "$out" "src/missing does not exist" "says the file does not exist"
+assert_eq "$(ls -A "$WS/repo" | tr '\n' ' ')" ".git src " "writes nothing"
+assert_eq "$(cat "$LOG")" "" "runs nothing"
 
 echo "bad arguments print usage"
 new_sandbox
