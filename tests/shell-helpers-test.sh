@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Tests for the interactive shell helpers: the address pyserver serves on,
-# and the nvim command line the fzf key binds build. PATH stubs stand in for
-# python, the browser openers, fzf, and nvim, so no server starts, no
-# browser opens, and no editor runs.
+# the nvim command line the fzf key binds build, and the direnv use_venv and
+# use_uv functions. PATH stubs stand in for python, the browser openers, fzf,
+# nvim, and uv, so no server starts, no browser opens, no editor runs, and no
+# virtualenv is built.
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PASS=0 FAIL=0
@@ -164,5 +165,119 @@ echo "prefix=$WS/evil" >"$WS/repo/.npmrc"
   </dev/null >/dev/null 2>&1)
 assert_eq "$(cat "$WS/path" 2>/dev/null)" "$WS/bin:/usr/bin:/bin" \
   "a start directory's .npmrc prefix does not reach PATH"
+
+# --- direnv use_venv and use_uv ---
+
+# The real direnv loads this direnvrc from a sandboxed config directory, with
+# the allow list in a sandboxed data directory. The uv stub appends each call's
+# argv to $WS/uv.calls and, for `uv venv`, keeps or creates .venv/bin as
+# --allow-existing does. $UV_VENV_FAIL makes `uv venv` fail.
+new_direnv_sandbox() {
+  new_sandbox
+  mkdir -p "$WS/config/direnv" "$WS/data" "$WS/cache" "$WS/home" "$WS/repo"
+  # direnv reports the physical path, and macOS's temp directory is a symlink.
+  REPO="$(cd "$WS/repo" && pwd -P)"
+  cp "$ROOT/dot_config/direnv/direnvrc" "$WS/config/direnv/direnvrc"
+  cat >"$WS/bin/uv" <<'STUB'
+#!/usr/bin/env bash
+printf '[%s]' "$@" >>"$STUB_DIR/uv.calls"; echo >>"$STUB_DIR/uv.calls"
+[[ $1 == venv ]] || exit 0
+[[ -z ${UV_VENV_FAIL-} ]] || exit 1
+mkdir -p .venv/bin
+STUB
+  chmod +x "$WS/bin/uv"
+}
+
+# Runs $@ in $WS/repo with the sandbox's direnv state and none of the caller's.
+in_direnv_repo() {
+  (cd "$WS/repo" && env -u DIRENV_DIFF -u DIRENV_DIR -u DIRENV_FILE -u DIRENV_WATCHES -u VIRTUAL_ENV \
+    HOME="$WS/home" XDG_CONFIG_HOME="$WS/config" XDG_DATA_HOME="$WS/data" XDG_CACHE_HOME="$WS/cache" \
+    PATH="$WS/bin:$PATH" "$@")
+}
+
+# Writes $1 as the repository's .envrc and allows it.
+allow_envrc() {
+  echo "$1" >"$WS/repo/.envrc"
+  in_direnv_repo direnv allow . >/dev/null 2>&1
+}
+
+# Evaluates what the shell hook evaluates at a prompt in $WS/repo, with
+# PYTHONHOME set as a shell could have it. Sets VENV, PYHOME, FIRST_PATH, ERR
+# and UV_CALLS.
+direnv_prompt() {
+  rm -f "$WS/env"
+  in_direnv_repo env PYTHONHOME=/from/the/shell bash -c \
+    'eval "$(direnv export bash)"; printf "%s\n" "${VIRTUAL_ENV-}" "${PYTHONHOME-unset}" "$PATH" >"$STUB_DIR/env"' \
+    >/dev/null 2>"$WS/direnv.err"
+  { IFS= read -r VENV; IFS= read -r PYHOME; IFS= read -r FIRST_PATH; } <"$WS/env"
+  FIRST_PATH="${FIRST_PATH%%:*}"
+  ERR="$(cat "$WS/direnv.err")"
+  UV_CALLS="$(cat "$WS/uv.calls" 2>/dev/null)"
+}
+
+git_commit_all() {
+  in_direnv_repo git init -q
+  in_direnv_repo git add -A
+  in_direnv_repo git -c user.name=test -c user.email=test@example.com commit -qm test
+}
+
+# Each marker file a repository script leaves proves the script ran.
+ran() { if [[ -e "$WS/$1.ran" ]]; then echo yes; else echo no; fi; }
+write_marker_script() {
+  mkdir -p "$(dirname "$1")"
+  echo ": >\"\$STUB_DIR/$2.ran\"" >"$1"
+}
+
+new_direnv_sandbox
+allow_envrc 'use uv'
+write_marker_script "$WS/repo/.envrc.local" sidecar
+direnv_prompt
+assert_eq "$(ran sidecar)" no "an allowed use uv does not run a .envrc.local added after the allow"
+assert_eq "$UV_CALLS" "[venv][--allow-existing]"$'\n'"[sync][--quiet]" \
+  "an allowed use uv creates the venv, then syncs"
+assert_eq "$VENV" "$REPO/.venv" "use uv sets VIRTUAL_ENV to the absolute .venv path"
+assert_eq "$FIRST_PATH" "$REPO/.venv/bin" "use uv puts .venv/bin first on PATH"
+assert_eq "$PYHOME" unset "use uv unsets PYTHONHOME"
+
+new_direnv_sandbox
+allow_envrc 'use venv'
+write_marker_script "$WS/repo/.venv/bin/activate" activate
+direnv_prompt
+assert_eq "$(ran activate)" no "use venv outside a git work tree does not run an existing activate script"
+assert_eq "$VENV" "$REPO/.venv" "use venv outside a git work tree keeps an existing .venv"
+
+new_direnv_sandbox
+allow_envrc 'use uv'
+UV_VENV_FAIL=1 direnv_prompt
+assert_eq "$VENV" "" "a failed uv venv leaves VIRTUAL_ENV unset"
+assert_eq "$UV_CALLS" "[venv][--allow-existing]" "a failed uv venv stops use uv before uv sync"
+
+new_direnv_sandbox
+allow_envrc 'use uv'
+write_marker_script "$WS/repo/.venv/bin/activate" activate
+git_commit_all
+direnv_prompt
+assert_eq "$(ran activate)" no "a committed .venv/bin/activate does not run"
+assert_contains "$ERR" "git tracks files under .venv" "a tracked .venv fails with the reason"
+assert_eq "$UV_CALLS" "" "a tracked .venv stops use uv before any uv call"
+assert_eq "$VENV" "" "a tracked .venv leaves VIRTUAL_ENV unset"
+assert_eq "$FIRST_PATH" "$WS/bin" "a tracked .venv leaves PATH unchanged"
+
+# A case-insensitive file system serves a tracked .VENV as .venv, and macOS has one.
+new_direnv_sandbox
+allow_envrc 'use venv'
+write_marker_script "$WS/repo/.VENV/bin/python" python
+git_commit_all
+direnv_prompt
+assert_contains "$ERR" "git tracks files under .venv" "a tracked .VENV fails like a tracked .venv"
+assert_eq "$UV_CALLS" "" "a tracked .VENV stops use venv before uv venv"
+
+new_direnv_sandbox
+allow_envrc 'use venv'
+echo .venv >"$WS/repo/.gitignore"
+git_commit_all
+direnv_prompt
+assert_eq "$VENV" "$REPO/.venv" "use venv works in a git work tree with an ignored .venv"
+assert_eq "$FIRST_PATH" "$REPO/.venv/bin" "an ignored .venv puts .venv/bin first on PATH"
 
 report
