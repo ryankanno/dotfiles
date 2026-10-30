@@ -45,18 +45,18 @@ set_host() {
 
 # Sets ERR from the apply of one target, and RC to its exit code.
 apply_target() {
+  mkdir -p "$WS/home/$(dirname "$TARGET")"
   cm apply "$WS/home/$TARGET" >/dev/null 2>"$WS/err"
   RC=$?
   ERR="$(cat "$WS/err")"
 }
 
-ntfy_lines_managed() {
-  cm managed 2>/dev/null | grep -cE '^\.config/ntfy(-macos)?(/|$)'
-}
-
 # Asserts that the current sandbox skips both configs and that the apply succeeds.
 assert_skipped() {
-  assert_eq "$(ntfy_lines_managed)" 0 "$1: chezmoi managed lists no ntfy config"
+  local managed
+  managed="$(cm managed 2>"$WS/err")"
+  assert_eq "$?" 0 "$1: chezmoi managed succeeds"$'\n'"$(cat "$WS/err")"
+  assert_eq "$(grep -cE '^\.config/ntfy(-macos)?(/|$)' <<<"$managed")" 0 "$1: chezmoi managed lists no ntfy config"
   cm apply >/dev/null 2>"$WS/err"
   assert_eq "$?" 0 "$1: the apply succeeds"$'\n'"$(cat "$WS/err")"
   assert_eq "$(ls "$WS/home/.config/ntfy" "$WS/home/.config/ntfy-macos" 2>/dev/null)" "" \
@@ -65,19 +65,35 @@ assert_skipped() {
 
 for OS in linux darwin; do
   if [[ $OS == linux ]]; then
-    TARGET=.config/ntfy/client.yml LINE='default-host: https://ntfy.example/base'
+    TARGET=.config/ntfy/client.yml OTHER=.config/ntfy-macos KEY='default-host: '
   else
-    TARGET=.config/ntfy-macos/config.yml LINE='  - url: https://ntfy.example/base'
+    TARGET=.config/ntfy-macos/config.yml OTHER=.config/ntfy KEY='  - url: '
   fi
+  LINE="$KEY\"https://ntfy.example/base\""
 
   # --- a valid host ---
 
   new_sandbox
   set_host 'https://ntfy.example/base'
   assert_contains "$(cm managed 2>/dev/null)" "$TARGET" "$OS: chezmoi managed lists the config"
+  assert_eq "$(cm managed 2>/dev/null | grep -cE "^$OTHER(/|$)")" 0 "$OS: chezmoi managed leaves out the other platform's config"
   cm apply >/dev/null 2>"$WS/err"
   assert_eq "$?" 0 "$OS: the apply of a valid host succeeds"$'\n'"$(cat "$WS/err")"
   assert_eq "$(grep -cxF -- "$LINE" "$WS/home/$TARGET" 2>/dev/null)" 1 "$OS: the host renders on its line"
+
+  # The control that lets the failing single-target applies below mean something.
+  new_sandbox
+  set_host 'https://ntfy.example/base'
+  apply_target
+  assert_eq "$RC" 0 "$OS: a single-target apply of a valid host succeeds"$'\n'"$ERR"
+  assert_eq "$(grep -cxF -- "$LINE" "$WS/home/$TARGET" 2>/dev/null)" 1 "$OS: a single-target apply writes the config"
+
+  # A trailing colon is a YAML mapping indicator unless the value is quoted.
+  new_sandbox
+  set_host 'https://ntfy.example:'
+  apply_target
+  assert_eq "$(grep -cxF -- "$KEY\"https://ntfy.example:\"" "$WS/home/$TARGET" 2>/dev/null)" 1 \
+    "$OS: a host ending in a colon renders as a quoted scalar"
 
   # --- a host that is not a single-line https:// URL ---
 
