@@ -10,18 +10,23 @@ use_mise() {
 
 # Function to setup a venv and activate (will create one if it doesn't exist)
 use_venv() {
-    local tracked
-    # env -i: use_uv loads the repository's .env first, and its GIT_* values could hide tracked files
+    local output status=0
+    # env -i: use_uv loads the repository's .env first, so GIT_* could hide tracked files and HOME could set core.fsmonitor
     # icase: a case-insensitive file system serves a tracked .VENV as .venv
-    if tracked=$(env -i PATH="$PATH" HOME="$HOME" git ls-files -- ':(icase).venv' 2>&1); then
-        if [[ -n $tracked ]]; then
+    output=$(env -i PATH="$PATH" git ls-files --error-unmatch -- ':(icase).venv' 2>&1) || status=$?
+    case $status in
+        0)
             log_error "use_venv: git tracks files under .venv, so its scripts are repository code"
             return 1
-        fi
-    elif [[ $tracked != *"not a git repository"* ]]; then
-        log_error "use_venv: git cannot list .venv: $tracked"
-        return 1
-    fi
+            ;;
+        1 | 127) ;; # 1: nothing tracked. 127: no git, so no work tree.
+        *)
+            if [[ $output != "fatal: not a git repository"* ]]; then
+                log_error "use_venv: git cannot list .venv: $output"
+                return 1
+            fi
+            ;;
+    esac
     uv venv --allow-existing || return
     # activate is not sourced: a kept .venv is repository code, and direnv passes only exports to the shell
     export VIRTUAL_ENV="$PWD/.venv"

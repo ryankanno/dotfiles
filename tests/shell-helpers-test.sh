@@ -301,4 +301,46 @@ assert_contains "$ERR" "git cannot list .venv" "a git failure inside a work tree
 assert_eq "$UV_CALLS" "" "a git failure inside a work tree stops use uv before any uv call"
 assert_eq "$VENV" "" "a git failure inside a work tree leaves VIRTUAL_ENV unset"
 
+# The check's git call reads $HOME/.gitconfig, and core.fsmonitor there is a
+# command. git runs it without STUB_DIR, so its marker path is literal.
+new_direnv_sandbox
+allow_envrc 'use uv'
+mkdir "$WS/repo/h"
+echo ": >\"$WS/monitor.ran\"" >"$WS/repo/h/monitor"
+chmod +x "$WS/repo/h/monitor"
+printf '[core]\n\tfsmonitor = %s\n' "$REPO/h/monitor" >"$WS/repo/h/.gitconfig"
+echo HOME=h >"$WS/repo/.env"
+git_commit_all
+direnv_prompt
+assert_eq "$(ran monitor)" no "a .env HOME does not make the check run a repository fsmonitor"
+
+new_direnv_sandbox
+allow_envrc 'use uv'
+write_marker_script "$WS/repo/.venv/bin/python" python
+mkdir "$WS/repo/not a git repository"
+echo '[bad' >"$WS/repo/not a git repository/.gitconfig"
+echo 'HOME="not a git repository"' >"$WS/repo/.env"
+git_commit_all
+direnv_prompt
+assert_contains "$ERR" "git tracks files under .venv" "a .env HOME named like git's message does not hide a tracked .venv"
+assert_eq "$UV_CALLS" "" "a .env HOME named like git's message does not reach uv past a tracked .venv"
+
+new_direnv_sandbox
+allow_envrc 'use venv'
+git_commit_all
+in_direnv_repo git config core.fsmonitor /usr/bin/true
+direnv_prompt
+assert_eq "$VENV" "$REPO/.venv" "a git warning on stderr does not stop use venv"
+
+# A PATH with no git, and no git work tree: only .env can narrow PATH this far
+# and leave direnv itself running.
+new_direnv_sandbox
+allow_envrc 'use uv'
+mkdir "$WS/nogit"
+cp "$WS/bin/uv" "$WS/nogit/uv"
+ln -s "$(command -v bash)" "$(command -v mkdir)" "$WS/nogit/"
+echo "PATH=$WS/nogit" >"$WS/repo/.env"
+direnv_prompt
+assert_eq "$VENV" "$REPO/.venv" "use uv with no git on PATH has no check to run"
+
 report
