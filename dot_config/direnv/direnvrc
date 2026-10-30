@@ -10,9 +10,16 @@ use_mise() {
 
 # Function to setup a venv and activate (will create one if it doesn't exist)
 use_venv() {
+    local tracked
+    # env -i: use_uv loads the repository's .env first, and its GIT_* values could hide tracked files
     # icase: a case-insensitive file system serves a tracked .VENV as .venv
-    if [[ -n $(git ls-files -- ':(icase).venv' 2>/dev/null) ]]; then
-        log_error "use_venv: git tracks files under .venv, so its scripts are repository code"
+    if tracked=$(env -i PATH="$PATH" HOME="$HOME" git ls-files -- ':(icase).venv' 2>&1); then
+        if [[ -n $tracked ]]; then
+            log_error "use_venv: git tracks files under .venv, so its scripts are repository code"
+            return 1
+        fi
+    elif [[ $tracked != *"not a git repository"* ]]; then
+        log_error "use_venv: git cannot list .venv: $tracked"
         return 1
     fi
     uv venv --allow-existing || return

@@ -280,4 +280,25 @@ direnv_prompt
 assert_eq "$VENV" "$REPO/.venv" "use venv works in a git work tree with an ignored .venv"
 assert_eq "$FIRST_PATH" "$REPO/.venv/bin" "an ignored .venv puts .venv/bin first on PATH"
 
+# use_uv loads the repository's .env first, so .env reaches the check's git call.
+for dotenv in GIT_DIR=/nonexistent GIT_LITERAL_PATHSPECS=1; do
+  new_direnv_sandbox
+  allow_envrc 'use uv'
+  write_marker_script "$WS/repo/.venv/bin/python" python
+  echo "$dotenv" >"$WS/repo/.env"
+  git_commit_all
+  direnv_prompt
+  assert_contains "$ERR" "git tracks files under .venv" "a repository .env with $dotenv does not hide a tracked .venv"
+  assert_eq "$UV_CALLS" "" "a repository .env with $dotenv does not reach uv past a tracked .venv"
+done
+
+new_direnv_sandbox
+allow_envrc 'use uv'
+git_commit_all
+echo corrupt >"$WS/repo/.git/index"
+direnv_prompt
+assert_contains "$ERR" "git cannot list .venv" "a git failure inside a work tree fails with the reason"
+assert_eq "$UV_CALLS" "" "a git failure inside a work tree stops use uv before any uv call"
+assert_eq "$VENV" "" "a git failure inside a work tree leaves VIRTUAL_ENV unset"
+
 report
