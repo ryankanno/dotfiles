@@ -1,5 +1,5 @@
-{{- $host := env "NTFY_SERVER_URL" -}}
-{{- if not $host }}{{ fail "NTFY_SERVER_URL is unset; it is exported from ~/.bashrc_local" }}{{ end -}}
+{{- $host := dig "ntfy" "host" "" . | toString -}}
+{{- if not (regexMatch "^https://[!-~]+$" $host) }}{{ fail "ntfy.host must be a single-line https:// URL with no control characters; fix it with chezmoi edit-config" }}{{ end -}}
 default-host: {{ $host }}
 
 # One topic per source, so each renders under its own app name and icon

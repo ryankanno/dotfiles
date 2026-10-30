@@ -1,2 +1,6 @@
+{{- $ntfyHost := promptStringOnce . "ntfy.host" "ntfy server URL, https:// (empty skips the ntfy configs)" -}}
+[data.ntfy]
+    host = {{ $ntfyHost | quote }}
+
 [diff]
     pager = "delta"
