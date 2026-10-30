@@ -145,4 +145,24 @@ for key in '\C-p' '\C-f'; do
   assert_eq "$ARGV" "[--][-S]" "$key bind passes a bare -S to nvim as a file name"
 done
 
+# --- dot_bashrc PATH ---
+
+# The npm stub reports the prefix in the start directory's .npmrc. npm 11
+# refuses that prefix, so a real npm cannot show a shell that trusts the
+# report. A bare PATH keeps the real mise and direnv out of the shell start,
+# and its repeated entry proves the rc file ran: the rc file's dedup removes it.
+new_sandbox
+cat >"$WS/bin/npm" <<'STUB'
+#!/usr/bin/env bash
+[[ $* == 'config get prefix' ]] && sed -n 's/^prefix=//p' .npmrc
+STUB
+chmod +x "$WS/bin/npm"
+mkdir "$WS/home" "$WS/repo"
+echo "prefix=$WS/evil" >"$WS/repo/.npmrc"
+(cd "$WS/repo" && HOME="$WS/home" PATH="$WS/bin:/usr/bin:$WS/bin:/bin" script -q /dev/null \
+  "$BASH" --noprofile --rcfile "$ROOT/dot_bashrc" -ic 'printf %s "$PATH" >"$1"' _ "$WS/path" \
+  </dev/null >/dev/null 2>&1)
+assert_eq "$(cat "$WS/path" 2>/dev/null)" "$WS/bin:/usr/bin:/bin" \
+  "a start directory's .npmrc prefix does not reach PATH"
+
 report
