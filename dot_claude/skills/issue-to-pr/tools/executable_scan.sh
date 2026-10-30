@@ -82,9 +82,10 @@ pattern+='|npm_[A-Za-z0-9]{20,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|[Bb]earer [A-
 pattern+='|eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]*|whsec_[A-Za-z0-9]{20,}'
 
 # grep's own failure (an unreadable file, a broken pattern) is a blocked
-# post, never a silent pass.
+# post, never a silent pass. Under a UTF-8 locale BSD grep matches nothing
+# on a line with a byte that is not UTF-8, so a hit there would pass.
 rc=0
-grep -nE "$pattern" "$file" || rc=$?
+LC_ALL=C grep -nE "$pattern" "$file" || rc=$?
 case "$rc" in
   0) exit 1 ;;
   1) exit 0 ;;

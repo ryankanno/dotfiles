@@ -609,6 +609,12 @@ LC_ALL=en_US.UTF-8 HOME=/Users/someone "$SCAN" "$WS/body.md" >/dev/null 2>&1
 assert_eq "$?" 0 "exits 0"
 assert_eq "$(cat "$WS/body.md")" "$(printf 'bad \xff byte, see /tmp/...')" "the temp path is rewritten"
 
+echo "scan: a byte that is not UTF-8 does not hide a home path on its line"
+new_sandbox
+printf 'bad \xff byte, see /Users/other/x\n' >"$WS/body.md"
+LC_ALL=en_US.UTF-8 HOME=/Users/someone "$SCAN" "$WS/body.md" >/dev/null 2>&1
+assert_eq "$?" 1 "blocks"
+
 echo "scan: a dotted path or a bare macOS prefix still blocks"
 for line in 'at /private/.scratch-9f2' 'at /private/' 'at /var/folders/'; do
   new_sandbox
