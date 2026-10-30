@@ -582,8 +582,10 @@ done
 
 # PR #199 round 1: an ocr finding wrote `/tmp/foo` as an example input, and the post blocked.
 echo "scan: a temp path becomes a placeholder and passes"
-for pair in 'see /tmp/foo|see /tmp/...' \
-  'at `/tmp/agent-scratch-9f2/x.log:4`, then|at `/tmp/...:4`, then' \
+for pair in 'see /tmp/foo|see /tmp/...' '/tmp/foo is the dir|/tmp/... is the dir' \
+  'at `/tmp/agent-scratch-9f2/x.log:4`, then|at `/tmp/...`, then' \
+  'at /tmp/a:b/x|at /tmp/...' 'at /tmp/foo#x/-Users-bob-x and|at /tmp/... and' \
+  'at "/tmp/a,b;c" then|at "/tmp/..." then' \
   'at /tmp/.scratch-9f2/x|at /tmp/...' 'see /tmp/... and /tmp/agent-scratch-9f2/x|see /tmp/... and /tmp/...' \
   'at /private/tmp/claude-501/-Users-someone-x/scratchpad|at /tmp/...' \
   'at /var/folders/ab/cd12/T/x|at /var/folders/...' 'at /var/folders/..x|at /var/folders/...' \
@@ -599,6 +601,13 @@ new_sandbox
 scan 'see /tmp/foo and /Users/other/x'
 assert_eq "$RC" 1 "the home path blocks"
 assert_eq "$BODY" 'see /tmp/... and /Users/other/x' "the temp path is rewritten all the same"
+
+echo "scan: a byte that is not UTF-8 does not stop the temp path rewrite"
+new_sandbox
+printf 'bad \xff byte, see /tmp/foo\n' >"$WS/body.md"
+LC_ALL=en_US.UTF-8 HOME=/Users/someone "$SCAN" "$WS/body.md" >/dev/null 2>&1
+assert_eq "$?" 0 "exits 0"
+assert_eq "$(cat "$WS/body.md")" "$(printf 'bad \xff byte, see /tmp/...')" "the temp path is rewritten"
 
 echo "scan: a dotted path or a bare macOS prefix still blocks"
 for line in 'at /private/.scratch-9f2' 'at /private/' 'at /var/folders/'; do
@@ -1409,6 +1418,19 @@ export GH_COMMENTS_JSON
 run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
 assert_contains "$(cat "$pd/round-2/background.md" 2>/dev/null)" "seen at ~/x" "the scan's rewrite reaches the background"
 assert_not_contains "$(cat "$pd/round-2/background.md" 2>/dev/null)" "$WS/home/x" "the home path does not"
+
+echo "pr-round: a disk comment's temp path reaches the reviewer as a placeholder"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+round_comment 1 "disk finding" "seen at /var/folders/xy/leak" >"$pd/round-1/comment.md"
+GH_COMMENTS_JSON='[]'
+export GH_COMMENTS_JSON
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+assert_contains "$(cat "$pd/round-2/background.md" 2>/dev/null)" "seen at /var/folders/..." "the scan's rewrite reaches the background"
+assert_not_contains "$(cat "$pd/round-2/background.md" 2>/dev/null)" "/var/folders/xy" "the temp path does not"
 
 echo "pr-round: two rounds on disk both settle, oldest first"
 new_sandbox
@@ -3618,6 +3640,23 @@ assert_contains "$OUT" "refine-dispositions.md" "stderr names the file"
 assert_contains "$OUT" "/Users/other/evidence.log" "stderr shows the scan's hit"
 assert_contains "$OUT" "the file carries a hit" "stderr says the file is at fault"
 assert_eq "$(ls "$rd")" "refine-dispositions.md" "the round dir holds only the refine's file: nothing reviewed"
+
+echo "pr-round: a refine dispositions file with a temp path runs, and the path reaches the reviewer as a placeholder"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+printf 'make add safe\n' >"$WS/brief.md"
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+pd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39"
+round_comment 1 "the finding" "the earlier rejection" >"$pd/round-1/comment.md"
+advance_head g.txt 'refined\n'
+mkdir -p "$pd/round-2"
+printf -- '- Rejected: [critic] the refine rejected this one — see /tmp/evidence.log\n' >"$pd/round-2/refine-dispositions.md"
+run_prr --repo "$repo" --pr 39 --round 2 --brief "$WS/brief.md" >/dev/null 2>&1; RC=$?
+rd="$pd/round-2"
+assert_eq "$RC" 0 "the round runs"
+assert_contains "$(cat "$rd/background.md" 2>/dev/null)" "see /tmp/..." "the background has the placeholder"
+assert_not_contains "$(cat "$rd/background.md" 2>/dev/null)" "/tmp/evidence.log" "the temp path does not"
 
 echo "pr-round: a scan that fails on the refine dispositions file says the scan failed, not the file"
 new_sandbox

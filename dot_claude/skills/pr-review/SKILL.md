@@ -286,8 +286,8 @@ It also rewrites the temp paths `/tmp/<x>`, `/private/tmp/<x>`,
 `/var/folders/<x>` and `/private/var/folders/<x>` to `/tmp/...` or
 `/var/folders/...`. These two rewrites are the only changes to
 verbatim text in the comment.
-Exit 1: it printed each remaining hit (another home path, a temp path,
-or a token); **do not post**. Record the lines. Exit 2: a usage
+Exit 1: it printed each remaining hit (another home path, a temp path
+the rewrite leaves, or a token); **do not post**. Record the lines. Exit 2: a usage
 error, or the scan itself failed; **do not post**. Record its stderr.
 In an interactive round, show the lines and wait instead.
 Unattended does not mean

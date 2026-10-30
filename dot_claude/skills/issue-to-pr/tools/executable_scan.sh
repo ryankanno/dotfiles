@@ -53,9 +53,11 @@ redaction=$'~/'
 # PR #199 round 1). The whole path becomes the placeholder: a later segment
 # can carry a username, as /private/tmp/claude-501/-Users-<name>-... does.
 # The left boundary keeps a home's or a repo's tmp/ out of the rewrite, so
-# the patterns still block ~/tmp/<x>.
-temp_paths='(^|[^A-Za-z0-9._/~-])(/private)?(/tmp|/var/folders)/[A-Za-z0-9._@%+=~-][A-Za-z0-9._/@%+=~-]*'
-printf '%s\n' "${body//"$home_prefix"/$redaction}" | sed -E "s#$temp_paths#\\1\\3/...#g" >"$tmp" \
+# the patterns still block ~/tmp/<x>. The path runs to whitespace, a quote
+# or a bracket: a path cut at `:` or `#` left its tail unblocked (PR #204
+# round 1). The C locale keeps a byte that is not UTF-8 from stopping sed.
+temp_paths="(^|[^A-Za-z0-9._/~-])(/private)?(/tmp|/var/folders)/[^][[:space:]\`'\"(){}<>|]+"
+printf '%s\n' "${body//"$home_prefix"/$redaction}" | LC_ALL=C sed -E "s#$temp_paths#\\1\\3/...#g" >"$tmp" \
   || { rm -f "$tmp"; printf 'scan failed (the temp path rewrite)\n' >&2; exit 2; }
 mv "$tmp" "$file"
 
