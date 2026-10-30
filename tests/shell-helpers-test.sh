@@ -332,15 +332,27 @@ in_direnv_repo git config core.fsmonitor /usr/bin/true
 direnv_prompt
 assert_eq "$VENV" "$REPO/.venv" "a git warning on stderr does not stop use venv"
 
-# A PATH with no git, and no git work tree: only .env can narrow PATH this far
-# and leave direnv itself running.
 new_direnv_sandbox
-allow_envrc 'use uv'
 mkdir "$WS/nogit"
 cp "$WS/bin/uv" "$WS/nogit/uv"
-ln -s "$(command -v bash)" "$(command -v mkdir)" "$WS/nogit/"
-echo "PATH=$WS/nogit" >"$WS/repo/.env"
+ln -s "$(command -v bash)" "$(command -v env)" "$(command -v mkdir)" "$WS/nogit/"
+allow_envrc "PATH=$WS/nogit"$'\n''use uv'
 direnv_prompt
 assert_eq "$VENV" "$REPO/.venv" "use uv with no git on PATH has no check to run"
+
+# The check needs the user's HOME: git expands ~ with it and reads safe.directory under it.
+new_direnv_sandbox
+allow_envrc 'use venv'
+git_commit_all
+printf '[core]\n\texcludesFile = ~/ignore\n' >>"$WS/repo/.git/config"
+direnv_prompt
+assert_eq "$VENV" "$REPO/.venv" "a ~ path in the repository's git config does not stop use venv"
+
+# A directory at ~/.gitconfig makes git print a warning before its fatal line.
+new_direnv_sandbox
+allow_envrc 'use venv'
+mkdir "$WS/home/.gitconfig"
+direnv_prompt
+assert_eq "$VENV" "$REPO/.venv" "a warning before git's fatal line does not stop use venv outside a work tree"
 
 report
