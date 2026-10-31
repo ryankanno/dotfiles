@@ -46,7 +46,7 @@ new_sandbox() { # [owner-type]  default Organization
   echo "dummy" >"$WS/seed.tgz"
   export RUNNER_TARBALL_SEED="$WS/seed.tgz"
   export RUNNER_VERSION="9.9.9" RUNNER_ARCH="test-arch"
-  TARBALL_NAME="actions-runner-$RUNNER_ARCH-$RUNNER_VERSION.tar.gz"
+  export TARBALL_NAME="actions-runner-$RUNNER_ARCH-$RUNNER_VERSION.tar.gz"
   export RELEASE_JSON="$WS/release.json"
   write_release "\"sha256:$(openssl dgst -sha256 -r "$WS/seed.tgz" | cut -d' ' -f1)\""
 
@@ -65,7 +65,7 @@ case "$*" in
   *registration-token*)       echo "FAKETOKEN";;
   *"/actions/runners --paginate"*) printf '%s\n' "alpha	online	false	self-hosted" "beta	offline	false	self-hosted,gpu";;
   *"releases/tags/v$RUNNER_VERSION"*) [[ -f "$RELEASE_JSON" ]] || exit 1; cat "$RELEASE_JSON";;
-  *"release download"*)       cp "$DOWNLOAD_SRC" "$GITHUB_RUNNERS_DIR/.cache/actions-runner-$RUNNER_ARCH-$RUNNER_VERSION.tar.gz";;
+  *"release download"*)       cp "$DOWNLOAD_SRC" "$GITHUB_RUNNERS_DIR/.cache/$TARBALL_NAME";;
 esac
 exit 0
 GH
@@ -83,12 +83,14 @@ UNAME
 echo "tar $*" >>"$PKG_LOG"
 # Emulate extracting the runner package: drop logging config.sh/svc.sh stubs
 # into the -C target directory.
-dir=""; prev=""
+dir=""; file=""; prev=""
 for a in "$@"; do
   [[ "$prev" == "-C" ]] && dir="$a"
+  [[ "$prev" == "-xzf" ]] && file="$a"
   prev="$a"
 done
 [[ -n "$dir" ]] || exit 0
+echo "tar-input $(cat "$file")" >>"$PKG_LOG"
 for s in config.sh svc.sh; do
   printf '#!/usr/bin/env bash\necho "%s $*" >>"%s"\n' "$s" "$PKG_LOG" >"$dir/$s"
   chmod +x "$dir/$s"
@@ -113,12 +115,18 @@ SYSCTL
   export PATH="$fakebin:$PATH"
 }
 
-drop_sandbox() { unset OWNER_TYPE RUNNER_VERSION RUNNER_ARCH UNAME_S UNAME_M; rm -rf "$WS"; }
+drop_sandbox() {
+  unset OWNER_TYPE RUNNER_VERSION RUNNER_ARCH UNAME_S UNAME_M
+  unset TARBALL_NAME RELEASE_JSON RUNNER_TARBALL_SEED
+  rm -rf "$WS"
+}
 
 linux_host() { export UNAME_S="Linux" UNAME_M="x86_64"; }
 
 write_release() { # digest as a JSON value; the release API's response body
-  printf '{"assets":[{"name":"%s","digest":%s}]}\n' "$TARBALL_NAME" "$1" >"$RELEASE_JSON"
+  # The other asset comes first: only a match on the name finds the right digest.
+  printf '{"assets":[{"name":"actions-runner-other.tar.gz","digest":"sha256:0"},{"name":"%s","digest":%s}]}\n' \
+    "$TARBALL_NAME" "$1" >"$RELEASE_JSON"
 }
 
 run_runner() { # runs runner.sh, captures stdout+stderr in OUT, exit in RC
@@ -368,13 +376,8 @@ test_restart_all_hits_every_runner() {
   run_runner restart-all
   assert_eq "$RC" "0" "exits 0"
   local pkg; pkg="$(cat "$PKG_LOG")"
-  if [[ "$(uname -s)" == "Linux" ]]; then
-    # Linux takes the systemd path: one glob covers every unit.
-    assert_contains "$pkg" "systemctl restart actions.runner.*" "systemd glob used"
-  else
-    assert_contains "$pkg" "actions-runner-acme-widget svc.sh stop" "widget bounced"
-    assert_contains "$pkg" "actions-runner-acme-gadget svc.sh stop" "gadget bounced"
-  fi
+  assert_contains "$pkg" "actions-runner-acme-widget svc.sh stop" "widget bounced"
+  assert_contains "$pkg" "actions-runner-acme-gadget svc.sh stop" "gadget bounced"
   assert_contains "$OUT" "Runners restarted" "reports completion"
   drop_sandbox
 }
@@ -393,7 +396,7 @@ test_add_seed_digest_mismatch() {
   new_sandbox
   echo "tampered" >"$RUNNER_TARBALL_SEED"
   run_runner add acme widget
-  assert_add_refused "digest" "seed mismatch"
+  assert_add_refused "digest mismatch" "seed mismatch"
   drop_sandbox
 }
 
@@ -405,7 +408,7 @@ test_add_cached_digest_mismatch() {
   echo "tampered" >"$GITHUB_RUNNERS_DIR/.cache/$TARBALL_NAME"
   : >"$PKG_LOG"; : >"$GH_LOG"
   run_runner add acme widget
-  assert_add_refused "digest" "cached mismatch"
+  assert_add_refused "digest mismatch" "cached mismatch"
   drop_sandbox
 }
 
@@ -416,9 +419,47 @@ test_add_download_digest_mismatch() {
   export DOWNLOAD_SRC="$WS/download.tgz"
   echo "tampered" >"$DOWNLOAD_SRC"
   run_runner add acme widget
-  assert_add_refused "digest" "download mismatch"
+  assert_add_refused "digest mismatch" "download mismatch"
   assert_contains "$(cat "$GH_LOG")" "release download" "the tarball came from a download"
   unset DOWNLOAD_SRC
+  drop_sandbox
+}
+
+test_add_extracts_the_bytes_it_verified() {
+  echo "test_add_extracts_the_bytes_it_verified"
+  new_sandbox
+  # A job swaps the cached tarball right after the hash.
+  cat >"$WS/bin/sha256sum" <<'SHA'
+#!/usr/bin/env bash
+openssl dgst -sha256 -r "$1"
+echo "tampered" >"$GITHUB_RUNNERS_DIR/.cache/$TARBALL_NAME"
+SHA
+  chmod +x "$WS/bin/sha256sum"
+  mkdir "$WS/tmp"
+  TMPDIR="$WS/tmp" run_runner add acme widget
+  assert_eq "$RC" "0" "exits 0"
+  assert_contains "$(cat "$PKG_LOG")" "tar-input dummy" "extracts the verified bytes"
+  assert_eq "$(ls -A "$WS/tmp")" "" "leaves no private copy behind"
+  drop_sandbox
+}
+
+test_add_refused_add_leaves_no_private_copy() {
+  echo "test_add_refused_add_leaves_no_private_copy"
+  new_sandbox
+  echo "tampered" >"$RUNNER_TARBALL_SEED"
+  mkdir "$WS/tmp"
+  TMPDIR="$WS/tmp" run_runner add acme widget
+  assert_add_refused "digest mismatch" "mismatch"
+  assert_eq "$(ls -A "$WS/tmp")" "" "leaves no private copy behind"
+  drop_sandbox
+}
+
+test_add_cached_entry_not_a_file() {
+  echo "test_add_cached_entry_not_a_file"
+  new_sandbox
+  mkdir -p "$GITHUB_RUNNERS_DIR/.cache/$TARBALL_NAME"
+  run_runner add acme widget
+  assert_add_refused "no tarball at" "cached directory"
   drop_sandbox
 }
 
@@ -536,7 +577,10 @@ test_remove_linux_rejects_bad_unit() {
     'actions.runner.a/../../sshd.service' \
     'actions.runner.*.service' \
     'actions.runner.a b.service' \
-    'actions.runner.service'; do
+    'actions.runner.service' \
+    $'actions.runner.a.service\nactions.runner.b.service' \
+    'actions.runner.a.service ' \
+    '../actions.runner.a.service'; do
     new_sandbox
     linux_host
     seed_configured_runner "$folder" 42 '"https://github.com/acme/widget"'
@@ -555,10 +599,23 @@ test_remove_linux_without_service_file() {
   local folder="actions-runner-acme-widget"
   seed_configured_runner "$folder" 42 '"https://github.com/acme/widget"'
   run_runner remove "$folder"
-  assert_eq "$RC" "0" "exits 0"
-  assert_contains "$OUT" "warning" "warns that no unit was found"
+  assert_remove_refused ".service missing" "no .service" "$folder"
+  assert_contains "$OUT" "list-unit-files" "says how to find the unit"
   assert_not_contains "$(cat "$PKG_LOG")" "sudo" "nothing ran as root"
-  assert_contains "$(cat "$GH_LOG")" "api -X DELETE" "still deregisters"
+  drop_sandbox
+}
+
+test_remove_linux_tolerates_stop_and_disable_failures() {
+  echo "test_remove_linux_tolerates_stop_and_disable_failures"
+  new_sandbox
+  linux_host
+  local folder="actions-runner-acme-widget"
+  seed_configured_runner "$folder" 42 '"https://github.com/acme/widget"'
+  echo "actions.runner.acme-widget.a.service" >"$GITHUB_RUNNERS_DIR/$folder/.service"
+  printf '#!/usr/bin/env bash\n[[ "$1" == "daemon-reload" ]]\n' >"$WS/bin/systemctl"
+  run_runner remove "$folder"
+  assert_eq "$RC" "0" "exits 0: the service was not installed"
+  assert_contains "$(cat "$GH_LOG")" "api -X DELETE" "deregisters"
   assert_nodir "$GITHUB_RUNNERS_DIR/$folder" "folder deleted"
   drop_sandbox
 }
@@ -621,7 +678,35 @@ test_restart_linux_only_bad_unit_fails() {
   echo "actions.runner.*.service" >"$GITHUB_RUNNERS_DIR/actions-runner-acme-widget/.service"
   run_runner restart 'actions-runner-acme-widget'
   [[ "$RC" -ne 0 ]] && ok "nonzero exit" || bad "should fail with nothing restarted"
+  assert_contains "$OUT" "no valid unit in any runner" "says why, not that nothing matched"
+  assert_not_contains "$OUT" "no runner in" "the glob did match"
   assert_not_contains "$(cat "$PKG_LOG")" "sudo" "nothing ran as root"
+  drop_sandbox
+}
+
+test_restart_linux_needs_no_svc_sh() {
+  echo "test_restart_linux_needs_no_svc_sh"
+  new_sandbox
+  linux_host
+  seed_runners actions-runner-acme-widget
+  echo "actions.runner.acme-widget.w.service" >"$GITHUB_RUNNERS_DIR/actions-runner-acme-widget/.service"
+  rm "$GITHUB_RUNNERS_DIR/actions-runner-acme-widget/svc.sh"
+  run_runner restart 'actions-runner-acme-widget'
+  assert_eq "$RC" "0" "exits 0"
+  assert_contains "$(cat "$PKG_LOG")" "sudo systemctl restart actions.runner.acme-widget.w.service" "restarts the unit"
+  drop_sandbox
+}
+
+test_restart_linux_skips_folder_that_is_no_runner() {
+  echo "test_restart_linux_skips_folder_that_is_no_runner"
+  new_sandbox
+  linux_host
+  seed_runners actions-runner-acme-widget
+  echo "actions.runner.acme-widget.w.service" >"$GITHUB_RUNNERS_DIR/actions-runner-acme-widget/.service"
+  mkdir -p "$GITHUB_RUNNERS_DIR/.cache"
+  run_runner restart '*'
+  assert_eq "$RC" "0" "exits 0"
+  assert_not_contains "$OUT" "warning" "the cache is not a runner"
   drop_sandbox
 }
 
@@ -646,6 +731,9 @@ test_add_asks_release_api_for_digest
 test_add_seed_digest_mismatch
 test_add_cached_digest_mismatch
 test_add_download_digest_mismatch
+test_add_extracts_the_bytes_it_verified
+test_add_refused_add_leaves_no_private_copy
+test_add_cached_entry_not_a_file
 test_add_missing_digest
 test_add_linux_keeps_svc_install_under_sudo
 test_remove_repo
@@ -656,10 +744,13 @@ test_remove_accepts_github_name_characters
 test_remove_linux_uses_systemctl
 test_remove_linux_rejects_bad_unit
 test_remove_linux_without_service_file
+test_remove_linux_tolerates_stop_and_disable_failures
 test_remove_linux_keeps_folder_when_unit_file_stays
 test_restart_linux_uses_systemctl
 test_restart_linux_rejects_bad_unit
 test_restart_linux_only_bad_unit_fails
+test_restart_linux_needs_no_svc_sh
+test_restart_linux_skips_folder_that_is_no_runner
 test_restart_all_linux_uses_systemd_glob
 test_list_org
 test_list_repo

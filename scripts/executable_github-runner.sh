@@ -85,14 +85,14 @@ sha256_of() {
 # Runner jobs can write the cache, so the tarball proves itself against the
 # release API on every add, however it got there.
 verify_tarball() {
-  local file="$CACHE_DIR/$TARBALL" digest actual
+  local file="$1" digest actual
   digest="$(gh api "repos/actions/runner/releases/tags/v${RUNNER_VERSION}" \
     | jq -r --arg name "$TARBALL" '.assets[] | select(.name == $name) | .digest // empty')" \
     || die "failed to read the release digest of $TARBALL"
   [[ -n "$digest" ]] || die "no digest for $TARBALL in release v${RUNNER_VERSION}"
   actual="$(sha256_of "$file")"
   [[ "$digest" == "sha256:$actual" ]] \
-    || die "digest mismatch for $file (delete it to download again)"
+    || die "digest mismatch for $CACHE_DIR/$TARBALL (delete it to download again)"
 }
 
 # Echoes "User" or "Organization".
@@ -174,9 +174,15 @@ cmd_add() {
   local name="${name_override:-$folder}"
 
   ensure_tarball
-  verify_tarball
+  # Hash and extract one private copy: a job can swap the cached file between
+  # the two.
+  staged="$(mktemp)"
+  trap 'rm -f "$staged"' EXIT
+  [[ -f "$CACHE_DIR/$TARBALL" ]] && cp "$CACHE_DIR/$TARBALL" "$staged" \
+    || die "no tarball at $CACHE_DIR/$TARBALL"
+  verify_tarball "$staged"
   mkdir -p "$dir"
-  tar -xzf "$CACHE_DIR/$TARBALL" -C "$dir"
+  tar -xzf "$staged" -C "$dir"
 
   echo "Requesting registration token for $target ..."
   local token
@@ -234,12 +240,14 @@ cmd_remove() {
   valid_github_url "$url" || die "gitHubUrl in $runner_file is not a GitHub owner or repo URL; folder kept"
   target="$(api_target_from_url "$url")"
 
-  local linux="" unit=""
+  local unit=""
   if [[ "$(uname -s)" == "Linux" ]]; then
-    linux=1
-    if [[ -f "$dir/.service" ]]; then
-      unit="$(runner_unit "$dir")" || die "$dir/.service does not name a runner unit; folder kept"
-    fi
+    # A job can delete .service, so its absence does not prove no unit exists.
+    [[ -e "$dir/.service" ]] || die "$dir/.service missing; folder kept." \
+      "Find the unit with: systemctl list-unit-files 'actions.runner.*'" \
+      "Write its name to .service and run remove again." \
+      "With no unit, delete $runner_file and run remove again."
+    unit="$(runner_unit "$dir")" || die "$dir/.service does not name a runner unit; folder kept"
   fi
 
   if [[ -n "$unit" ]]; then
@@ -251,8 +259,6 @@ cmd_remove() {
       || die "failed to delete the unit file of $unit; folder kept"
     sudo systemctl daemon-reload \
       || die "failed to reload systemd after deleting $unit; folder kept"
-  elif [[ -n "$linux" ]]; then
-    echo "warning: $dir/.service missing; no systemd unit removed." >&2
   else
     (
       cd "$dir"
@@ -313,20 +319,22 @@ cmd_restart() {
   [[ -n "$pattern" ]] || usage
   [[ -d "$BASE_DIR" ]] || die "no runner directory at $BASE_DIR"
 
-  local dir name unit matched=0
+  local dir name unit matched=0 skipped=0
   while IFS= read -r dir; do
-    [[ -f "$dir/svc.sh" ]] || continue
     name="$(basename "$dir")"
     if [[ "$(uname -s)" == "Linux" ]]; then
+      [[ -e "$dir/.service" || -f "$dir/svc.sh" ]] || continue
+      matched=$((matched + 1))
       unit="$(runner_unit "$dir")" || {
         echo "warning: no valid unit for $name in .service; skipped" >&2
+        skipped=$((skipped + 1))
         continue
       }
-      matched=$((matched + 1))
       echo "Restarting $name ..."
       sudo systemctl restart "$unit" \
         || echo "warning: failed to restart $name" >&2
     else
+      [[ -f "$dir/svc.sh" ]] || continue
       matched=$((matched + 1))
       echo "Restarting $name ..."
       ( cd "$dir" && ./svc.sh stop && ./svc.sh start ) \
@@ -335,7 +343,8 @@ cmd_restart() {
   done < <(find "$BASE_DIR" -mindepth 1 -maxdepth 1 -type d -name "$pattern" | sort)
 
   [[ "$matched" -gt 0 ]] || die "no runner in $BASE_DIR matches: $pattern"
-  echo "Restarted $matched runner(s)."
+  [[ "$matched" -gt "$skipped" ]] || die "no valid unit in any runner matching: $pattern"
+  echo "Restarted $((matched - skipped)) runner(s)."
 }
 
 main() {
