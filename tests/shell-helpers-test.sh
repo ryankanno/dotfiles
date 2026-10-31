@@ -280,16 +280,18 @@ direnv_prompt
 assert_eq "$VENV" "$REPO/.venv" "use venv works in a git work tree with an ignored .venv"
 assert_eq "$FIRST_PATH" "$REPO/.venv/bin" "an ignored .venv puts .venv/bin first on PATH"
 
-# use_uv loads the repository's .env first, so .env reaches the check's git call.
-for dotenv in GIT_DIR=/nonexistent GIT_LITERAL_PATHSPECS=1; do
-  new_direnv_sandbox
-  allow_envrc 'use uv'
-  write_marker_script "$WS/repo/.venv/bin/python" python
-  echo "$dotenv" >"$WS/repo/.env"
-  git_commit_all
-  direnv_prompt
-  assert_contains "$ERR" "git tracks files under .venv" "a repository .env with $dotenv does not hide a tracked .venv"
-  assert_eq "$UV_CALLS" "" "a repository .env with $dotenv does not reach uv past a tracked .venv"
+# An .envrc can load .env before use venv, so .env can reach the check's git call.
+for envrc in 'use uv' $'dotenv_if_exists\nuse venv'; do
+  for dotenv in GIT_DIR=/nonexistent GIT_LITERAL_PATHSPECS=1; do
+    new_direnv_sandbox
+    allow_envrc "$envrc"
+    write_marker_script "$WS/repo/.venv/bin/python" python
+    echo "$dotenv" >"$WS/repo/.env"
+    git_commit_all
+    direnv_prompt
+    assert_contains "$ERR" "git tracks files under .venv" "a .env with $dotenv under ${envrc##*$'\n'} does not hide a tracked .venv"
+    assert_eq "$UV_CALLS" "" "a .env with $dotenv under ${envrc##*$'\n'} does not reach uv past a tracked .venv"
+  done
 done
 
 new_direnv_sandbox
@@ -354,5 +356,11 @@ allow_envrc 'use venv'
 mkdir "$WS/home/.gitconfig"
 direnv_prompt
 assert_eq "$VENV" "$REPO/.venv" "a warning before git's fatal line does not stop use venv outside a work tree"
+
+# git translates its fatal line, and the check matches the English text.
+new_direnv_sandbox
+allow_envrc 'use venv'
+LC_ALL=de_DE.UTF-8 direnv_prompt
+assert_eq "$VENV" "$REPO/.venv" "a translated locale does not stop use venv outside a work tree"
 
 report
