@@ -14,7 +14,7 @@ Global config under `dot_claude/` (deploys to `~/.claude/`):
 - `agents/` — `diataxis-expert`
 - `scripts/` — `ntfy-notify.sh` (push notifications via ntfy)
 
-Notifications require `NTFY_SERVER_URL` in the shell environment; without it, hooks silently no-op.
+Notifications require `NTFY_SERVER_URL` in the shell environment; without it, hooks silently no-op. The subscriber configs read `ntfy.host` from `chezmoi init`, and an empty value skips them.
 
 ## mise (runtime version management)
 

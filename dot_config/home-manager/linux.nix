@@ -31,6 +31,7 @@ in
             Description = "ntfy desktop notification subscriber";
             After = [ "graphical-session.target" ];
             PartOf = [ "graphical-session.target" ];
+            ConditionPathExists = "%h/.config/ntfy/client.yml";
         };
 
         # The topic commands call notify-send and date, both under /usr/bin,

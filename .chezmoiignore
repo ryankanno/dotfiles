@@ -15,3 +15,7 @@ docs/
 {{- if eq .chezmoi.os "darwin" }}
 .config/ntfy
 {{- end }}
+{{- if not (dig "ntfy" "host" "" . | toString) }}
+.config/ntfy
+.config/ntfy-macos
+{{- end }}
