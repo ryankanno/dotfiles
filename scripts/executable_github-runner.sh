@@ -117,6 +117,31 @@ runner_unit() {
   echo "$unit"
 }
 
+# Linux only. Drives the root-owned unit: sudo ./svc.sh would run a file that a
+# job can rewrite. A job can also delete .service, so a missing file proves
+# nothing about the unit, and systemd can still list what remains.
+remove_unit() {
+  local dir="$1" unit
+  if [[ ! -e "$dir/.service" ]]; then
+    {
+      echo "warning: $dir/.service missing; no systemd unit removed, and one may remain."
+      echo "List units: systemctl list-unit-files 'actions.runner.*'"
+      echo "Clear one:  sudo systemctl disable --now <unit>"
+      echo "            sudo rm /etc/systemd/system/<unit>"
+      echo "            sudo systemctl daemon-reload"
+    } >&2
+    return 0
+  fi
+  unit="$(runner_unit "$dir")" || die "$dir/.service does not name a runner unit; folder kept"
+  # Stop and disable fail when the service is not installed; tolerate that.
+  sudo systemctl stop "$unit"    || true
+  sudo systemctl disable "$unit" || true
+  sudo rm -f "/etc/systemd/system/$unit" \
+    || die "failed to delete the unit file of $unit; folder kept"
+  sudo systemctl daemon-reload \
+    || die "failed to reload systemd after deleting $unit; folder kept"
+}
+
 # Maps https://github.com/<owner>[/<repo>] to orgs/<owner> or repos/<owner>/<repo>.
 api_target_from_url() {
   local path="${1#https://github.com/}"
@@ -178,8 +203,8 @@ cmd_add() {
   # the two.
   staged="$(mktemp)"
   trap 'rm -f "$staged"' EXIT
-  [[ -f "$CACHE_DIR/$TARBALL" ]] && cp "$CACHE_DIR/$TARBALL" "$staged" \
-    || die "no tarball at $CACHE_DIR/$TARBALL"
+  [[ -f "$CACHE_DIR/$TARBALL" ]] || die "no tarball at $CACHE_DIR/$TARBALL"
+  cp "$CACHE_DIR/$TARBALL" "$staged" || die "failed to copy $CACHE_DIR/$TARBALL"
   verify_tarball "$staged"
   mkdir -p "$dir"
   tar -xzf "$staged" -C "$dir"
@@ -220,6 +245,9 @@ cmd_remove() {
 
   local runner_file="$dir/.runner"
   if [[ ! -f "$runner_file" ]]; then
+    if [[ "$(uname -s)" == "Linux" ]]; then
+      remove_unit "$dir"
+    fi
     {
       echo "warning: $runner_file missing; folder looks half-built."
       echo "Deleting folder only. A GitHub-side runner may linger; list with:"
@@ -240,25 +268,8 @@ cmd_remove() {
   valid_github_url "$url" || die "gitHubUrl in $runner_file is not a GitHub owner or repo URL; folder kept"
   target="$(api_target_from_url "$url")"
 
-  local unit=""
   if [[ "$(uname -s)" == "Linux" ]]; then
-    # A job can delete .service, so its absence does not prove no unit exists.
-    [[ -e "$dir/.service" ]] || die "$dir/.service missing; folder kept." \
-      "Find the unit with: systemctl list-unit-files 'actions.runner.*'" \
-      "Write its name to .service and run remove again." \
-      "With no unit, delete $runner_file and run remove again."
-    unit="$(runner_unit "$dir")" || die "$dir/.service does not name a runner unit; folder kept"
-  fi
-
-  if [[ -n "$unit" ]]; then
-    # The unit file is root-owned; sudo ./svc.sh would run a job-writable file.
-    # Stop and disable fail when the service is not installed; tolerate that.
-    sudo systemctl stop "$unit"    || true
-    sudo systemctl disable "$unit" || true
-    sudo rm -f "/etc/systemd/system/$unit" \
-      || die "failed to delete the unit file of $unit; folder kept"
-    sudo systemctl daemon-reload \
-      || die "failed to reload systemd after deleting $unit; folder kept"
+    remove_unit "$dir"
   else
     (
       cd "$dir"
@@ -323,7 +334,8 @@ cmd_restart() {
   while IFS= read -r dir; do
     name="$(basename "$dir")"
     if [[ "$(uname -s)" == "Linux" ]]; then
-      [[ -e "$dir/.service" || -f "$dir/svc.sh" ]] || continue
+      # .runner counts too: a job can delete the other two.
+      [[ -e "$dir/.runner" || -e "$dir/.service" || -f "$dir/svc.sh" ]] || continue
       matched=$((matched + 1))
       unit="$(runner_unit "$dir")" || {
         echo "warning: no valid unit for $name in .service; skipped" >&2

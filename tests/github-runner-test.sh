@@ -599,9 +599,55 @@ test_remove_linux_without_service_file() {
   local folder="actions-runner-acme-widget"
   seed_configured_runner "$folder" 42 '"https://github.com/acme/widget"'
   run_runner remove "$folder"
-  assert_remove_refused ".service missing" "no .service" "$folder"
-  assert_contains "$OUT" "list-unit-files" "says how to find the unit"
+  assert_eq "$RC" "0" "exits 0"
+  assert_contains "$OUT" "list-unit-files" "says how to find a leftover unit"
+  assert_contains "$OUT" "sudo rm /etc/systemd/system/" "says how to clear a leftover unit"
   assert_not_contains "$(cat "$PKG_LOG")" "sudo" "nothing ran as root"
+  assert_contains "$(cat "$GH_LOG")" "api -X DELETE /repos/acme/widget/actions/runners/42" "still deregisters"
+  assert_nodir "$GITHUB_RUNNERS_DIR/$folder" "folder deleted"
+  drop_sandbox
+}
+
+test_remove_linux_half_built_removes_the_unit() {
+  echo "test_remove_linux_half_built_removes_the_unit"
+  new_sandbox
+  linux_host
+  local folder="actions-runner-acme-widget" unit="actions.runner.acme-widget.a.service"
+  mkdir -p "$GITHUB_RUNNERS_DIR/$folder"
+  echo "$unit" >"$GITHUB_RUNNERS_DIR/$folder/.service"
+  run_runner remove "$folder"
+  assert_eq "$RC" "0" "exits 0"
+  local pkg; pkg="$(cat "$PKG_LOG")"
+  assert_contains "$pkg" "sudo systemctl stop $unit" "stops the unit"
+  assert_contains "$pkg" "sudo rm -f /etc/systemd/system/$unit" "deletes the unit file"
+  assert_nodir "$GITHUB_RUNNERS_DIR/$folder" "folder deleted"
+  drop_sandbox
+}
+
+test_remove_linux_half_built_rejects_bad_unit() {
+  echo "test_remove_linux_half_built_rejects_bad_unit"
+  new_sandbox
+  linux_host
+  local folder="actions-runner-acme-widget"
+  mkdir -p "$GITHUB_RUNNERS_DIR/$folder"
+  echo "sshd.service" >"$GITHUB_RUNNERS_DIR/$folder/.service"
+  run_runner remove "$folder"
+  assert_remove_refused ".service" "half-built bad unit" "$folder"
+  assert_not_contains "$(cat "$PKG_LOG")" "sudo" "nothing ran as root"
+  drop_sandbox
+}
+
+test_remove_linux_half_built_without_service_file() {
+  echo "test_remove_linux_half_built_without_service_file"
+  new_sandbox
+  linux_host
+  local folder="actions-runner-acme-widget"
+  mkdir -p "$GITHUB_RUNNERS_DIR/$folder"
+  run_runner remove "$folder"
+  assert_eq "$RC" "0" "exits 0"
+  assert_contains "$OUT" "list-unit-files" "says how to find a leftover unit"
+  assert_not_contains "$(cat "$PKG_LOG")" "sudo" "nothing ran as root"
+  assert_nodir "$GITHUB_RUNNERS_DIR/$folder" "folder deleted"
   drop_sandbox
 }
 
@@ -697,6 +743,19 @@ test_restart_linux_needs_no_svc_sh() {
   drop_sandbox
 }
 
+test_restart_linux_warns_on_configured_folder_without_service_files() {
+  echo "test_restart_linux_warns_on_configured_folder_without_service_files"
+  new_sandbox
+  linux_host
+  local folder="actions-runner-acme-widget"
+  seed_configured_runner "$folder" 42 '"https://github.com/acme/widget"'
+  rm "$GITHUB_RUNNERS_DIR/$folder/svc.sh"
+  run_runner restart "$folder"
+  [[ "$RC" -ne 0 ]] && ok "nonzero exit" || bad "should fail with nothing restarted"
+  assert_contains "$OUT" "warning: no valid unit for $folder" "warns instead of skipping silently"
+  drop_sandbox
+}
+
 test_restart_linux_skips_folder_that_is_no_runner() {
   echo "test_restart_linux_skips_folder_that_is_no_runner"
   new_sandbox
@@ -744,12 +803,16 @@ test_remove_accepts_github_name_characters
 test_remove_linux_uses_systemctl
 test_remove_linux_rejects_bad_unit
 test_remove_linux_without_service_file
+test_remove_linux_half_built_removes_the_unit
+test_remove_linux_half_built_rejects_bad_unit
+test_remove_linux_half_built_without_service_file
 test_remove_linux_tolerates_stop_and_disable_failures
 test_remove_linux_keeps_folder_when_unit_file_stays
 test_restart_linux_uses_systemctl
 test_restart_linux_rejects_bad_unit
 test_restart_linux_only_bad_unit_fails
 test_restart_linux_needs_no_svc_sh
+test_restart_linux_warns_on_configured_folder_without_service_files
 test_restart_linux_skips_folder_that_is_no_runner
 test_restart_all_linux_uses_systemd_glob
 test_list_org
