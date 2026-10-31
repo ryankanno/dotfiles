@@ -106,9 +106,14 @@ echo "sudo $*" >>"$PKG_LOG"
 [[ "$1" == "rm" ]] && exit 0
 exec "$@"
 SUDO
-  cat >"$fakebin/systemctl" <<SYSCTL
+  # STUB_UNIT and STUB_UNIT_DIR stand for a unit file in the systemd folder.
+  cat >"$fakebin/systemctl" <<'SYSCTL'
 #!/usr/bin/env bash
-echo "systemctl \$*" >>"\$PKG_LOG"
+case "$1" in
+  list-unit-files) [[ -z "${STUB_UNIT:-}" ]] || echo "$STUB_UNIT enabled enabled"; exit 0;;
+  show)            echo "${STUB_UNIT_DIR:-}"; exit 0;;
+esac
+echo "systemctl $*" >>"$PKG_LOG"
 SYSCTL
 
   chmod +x "$fakebin/gh" "$fakebin/tar" "$fakebin/sudo" "$fakebin/systemctl" "$fakebin/uname"
@@ -117,7 +122,7 @@ SYSCTL
 
 drop_sandbox() {
   unset OWNER_TYPE RUNNER_VERSION RUNNER_ARCH UNAME_S UNAME_M
-  unset TARBALL_NAME RELEASE_JSON RUNNER_TARBALL_SEED
+  unset TARBALL_NAME RELEASE_JSON RUNNER_TARBALL_SEED STUB_UNIT STUB_UNIT_DIR
   rm -rf "$WS"
 }
 
@@ -608,6 +613,54 @@ test_remove_linux_without_service_file() {
   drop_sandbox
 }
 
+test_remove_linux_finds_the_unit_a_job_hid() {
+  echo "test_remove_linux_finds_the_unit_a_job_hid"
+  new_sandbox
+  linux_host
+  local folder="actions-runner-acme-widget"
+  seed_configured_runner "$folder" 42 '"https://github.com/acme/widget"'
+  export STUB_UNIT="actions.runner.acme-widget.a.service" STUB_UNIT_DIR="$GITHUB_RUNNERS_DIR/$folder"
+  run_runner remove "$folder"
+  assert_eq "$RC" "0" "exits 0"
+  local pkg; pkg="$(cat "$PKG_LOG")"
+  assert_contains "$pkg" "sudo systemctl stop $STUB_UNIT" "stops the unit"
+  assert_contains "$pkg" "sudo systemctl disable $STUB_UNIT" "disables the unit"
+  assert_contains "$pkg" "sudo rm -f /etc/systemd/system/$STUB_UNIT" "deletes the unit file"
+  assert_contains "$pkg" "sudo systemctl daemon-reload" "reloads systemd"
+  assert_not_contains "$OUT" "warning" "nothing is left to warn about"
+  assert_nodir "$GITHUB_RUNNERS_DIR/$folder" "folder deleted"
+  drop_sandbox
+}
+
+test_remove_linux_installed_unit_beats_service_file() {
+  echo "test_remove_linux_installed_unit_beats_service_file"
+  new_sandbox
+  linux_host
+  local folder="actions-runner-acme-widget"
+  seed_configured_runner "$folder" 42 '"https://github.com/acme/widget"'
+  echo "actions.runner.acme-other.b.service" >"$GITHUB_RUNNERS_DIR/$folder/.service"
+  export STUB_UNIT="actions.runner.acme-widget.a.service" STUB_UNIT_DIR="$GITHUB_RUNNERS_DIR/$folder"
+  run_runner remove "$folder"
+  assert_eq "$RC" "0" "exits 0"
+  local pkg; pkg="$(cat "$PKG_LOG")"
+  assert_contains "$pkg" "sudo rm -f /etc/systemd/system/$STUB_UNIT" "removes this runner's unit"
+  assert_not_contains "$pkg" "actions.runner.acme-other" "another runner's unit is safe"
+  drop_sandbox
+}
+
+test_remove_linux_ignores_another_folders_unit() {
+  echo "test_remove_linux_ignores_another_folders_unit"
+  new_sandbox
+  linux_host
+  local folder="actions-runner-acme-widget"
+  seed_configured_runner "$folder" 42 '"https://github.com/acme/widget"'
+  export STUB_UNIT="actions.runner.acme-other.b.service" STUB_UNIT_DIR="$GITHUB_RUNNERS_DIR/actions-runner-acme-other"
+  run_runner remove "$folder"
+  assert_eq "$RC" "0" "exits 0"
+  assert_not_contains "$(cat "$PKG_LOG")" "sudo" "another runner's unit is safe"
+  drop_sandbox
+}
+
 test_remove_linux_half_built_removes_the_unit() {
   echo "test_remove_linux_half_built_removes_the_unit"
   new_sandbox
@@ -620,6 +673,7 @@ test_remove_linux_half_built_removes_the_unit() {
   local pkg; pkg="$(cat "$PKG_LOG")"
   assert_contains "$pkg" "sudo systemctl stop $unit" "stops the unit"
   assert_contains "$pkg" "sudo rm -f /etc/systemd/system/$unit" "deletes the unit file"
+  assert_not_contains "$OUT" "Deleting folder only" "reports what ran as root"
   assert_nodir "$GITHUB_RUNNERS_DIR/$folder" "folder deleted"
   drop_sandbox
 }
@@ -633,6 +687,7 @@ test_remove_linux_half_built_rejects_bad_unit() {
   echo "sshd.service" >"$GITHUB_RUNNERS_DIR/$folder/.service"
   run_runner remove "$folder"
   assert_remove_refused ".service" "half-built bad unit" "$folder"
+  assert_contains "$OUT" "Delete that file" "says how to clear the folder"
   assert_not_contains "$(cat "$PKG_LOG")" "sudo" "nothing ran as root"
   drop_sandbox
 }
@@ -803,6 +858,9 @@ test_remove_accepts_github_name_characters
 test_remove_linux_uses_systemctl
 test_remove_linux_rejects_bad_unit
 test_remove_linux_without_service_file
+test_remove_linux_finds_the_unit_a_job_hid
+test_remove_linux_installed_unit_beats_service_file
+test_remove_linux_ignores_another_folders_unit
 test_remove_linux_half_built_removes_the_unit
 test_remove_linux_half_built_rejects_bad_unit
 test_remove_linux_half_built_without_service_file

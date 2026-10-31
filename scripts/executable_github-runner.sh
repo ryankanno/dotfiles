@@ -117,22 +117,38 @@ runner_unit() {
   echo "$unit"
 }
 
+# Echoes the installed unit that runs from folder $1. The unit file is
+# root-owned, so a job cannot hide the unit or point it at another runner.
+installed_unit() {
+  local unit _
+  while read -r unit _; do
+    if [[ "$(systemctl show -p WorkingDirectory --value "$unit")" == "$1" ]]; then
+      echo "$unit"
+      return 0
+    fi
+  done < <(systemctl list-unit-files --no-legend --no-pager 'actions.runner.*')
+  return 1
+}
+
 # Linux only. Drives the root-owned unit: sudo ./svc.sh would run a file that a
-# job can rewrite. A job can also delete .service, so a missing file proves
-# nothing about the unit, and systemd can still list what remains.
+# job can rewrite. .service is the fallback for a symlinked runner path, where
+# the folder name differs from the unit's WorkingDirectory.
 remove_unit() {
   local dir="$1" unit
-  if [[ ! -e "$dir/.service" ]]; then
-    {
-      echo "warning: $dir/.service missing; no systemd unit removed, and one may remain."
-      echo "List units: systemctl list-unit-files 'actions.runner.*'"
-      echo "Clear one:  sudo systemctl disable --now <unit>"
-      echo "            sudo rm /etc/systemd/system/<unit>"
-      echo "            sudo systemctl daemon-reload"
-    } >&2
-    return 0
+  if ! unit="$(installed_unit "$dir")"; then
+    if [[ ! -e "$dir/.service" ]]; then
+      {
+        echo "warning: no installed unit found for $dir, and .service is missing."
+        echo "If a unit remains, list units: systemctl list-unit-files 'actions.runner.*'"
+        echo "Clear one:  sudo systemctl disable --now <unit>"
+        echo "            sudo rm /etc/systemd/system/<unit>"
+        echo "            sudo systemctl daemon-reload"
+      } >&2
+      return 0
+    fi
+    unit="$(runner_unit "$dir")" \
+      || die "$dir/.service does not name a runner unit; folder kept. Delete that file to remove the folder anyway."
   fi
-  unit="$(runner_unit "$dir")" || die "$dir/.service does not name a runner unit; folder kept"
   # Stop and disable fail when the service is not installed; tolerate that.
   sudo systemctl stop "$unit"    || true
   sudo systemctl disable "$unit" || true
@@ -250,7 +266,7 @@ cmd_remove() {
     fi
     {
       echo "warning: $runner_file missing; folder looks half-built."
-      echo "Deleting folder only. A GitHub-side runner may linger; list with:"
+      echo "Not deregistered. A GitHub-side runner may linger; list with:"
       echo "  gh api /<orgs|repos>/<owner>[/<repo>]/actions/runners"
     } >&2
     rm -rf "$dir"
