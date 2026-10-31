@@ -74,8 +74,48 @@ ensure_tarball() {
     || die "failed to download $TARBALL"
 }
 
+sha256_of() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1"
+  else
+    shasum -a 256 "$1"
+  fi | cut -d' ' -f1
+}
+
+# Runner jobs can write the cache, so the tarball proves itself against the
+# release API on every add, however it got there.
+verify_tarball() {
+  local file="$CACHE_DIR/$TARBALL" digest actual
+  digest="$(gh api "repos/actions/runner/releases/tags/v${RUNNER_VERSION}" \
+    | jq -r --arg name "$TARBALL" '.assets[] | select(.name == $name) | .digest // empty')" \
+    || die "failed to read the release digest of $TARBALL"
+  [[ -n "$digest" ]] || die "no digest for $TARBALL in release v${RUNNER_VERSION}"
+  actual="$(sha256_of "$file")"
+  [[ "$digest" == "sha256:$actual" ]] \
+    || die "digest mismatch for $file (delete it to download again)"
+}
+
 # Echoes "User" or "Organization".
 owner_type() { gh api "/users/$1" --jq .type; }
+
+# https://github.com/<owner>[/<repo>] with GitHub's name characters, optional
+# trailing slash. The repo part also excludes . and .., which would climb the
+# API path.
+valid_github_url() {
+  [[ "$1" =~ ^https://github\.com/[A-Za-z0-9_-]+(/[A-Za-z0-9._-]+)?/?$ ]] \
+    && [[ ! "${1%/}" =~ /\.\.?$ ]]
+}
+
+# Echoes the systemd unit named by a runner folder's .service file, or fails.
+# Runner jobs can write that file. The pattern allows only systemd's unit-name
+# characters: a * would make systemctl act on every runner on the host.
+runner_unit() {
+  local unit pattern='^actions\.runner\.[A-Za-z0-9:_.@\-]+\.service$'
+  [[ -f "$1/.service" ]] || return 1
+  unit="$(<"$1/.service")"
+  [[ "$unit" =~ $pattern ]] || return 1
+  echo "$unit"
+}
 
 # Maps https://github.com/<owner>[/<repo>] to orgs/<owner> or repos/<owner>/<repo>.
 api_target_from_url() {
@@ -134,6 +174,7 @@ cmd_add() {
   local name="${name_override:-$folder}"
 
   ensure_tarball
+  verify_tarball
   mkdir -p "$dir"
   tar -xzf "$CACHE_DIR/$TARBALL" -C "$dir"
 
@@ -187,20 +228,39 @@ cmd_remove() {
   url="$(jq -r .gitHubUrl "$runner_file")"
   agent_id="$(jq -r .agentId "$runner_file")"
   name="$(jq -r .agentName "$runner_file")"
+
+  # Runner jobs can write everything in the folder: check it before acting on it.
+  [[ "$agent_id" =~ ^[0-9]+$ ]] || die "agentId in $runner_file is not a number; folder kept"
+  valid_github_url "$url" || die "gitHubUrl in $runner_file is not a GitHub owner or repo URL; folder kept"
   target="$(api_target_from_url "$url")"
 
-  (
-    cd "$dir"
-    # Service may not be installed; tolerate failure either way. Linux svc.sh
-    # (systemd) needs root, matching the sudo used at install time.
-    if [[ "$(uname -s)" == "Linux" ]]; then
-      sudo ./svc.sh stop      || true
-      sudo ./svc.sh uninstall || true
-    else
+  local linux="" unit=""
+  if [[ "$(uname -s)" == "Linux" ]]; then
+    linux=1
+    if [[ -f "$dir/.service" ]]; then
+      unit="$(runner_unit "$dir")" || die "$dir/.service does not name a runner unit; folder kept"
+    fi
+  fi
+
+  if [[ -n "$unit" ]]; then
+    # The unit file is root-owned; sudo ./svc.sh would run a job-writable file.
+    # Stop and disable fail when the service is not installed; tolerate that.
+    sudo systemctl stop "$unit"    || true
+    sudo systemctl disable "$unit" || true
+    sudo rm -f "/etc/systemd/system/$unit" \
+      || die "failed to delete the unit file of $unit; folder kept"
+    sudo systemctl daemon-reload \
+      || die "failed to reload systemd after deleting $unit; folder kept"
+  elif [[ -n "$linux" ]]; then
+    echo "warning: $dir/.service missing; no systemd unit removed." >&2
+  else
+    (
+      cd "$dir"
+      # Service may not be installed; tolerate failure either way.
       ./svc.sh stop      || true
       ./svc.sh uninstall || true
-    fi
-  )
+    )
+  fi
 
   echo "Deregistering runner $name (id $agent_id) from $target ..."
   gh api -X DELETE "/$target/actions/runners/$agent_id" \
@@ -246,23 +306,29 @@ cmd_restart_all() {
 
 # Restart only the runners whose folder name matches a glob, e.g.
 #   runner.sh restart 'actions-runner-myrepo-*'
-# Drives each runner's own svc.sh rather than a systemd unit glob, so one code
-# path covers systemd and launchd. Linux svc.sh needs root, as it does in add.
+# On Linux this restarts the runner's systemd unit, because svc.sh needs root
+# and a job can rewrite it. On macOS it drives the runner's own svc.sh.
 cmd_restart() {
   local pattern="${1:-}"
   [[ -n "$pattern" ]] || usage
   [[ -d "$BASE_DIR" ]] || die "no runner directory at $BASE_DIR"
 
-  local dir name matched=0
+  local dir name unit matched=0
   while IFS= read -r dir; do
     [[ -f "$dir/svc.sh" ]] || continue
     name="$(basename "$dir")"
-    matched=$((matched + 1))
-    echo "Restarting $name ..."
     if [[ "$(uname -s)" == "Linux" ]]; then
-      ( cd "$dir" && sudo ./svc.sh stop && sudo ./svc.sh start ) \
+      unit="$(runner_unit "$dir")" || {
+        echo "warning: no valid unit for $name in .service; skipped" >&2
+        continue
+      }
+      matched=$((matched + 1))
+      echo "Restarting $name ..."
+      sudo systemctl restart "$unit" \
         || echo "warning: failed to restart $name" >&2
     else
+      matched=$((matched + 1))
+      echo "Restarting $name ..."
       ( cd "$dir" && ./svc.sh stop && ./svc.sh start ) \
         || echo "warning: failed to restart $name" >&2
     fi

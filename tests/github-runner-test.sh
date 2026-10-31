@@ -40,9 +40,18 @@ new_sandbox() { # [owner-type]  default Organization
   : >"$GH_LOG"; : >"$PKG_LOG"
   export OWNER_TYPE="${1:-Organization}"
 
-  # Seed the tarball cache so ensure_tarball never reaches the network.
+  # Seed the tarball cache so ensure_tarball never reaches the network. The
+  # release stub publishes the seed's digest, so add verifies by default.
+  # openssl, not the script's tools, computes the digest the script must match.
   echo "dummy" >"$WS/seed.tgz"
   export RUNNER_TARBALL_SEED="$WS/seed.tgz"
+  export RUNNER_VERSION="9.9.9" RUNNER_ARCH="test-arch"
+  TARBALL_NAME="actions-runner-$RUNNER_ARCH-$RUNNER_VERSION.tar.gz"
+  export RELEASE_JSON="$WS/release.json"
+  write_release "\"sha256:$(openssl dgst -sha256 -r "$WS/seed.tgz" | cut -d' ' -f1)\""
+
+  # Every test but the *_linux ones takes the macOS paths, whatever the host.
+  export UNAME_S="Darwin" UNAME_M="arm64"
 
   local fakebin="$WS/bin"
   mkdir -p "$fakebin"
@@ -55,12 +64,23 @@ case "$*" in
   *"/users/"*)                echo "${OWNER_TYPE}";;
   *registration-token*)       echo "FAKETOKEN";;
   *"/actions/runners --paginate"*) printf '%s\n' "alpha	online	false	self-hosted" "beta	offline	false	self-hosted,gpu";;
+  *"releases/tags/v$RUNNER_VERSION"*) [[ -f "$RELEASE_JSON" ]] || exit 1; cat "$RELEASE_JSON";;
+  *"release download"*)       cp "$DOWNLOAD_SRC" "$GITHUB_RUNNERS_DIR/.cache/actions-runner-$RUNNER_ARCH-$RUNNER_VERSION.tar.gz";;
 esac
 exit 0
 GH
 
+  cat >"$fakebin/uname" <<'UNAME'
+#!/usr/bin/env bash
+case "$1" in
+  -s) echo "$UNAME_S";;
+  -m) echo "$UNAME_M";;
+esac
+UNAME
+
   cat >"$fakebin/tar" <<'TAR'
 #!/usr/bin/env bash
+echo "tar $*" >>"$PKG_LOG"
 # Emulate extracting the runner package: drop logging config.sh/svc.sh stubs
 # into the -C target directory.
 dir=""; prev=""
@@ -75,23 +95,62 @@ for s in config.sh svc.sh; do
 done
 TAR
 
-  # svc.sh runs under sudo on Linux, so the sandbox needs its own sudo that
-  # just drops the prefix. systemctl is stubbed too: nothing here may reach
-  # the host's real actions.runner.* units.
-  printf '#!/usr/bin/env bash\nexec "$@"\n' >"$fakebin/sudo"
+  # The sandbox sudo logs its command so tests can see what ran as root, then
+  # drops the prefix. It never runs rm, and systemctl is stubbed: nothing here
+  # may reach the host's real actions.runner.* units.
+  cat >"$fakebin/sudo" <<'SUDO'
+#!/usr/bin/env bash
+echo "sudo $*" >>"$PKG_LOG"
+[[ "$1" == "rm" ]] && exit 0
+exec "$@"
+SUDO
   cat >"$fakebin/systemctl" <<SYSCTL
 #!/usr/bin/env bash
 echo "systemctl \$*" >>"\$PKG_LOG"
 SYSCTL
 
-  chmod +x "$fakebin/gh" "$fakebin/tar" "$fakebin/sudo" "$fakebin/systemctl"
+  chmod +x "$fakebin/gh" "$fakebin/tar" "$fakebin/sudo" "$fakebin/systemctl" "$fakebin/uname"
   export PATH="$fakebin:$PATH"
 }
 
-drop_sandbox() { unset OWNER_TYPE; rm -rf "$WS"; }
+drop_sandbox() { unset OWNER_TYPE RUNNER_VERSION RUNNER_ARCH UNAME_S UNAME_M; rm -rf "$WS"; }
+
+linux_host() { export UNAME_S="Linux" UNAME_M="x86_64"; }
+
+write_release() { # digest as a JSON value; the release API's response body
+  printf '{"assets":[{"name":"%s","digest":%s}]}\n' "$TARBALL_NAME" "$1" >"$RELEASE_JSON"
+}
 
 run_runner() { # runs runner.sh, captures stdout+stderr in OUT, exit in RC
   OUT="$(bash "$SCRIPT" "$@" 2>&1)"; RC=$?
+}
+
+assert_add_refused() { # msg-needle label: add failed before it touched anything
+  [[ "$RC" -ne 0 ]] && ok "$2: nonzero exit" || bad "$2: add should fail"
+  assert_contains "$OUT" "$1" "$2: explains the failure"
+  assert_nodir "$GITHUB_RUNNERS_DIR/actions-runner-acme-widget" "$2: no folder left behind"
+  local pkg gh; pkg="$(cat "$PKG_LOG")"; gh="$(cat "$GH_LOG")"
+  assert_not_contains "$pkg" "tar " "$2: nothing extracted"
+  assert_not_contains "$gh" "registration-token" "$2: no registration token requested"
+}
+
+# A configured runner folder: .runner from the given JSON values, logging svc.sh.
+seed_configured_runner() { # folder agentId-json gitHubUrl-json
+  local dir="$GITHUB_RUNNERS_DIR/$1"
+  mkdir -p "$dir"
+  printf '{ "agentId": %s, "agentName": "%s", "gitHubUrl": %s }\n' "$2" "$1" "$3" >"$dir/.runner"
+  printf '#!/usr/bin/env bash\necho "svc.sh $*" >>"%s"\n' "$PKG_LOG" >"$dir/svc.sh"
+  chmod +x "$dir/svc.sh"
+}
+
+assert_remove_refused() { # msg-needle label: remove stopped before any effect
+  local dir="$GITHUB_RUNNERS_DIR/$3"
+  [[ "$RC" -ne 0 ]] && ok "$2: nonzero exit" || bad "$2: remove should fail"
+  assert_contains "$OUT" "$1" "$2: explains the failure"
+  assert_dir "$dir" "$2: folder kept"
+  assert_not_contains "$(cat "$GH_LOG")" "api" "$2: no API call"
+  assert_not_contains "$(cat "$PKG_LOG")" "svc.sh" "$2: service untouched"
+  assert_not_contains "$(cat "$PKG_LOG")" "systemctl" "$2: systemd untouched"
 }
 
 # ---------------------------------------------------------------------------
@@ -320,12 +379,288 @@ test_restart_all_hits_every_runner() {
   drop_sandbox
 }
 
+test_add_asks_release_api_for_digest() {
+  echo "test_add_asks_release_api_for_digest"
+  new_sandbox
+  run_runner add acme widget
+  assert_eq "$RC" "0" "exits 0 on a matching digest"
+  assert_contains "$(cat "$GH_LOG")" "api repos/actions/runner/releases/tags/v9.9.9" "reads the release of this version"
+  drop_sandbox
+}
+
+test_add_seed_digest_mismatch() {
+  echo "test_add_seed_digest_mismatch"
+  new_sandbox
+  echo "tampered" >"$RUNNER_TARBALL_SEED"
+  run_runner add acme widget
+  assert_add_refused "digest" "seed mismatch"
+  drop_sandbox
+}
+
+test_add_cached_digest_mismatch() {
+  echo "test_add_cached_digest_mismatch"
+  new_sandbox
+  run_runner add acme gadget
+  assert_eq "$RC" "0" "first add caches a good tarball"
+  echo "tampered" >"$GITHUB_RUNNERS_DIR/.cache/$TARBALL_NAME"
+  : >"$PKG_LOG"; : >"$GH_LOG"
+  run_runner add acme widget
+  assert_add_refused "digest" "cached mismatch"
+  drop_sandbox
+}
+
+test_add_download_digest_mismatch() {
+  echo "test_add_download_digest_mismatch"
+  new_sandbox
+  unset RUNNER_TARBALL_SEED
+  export DOWNLOAD_SRC="$WS/download.tgz"
+  echo "tampered" >"$DOWNLOAD_SRC"
+  run_runner add acme widget
+  assert_add_refused "digest" "download mismatch"
+  assert_contains "$(cat "$GH_LOG")" "release download" "the tarball came from a download"
+  unset DOWNLOAD_SRC
+  drop_sandbox
+}
+
+test_add_missing_digest() {
+  echo "test_add_missing_digest"
+  new_sandbox
+  write_release null
+  run_runner add acme widget
+  assert_add_refused "no digest" "null digest"
+  drop_sandbox
+
+  new_sandbox
+  printf '{"assets":[]}\n' >"$RELEASE_JSON"
+  run_runner add acme widget
+  assert_add_refused "no digest" "asset absent"
+  drop_sandbox
+
+  new_sandbox
+  rm "$RELEASE_JSON"
+  run_runner add acme widget
+  assert_add_refused "digest" "release API failure"
+  drop_sandbox
+}
+
+test_add_linux_keeps_svc_install_under_sudo() {
+  echo "test_add_linux_keeps_svc_install_under_sudo"
+  new_sandbox
+  linux_host
+  run_runner add acme widget
+  assert_eq "$RC" "0" "exits 0"
+  local pkg; pkg="$(cat "$PKG_LOG")"
+  assert_contains "$pkg" "sudo ./svc.sh install" "install runs as root on the verified folder"
+  assert_contains "$pkg" "sudo ./svc.sh start" "start runs as root on the verified folder"
+  drop_sandbox
+}
+
+test_remove_rejects_bad_agent_id() {
+  echo "test_remove_rejects_bad_agent_id"
+  local bad_id folder="actions-runner-acme-widget"
+  for bad_id in '"abc"' '"1/../2"' '"4 2"' '""' 'null' '-1'; do
+    new_sandbox
+    seed_configured_runner "$folder" "$bad_id" '"https://github.com/acme/widget"'
+    run_runner remove "$folder"
+    assert_remove_refused "agentId" "agentId $bad_id" "$folder"
+    drop_sandbox
+  done
+}
+
+test_remove_rejects_bad_github_url() {
+  echo "test_remove_rejects_bad_github_url"
+  local bad_url folder="actions-runner-acme-widget"
+  for bad_url in \
+    'http://github.com/acme' \
+    'https://github.com.evil.example/acme' \
+    'https://evil.example/https://github.com/acme' \
+    'https://github.com/' \
+    'https://github.com/acme/widget/extra' \
+    'https://github.com/acme/..' \
+    'https://github.com/acme/./' \
+    'https://github.com/../user' \
+    'https://github.com/acme/widget?x=1' \
+    'https://github.com/acme/%2e%2e' \
+    'https://github.com/acme//widget'; do
+    new_sandbox
+    seed_configured_runner "$folder" 42 "\"$bad_url\""
+    run_runner remove "$folder"
+    assert_remove_refused "gitHubUrl" "url $bad_url" "$folder"
+    drop_sandbox
+  done
+}
+
+test_remove_accepts_github_name_characters() {
+  echo "test_remove_accepts_github_name_characters"
+  local good folder="actions-runner-acme-widget"
+  for good in \
+    'https://github.com/acme|/orgs/acme/' \
+    'https://github.com/acme/|/orgs/acme/' \
+    'https://github.com/Acme-1/.github|/repos/Acme-1/.github/' \
+    'https://github.com/acme/my_repo.v2-x/|/repos/acme/my_repo.v2-x/'; do
+    new_sandbox
+    seed_configured_runner "$folder" 42 "\"${good%%|*}\""
+    run_runner remove "$folder"
+    assert_eq "$RC" "0" "${good%%|*}: exits 0"
+    assert_contains "$(cat "$GH_LOG")" "api -X DELETE ${good##*|}actions/runners/42" "${good%%|*}: deregisters"
+    assert_nodir "$GITHUB_RUNNERS_DIR/$folder" "${good%%|*}: folder deleted"
+    drop_sandbox
+  done
+}
+
+test_remove_linux_uses_systemctl() {
+  echo "test_remove_linux_uses_systemctl"
+  new_sandbox
+  linux_host
+  local folder="actions-runner-acme-widget" unit="actions.runner.acme-widget.actions-runner-acme-widget.service"
+  seed_configured_runner "$folder" 42 '"https://github.com/acme/widget"'
+  echo "$unit" >"$GITHUB_RUNNERS_DIR/$folder/.service"
+  run_runner remove "$folder"
+  assert_eq "$RC" "0" "exits 0"
+  local pkg; pkg="$(cat "$PKG_LOG")"
+  assert_contains "$pkg" "sudo systemctl stop $unit" "stops the unit"
+  assert_contains "$pkg" "sudo systemctl disable $unit" "disables the unit"
+  assert_contains "$pkg" "sudo rm -f /etc/systemd/system/$unit" "deletes the unit file"
+  assert_contains "$pkg" "sudo systemctl daemon-reload" "reloads systemd"
+  assert_not_contains "$pkg" "svc.sh" "never runs svc.sh"
+  assert_contains "$(cat "$GH_LOG")" "api -X DELETE /repos/acme/widget/actions/runners/42" "deregisters"
+  assert_nodir "$GITHUB_RUNNERS_DIR/$folder" "folder deleted"
+  drop_sandbox
+}
+
+test_remove_linux_rejects_bad_unit() {
+  echo "test_remove_linux_rejects_bad_unit"
+  local bad_unit folder="actions-runner-acme-widget"
+  for bad_unit in \
+    'sshd.service' \
+    'actions.runner.a/../../sshd.service' \
+    'actions.runner.*.service' \
+    'actions.runner.a b.service' \
+    'actions.runner.service'; do
+    new_sandbox
+    linux_host
+    seed_configured_runner "$folder" 42 '"https://github.com/acme/widget"'
+    echo "$bad_unit" >"$GITHUB_RUNNERS_DIR/$folder/.service"
+    run_runner remove "$folder"
+    assert_remove_refused ".service" "unit $bad_unit" "$folder"
+    assert_not_contains "$(cat "$PKG_LOG")" "sudo" "unit $bad_unit: nothing ran as root"
+    drop_sandbox
+  done
+}
+
+test_remove_linux_without_service_file() {
+  echo "test_remove_linux_without_service_file"
+  new_sandbox
+  linux_host
+  local folder="actions-runner-acme-widget"
+  seed_configured_runner "$folder" 42 '"https://github.com/acme/widget"'
+  run_runner remove "$folder"
+  assert_eq "$RC" "0" "exits 0"
+  assert_contains "$OUT" "warning" "warns that no unit was found"
+  assert_not_contains "$(cat "$PKG_LOG")" "sudo" "nothing ran as root"
+  assert_contains "$(cat "$GH_LOG")" "api -X DELETE" "still deregisters"
+  assert_nodir "$GITHUB_RUNNERS_DIR/$folder" "folder deleted"
+  drop_sandbox
+}
+
+test_remove_linux_keeps_folder_when_unit_file_stays() {
+  echo "test_remove_linux_keeps_folder_when_unit_file_stays"
+  new_sandbox
+  linux_host
+  local folder="actions-runner-acme-widget" unit="actions.runner.acme-widget.a.service"
+  seed_configured_runner "$folder" 42 '"https://github.com/acme/widget"'
+  echo "$unit" >"$GITHUB_RUNNERS_DIR/$folder/.service"
+  printf '#!/usr/bin/env bash\n[[ "$1" == "rm" ]] && exit 1\nexec "$@"\n' >"$WS/bin/sudo"
+  run_runner remove "$folder"
+  [[ "$RC" -ne 0 ]] && ok "nonzero exit" || bad "should fail when the unit file stays"
+  assert_contains "$OUT" "$unit" "names the unit"
+  assert_dir "$GITHUB_RUNNERS_DIR/$folder" "folder keeps the only record of the unit name"
+  assert_not_contains "$(cat "$GH_LOG")" "DELETE" "runner stays registered"
+  drop_sandbox
+}
+
+test_restart_linux_uses_systemctl() {
+  echo "test_restart_linux_uses_systemctl"
+  new_sandbox
+  linux_host
+  seed_runners actions-runner-acme-widget actions-runner-acme-gadget
+  echo "actions.runner.acme-widget.w.service" >"$GITHUB_RUNNERS_DIR/actions-runner-acme-widget/.service"
+  run_runner restart 'actions-runner-acme-w*'
+  assert_eq "$RC" "0" "exits 0"
+  local pkg; pkg="$(cat "$PKG_LOG")"
+  assert_contains "$pkg" "sudo systemctl restart actions.runner.acme-widget.w.service" "restarts the unit"
+  assert_not_contains "$pkg" "svc.sh" "never runs svc.sh"
+  assert_contains "$OUT" "Restarted 1 runner" "reports how many"
+  drop_sandbox
+}
+
+test_restart_linux_rejects_bad_unit() {
+  echo "test_restart_linux_rejects_bad_unit"
+  new_sandbox
+  linux_host
+  seed_runners actions-runner-acme-widget actions-runner-acme-gadget actions-runner-acme-unset
+  echo "sshd.service" >"$GITHUB_RUNNERS_DIR/actions-runner-acme-widget/.service"
+  echo "actions.runner.acme-gadget.g.service" >"$GITHUB_RUNNERS_DIR/actions-runner-acme-gadget/.service"
+  run_runner restart 'actions-runner-acme-*'
+  assert_eq "$RC" "0" "exits 0: the good runner restarted"
+  local pkg; pkg="$(cat "$PKG_LOG")"
+  assert_contains "$pkg" "sudo systemctl restart actions.runner.acme-gadget.g.service" "good unit restarted"
+  assert_not_contains "$pkg" "sshd.service" "bad unit never reaches systemctl"
+  assert_not_contains "$pkg" "svc.sh" "never runs svc.sh"
+  assert_contains "$OUT" "warning: no valid unit for actions-runner-acme-widget" "warns on the bad unit"
+  assert_contains "$OUT" "warning: no valid unit for actions-runner-acme-unset" "warns on no unit"
+  assert_contains "$OUT" "Restarted 1 runner" "counts only the runner it restarted"
+  drop_sandbox
+}
+
+test_restart_linux_only_bad_unit_fails() {
+  echo "test_restart_linux_only_bad_unit_fails"
+  new_sandbox
+  linux_host
+  seed_runners actions-runner-acme-widget
+  echo "actions.runner.*.service" >"$GITHUB_RUNNERS_DIR/actions-runner-acme-widget/.service"
+  run_runner restart 'actions-runner-acme-widget'
+  [[ "$RC" -ne 0 ]] && ok "nonzero exit" || bad "should fail with nothing restarted"
+  assert_not_contains "$(cat "$PKG_LOG")" "sudo" "nothing ran as root"
+  drop_sandbox
+}
+
+test_restart_all_linux_uses_systemd_glob() {
+  echo "test_restart_all_linux_uses_systemd_glob"
+  new_sandbox
+  linux_host
+  seed_runners actions-runner-acme-widget
+  run_runner restart-all
+  assert_eq "$RC" "0" "exits 0"
+  local pkg; pkg="$(cat "$PKG_LOG")"
+  assert_contains "$pkg" "sudo systemctl restart actions.runner.*" "systemd glob used"
+  assert_not_contains "$pkg" "svc.sh" "never runs svc.sh"
+  drop_sandbox
+}
+
 test_add_repo
 test_add_org
 test_add_user_no_repo_fails
 test_add_collision_suffix
+test_add_asks_release_api_for_digest
+test_add_seed_digest_mismatch
+test_add_cached_digest_mismatch
+test_add_download_digest_mismatch
+test_add_missing_digest
+test_add_linux_keeps_svc_install_under_sudo
 test_remove_repo
 test_remove_half_built
+test_remove_rejects_bad_agent_id
+test_remove_rejects_bad_github_url
+test_remove_accepts_github_name_characters
+test_remove_linux_uses_systemctl
+test_remove_linux_rejects_bad_unit
+test_remove_linux_without_service_file
+test_remove_linux_keeps_folder_when_unit_file_stays
+test_restart_linux_uses_systemctl
+test_restart_linux_rejects_bad_unit
+test_restart_linux_only_bad_unit_fails
+test_restart_all_linux_uses_systemd_glob
 test_list_org
 test_list_repo
 test_list_user_no_repo_fails
