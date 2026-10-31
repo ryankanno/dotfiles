@@ -9,13 +9,14 @@ use_mise() {
 }
 
 # Function to refuse a .venv that git tracks. Run it before a repository's .env
-# loads: the check keeps HOME, and .env can set HOME to set core.fsmonitor.
+# loads: the check keeps HOME and XDG_CONFIG_HOME, and .env can set either to set core.fsmonitor.
 check_venv_untracked() {
     local output status=0
     # env -i: GIT_* can hide tracked files, and git translates the fatal line matched below
-    # HOME: git expands ~ with it and reads safe.directory under it
+    # HOME: git expands ~ with it. HOME and XDG_CONFIG_HOME: git reads safe.directory under them.
     # icase: a case-insensitive file system serves a tracked .VENV as .venv
-    output=$(env -i PATH="$PATH" HOME="$HOME" LC_ALL=C git ls-files --error-unmatch -- ':(icase).venv' 2>&1) || status=$?
+    output=$(env -i PATH="$PATH" HOME="$HOME" XDG_CONFIG_HOME="${XDG_CONFIG_HOME-}" LC_ALL=C \
+        git ls-files --error-unmatch -- ':(icase).venv' 2>&1) || status=$?
     case $status in
         0)
             log_error "use_venv: git tracks files under .venv, so its scripts are repository code"

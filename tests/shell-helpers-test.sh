@@ -188,6 +188,12 @@ STUB
   chmod +x "$WS/bin/uv"
 }
 
+# Puts a git on the sandbox's PATH that runs stdin, then the real git.
+wrap_git() {
+  { echo '#!/usr/bin/env bash'; cat; echo "exec \"$(command -v git)\" \"\$@\""; } >"$WS/bin/git"
+  chmod +x "$WS/bin/git"
+}
+
 # Runs $@ in $WS/repo with the sandbox's direnv state and none of the caller's.
 in_direnv_repo() {
   (cd "$WS/repo" && env -u DIRENV_DIFF -u DIRENV_DIR -u DIRENV_FILE -u DIRENV_WATCHES -u VIRTUAL_ENV \
@@ -288,9 +294,12 @@ for envrc in 'use uv' $'dotenv_if_exists\nuse venv'; do
     write_marker_script "$WS/repo/.venv/bin/python" python
     echo "$dotenv" >"$WS/repo/.env"
     git_commit_all
+    # use_uv checks before it loads .env, so there only the shell's copy of an earlier load reaches git.
+    if [[ $envrc == 'use uv' ]]; then export "${dotenv?}"; fi
     direnv_prompt
-    assert_contains "$ERR" "git tracks files under .venv" "a .env with $dotenv under ${envrc##*$'\n'} does not hide a tracked .venv"
-    assert_eq "$UV_CALLS" "" "a .env with $dotenv under ${envrc##*$'\n'} does not reach uv past a tracked .venv"
+    unset "${dotenv%%=*}"
+    assert_contains "$ERR" "git tracks files under .venv" "$dotenv under ${envrc##*$'\n'} does not hide a tracked .venv"
+    assert_eq "$UV_CALLS" "" "$dotenv under ${envrc##*$'\n'} does not reach uv past a tracked .venv"
   done
 done
 
@@ -357,10 +366,26 @@ mkdir "$WS/home/.gitconfig"
 direnv_prompt
 assert_eq "$VENV" "$REPO/.venv" "a warning before git's fatal line does not stop use venv outside a work tree"
 
-# git translates its fatal line, and the check matches the English text.
+# git translates its fatal line, and the check matches the English text. A real
+# translation needs a catalogue and a locale that not every host has.
 new_direnv_sandbox
 allow_envrc 'use venv'
-LC_ALL=de_DE.UTF-8 direnv_prompt
+wrap_git <<'STUB'
+[[ ${LC_ALL-} == C ]] || { echo 'Schwerwiegend: Kein Git-Repository' >&2; exit 128; }
+STUB
+direnv_prompt
 assert_eq "$VENV" "$REPO/.venv" "a translated locale does not stop use venv outside a work tree"
+
+# A repository owned by another user needs safe.directory, here from the XDG config.
+new_direnv_sandbox
+allow_envrc 'use venv'
+git_commit_all
+mkdir "$WS/config/git"
+printf '[safe]\n\tdirectory = *\n' >"$WS/config/git/config"
+wrap_git <<'STUB'
+export GIT_TEST_ASSUME_DIFFERENT_OWNER=1
+STUB
+direnv_prompt
+assert_eq "$VENV" "$REPO/.venv" "safe.directory in the XDG git config does not stop use venv"
 
 report
