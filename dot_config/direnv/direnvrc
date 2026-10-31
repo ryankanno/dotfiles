@@ -8,17 +8,51 @@ use_mise() {
     direnv_load mise direnv exec
 }
 
+# Function to refuse a .venv that git tracks. Run it before a repository's .env
+# loads: the check keeps HOME and XDG_CONFIG_HOME, and .env can set either to set core.fsmonitor.
+check_venv_untracked() {
+    local output status=0
+    # env -i: GIT_* can hide tracked files, and git translates the fatal line matched below
+    # HOME: git expands ~ with it. HOME and XDG_CONFIG_HOME: git reads safe.directory under them.
+    # icase: a case-insensitive file system serves a tracked .VENV as .venv
+    output=$(env -i PATH="$PATH" HOME="$HOME" XDG_CONFIG_HOME="${XDG_CONFIG_HOME-}" LC_ALL=C \
+        git ls-files --error-unmatch -- ':(icase).venv' 2>&1) || status=$?
+    case $status in
+        0)
+            log_error "use_venv: git tracks files under .venv, so its scripts are repository code"
+            return 1
+            ;;
+        1 | 127) ;; # 1: nothing tracked. 127: no git, so no work tree.
+        *)
+            # the last line: a warning can come before git's fatal line
+            if [[ ${output##*$'\n'} != "fatal: not a git repository"* ]]; then
+                log_error "use_venv: git cannot list .venv: $output"
+                return 1
+            fi
+            ;;
+    esac
+}
+
+# Function to create a venv if it doesn't exist and set the environment for it
+setup_venv() {
+    uv venv --allow-existing || return
+    # activate is not sourced: a kept .venv is repository code, and direnv passes only exports to the shell
+    export VIRTUAL_ENV="$PWD/.venv"
+    PATH_add .venv/bin
+    unset PYTHONHOME
+}
+
 # Function to setup a venv and activate (will create one if it doesn't exist)
 use_venv() {
-    uv venv --allow-existing
-    source .venv/bin/activate
+    check_venv_untracked || return
+    setup_venv
 }
 
 # Function to set up a Python virtual environment using uv
 use_uv() {
     watch_file uv.lock pyproject.toml
+    check_venv_untracked || return
     dotenv_if_exists
-    source_env_if_exists .envrc.local
-    use venv
+    setup_venv || return
     uv sync --quiet
 }
