@@ -106,12 +106,19 @@ echo "sudo $*" >>"$PKG_LOG"
 [[ "$1" == "rm" ]] && exit 0
 exec "$@"
 SUDO
-  # STUB_UNIT and STUB_UNIT_DIR stand for a unit file in the systemd folder.
+  # STUB_UNITS lists <unit>=<WorkingDirectory> entries, in list-unit-files order.
   cat >"$fakebin/systemctl" <<'SYSCTL'
 #!/usr/bin/env bash
 case "$1" in
-  list-unit-files) [[ -z "${STUB_UNIT:-}" ]] || echo "$STUB_UNIT enabled enabled"; exit 0;;
-  show)            echo "${STUB_UNIT_DIR:-}"; exit 0;;
+  list-unit-files)
+    for u in ${STUB_UNITS:-}; do echo "${u%%=*} enabled enabled"; done
+    exit 0;;
+  show)
+    [[ "$2 $3 $4" == "-p WorkingDirectory --value" ]] || exit 0
+    for u in ${STUB_UNITS:-}; do
+      [[ "${u%%=*}" == "$5" ]] && echo "${u#*=}"
+    done
+    exit 0;;
 esac
 echo "systemctl $*" >>"$PKG_LOG"
 SYSCTL
@@ -122,7 +129,7 @@ SYSCTL
 
 drop_sandbox() {
   unset OWNER_TYPE RUNNER_VERSION RUNNER_ARCH UNAME_S UNAME_M
-  unset TARBALL_NAME RELEASE_JSON RUNNER_TARBALL_SEED STUB_UNIT STUB_UNIT_DIR
+  unset TARBALL_NAME RELEASE_JSON RUNNER_TARBALL_SEED STUB_UNITS
   rm -rf "$WS"
 }
 
@@ -617,18 +624,62 @@ test_remove_linux_finds_the_unit_a_job_hid() {
   echo "test_remove_linux_finds_the_unit_a_job_hid"
   new_sandbox
   linux_host
-  local folder="actions-runner-acme-widget"
+  local folder="actions-runner-acme-widget" unit="actions.runner.acme-widget.a.service"
   seed_configured_runner "$folder" 42 '"https://github.com/acme/widget"'
-  export STUB_UNIT="actions.runner.acme-widget.a.service" STUB_UNIT_DIR="$GITHUB_RUNNERS_DIR/$folder"
+  export STUB_UNITS="$unit=$GITHUB_RUNNERS_DIR/$folder"
   run_runner remove "$folder"
   assert_eq "$RC" "0" "exits 0"
   local pkg; pkg="$(cat "$PKG_LOG")"
-  assert_contains "$pkg" "sudo systemctl stop $STUB_UNIT" "stops the unit"
-  assert_contains "$pkg" "sudo systemctl disable $STUB_UNIT" "disables the unit"
-  assert_contains "$pkg" "sudo rm -f /etc/systemd/system/$STUB_UNIT" "deletes the unit file"
+  assert_contains "$pkg" "sudo systemctl stop $unit" "stops the unit"
+  assert_contains "$pkg" "sudo systemctl disable $unit" "disables the unit"
+  assert_contains "$pkg" "sudo rm -f /etc/systemd/system/$unit" "deletes the unit file"
   assert_contains "$pkg" "sudo systemctl daemon-reload" "reloads systemd"
   assert_not_contains "$OUT" "warning" "nothing is left to warn about"
   assert_nodir "$GITHUB_RUNNERS_DIR/$folder" "folder deleted"
+  drop_sandbox
+}
+
+# Each spelling reaches the same folder as the unit's WorkingDirectory.
+test_remove_linux_finds_the_unit_by_any_path() {
+  echo "test_remove_linux_finds_the_unit_by_any_path"
+  local folder="actions-runner-acme-widget" unit="actions.runner.acme-widget.a.service"
+  local how real
+  for how in trailing-slash base-trailing-slash symlinked-base; do
+    new_sandbox
+    linux_host
+    seed_configured_runner "$folder" 42 '"https://github.com/acme/widget"'
+    real="$GITHUB_RUNNERS_DIR"
+    export STUB_UNITS="$unit=$real/$folder"
+    case "$how" in
+      trailing-slash) run_runner remove "$folder/";;
+      base-trailing-slash)
+        GITHUB_RUNNERS_DIR="$real/" run_runner remove "$folder";;
+      symlinked-base)
+        ln -s "$real" "$WS/link"
+        GITHUB_RUNNERS_DIR="$WS/link" run_runner remove "$folder";;
+    esac
+    assert_eq "$RC" "0" "$how: exits 0"
+    assert_contains "$(cat "$PKG_LOG")" "sudo rm -f /etc/systemd/system/$unit" "$how: deletes the unit file"
+    assert_not_contains "$OUT" "warning" "$how: nothing is left to warn about"
+    assert_nodir "$real/$folder" "$how: folder deleted"
+    drop_sandbox
+  done
+}
+
+test_remove_linux_finds_a_later_unit() {
+  echo "test_remove_linux_finds_a_later_unit"
+  new_sandbox
+  linux_host
+  local folder="actions-runner-acme-widget" other="actions-runner-acme-other"
+  local unit="actions.runner.acme-widget.a.service"
+  seed_configured_runner "$folder" 42 '"https://github.com/acme/widget"'
+  mkdir -p "$GITHUB_RUNNERS_DIR/$other"
+  export STUB_UNITS="actions.runner.acme-other.b.service=$GITHUB_RUNNERS_DIR/$other $unit=$GITHUB_RUNNERS_DIR/$folder"
+  run_runner remove "$folder"
+  assert_eq "$RC" "0" "exits 0"
+  local pkg; pkg="$(cat "$PKG_LOG")"
+  assert_contains "$pkg" "sudo rm -f /etc/systemd/system/$unit" "removes this runner's unit"
+  assert_not_contains "$pkg" "actions.runner.acme-other" "another runner's unit is safe"
   drop_sandbox
 }
 
@@ -636,14 +687,14 @@ test_remove_linux_installed_unit_beats_service_file() {
   echo "test_remove_linux_installed_unit_beats_service_file"
   new_sandbox
   linux_host
-  local folder="actions-runner-acme-widget"
+  local folder="actions-runner-acme-widget" unit="actions.runner.acme-widget.a.service"
   seed_configured_runner "$folder" 42 '"https://github.com/acme/widget"'
   echo "actions.runner.acme-other.b.service" >"$GITHUB_RUNNERS_DIR/$folder/.service"
-  export STUB_UNIT="actions.runner.acme-widget.a.service" STUB_UNIT_DIR="$GITHUB_RUNNERS_DIR/$folder"
+  export STUB_UNITS="$unit=$GITHUB_RUNNERS_DIR/$folder"
   run_runner remove "$folder"
   assert_eq "$RC" "0" "exits 0"
   local pkg; pkg="$(cat "$PKG_LOG")"
-  assert_contains "$pkg" "sudo rm -f /etc/systemd/system/$STUB_UNIT" "removes this runner's unit"
+  assert_contains "$pkg" "sudo rm -f /etc/systemd/system/$unit" "removes this runner's unit"
   assert_not_contains "$pkg" "actions.runner.acme-other" "another runner's unit is safe"
   drop_sandbox
 }
@@ -654,7 +705,8 @@ test_remove_linux_ignores_another_folders_unit() {
   linux_host
   local folder="actions-runner-acme-widget"
   seed_configured_runner "$folder" 42 '"https://github.com/acme/widget"'
-  export STUB_UNIT="actions.runner.acme-other.b.service" STUB_UNIT_DIR="$GITHUB_RUNNERS_DIR/actions-runner-acme-other"
+  mkdir -p "$GITHUB_RUNNERS_DIR/actions-runner-acme-other"
+  export STUB_UNITS="actions.runner.acme-other.b.service=$GITHUB_RUNNERS_DIR/actions-runner-acme-other"
   run_runner remove "$folder"
   assert_eq "$RC" "0" "exits 0"
   assert_not_contains "$(cat "$PKG_LOG")" "sudo" "another runner's unit is safe"
@@ -859,6 +911,8 @@ test_remove_linux_uses_systemctl
 test_remove_linux_rejects_bad_unit
 test_remove_linux_without_service_file
 test_remove_linux_finds_the_unit_a_job_hid
+test_remove_linux_finds_the_unit_by_any_path
+test_remove_linux_finds_a_later_unit
 test_remove_linux_installed_unit_beats_service_file
 test_remove_linux_ignores_another_folders_unit
 test_remove_linux_half_built_removes_the_unit

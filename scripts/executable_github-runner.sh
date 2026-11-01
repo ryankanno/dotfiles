@@ -118,11 +118,12 @@ runner_unit() {
 }
 
 # Echoes the installed unit that runs from folder $1. The unit file is
-# root-owned, so a job cannot hide the unit or point it at another runner.
+# root-owned, so deleting or rewriting .service does not change the answer.
+# -ef compares the folders themselves: $1 can end in / or pass through a symlink.
 installed_unit() {
   local unit _
   while read -r unit _; do
-    if [[ "$(systemctl show -p WorkingDirectory --value "$unit")" == "$1" ]]; then
+    if [[ "$(systemctl show -p WorkingDirectory --value "$unit")" -ef "$1" ]]; then
       echo "$unit"
       return 0
     fi
@@ -131,8 +132,8 @@ installed_unit() {
 }
 
 # Linux only. Drives the root-owned unit: sudo ./svc.sh would run a file that a
-# job can rewrite. .service is the fallback for a symlinked runner path, where
-# the folder name differs from the unit's WorkingDirectory.
+# job can rewrite. .service is the fallback for a moved folder, where the unit's
+# WorkingDirectory is stale.
 remove_unit() {
   local dir="$1" unit
   if ! unit="$(installed_unit "$dir")"; then
