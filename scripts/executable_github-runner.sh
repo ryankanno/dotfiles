@@ -119,11 +119,13 @@ runner_unit() {
 
 # Echoes the installed unit that runs from folder $1. The unit file is
 # root-owned, so deleting or rewriting .service does not change the answer.
-# -ef compares the folders themselves: $1 can end in / or pass through a symlink.
+# -ef compares the folders themselves, so a symlinked base still matches. A
+# WorkingDirectory that is a link does not: a job can point one at its own folder.
 installed_unit() {
-  local unit _
+  local unit _ workdir
   while read -r unit _; do
-    if [[ "$(systemctl show -p WorkingDirectory --value "$unit")" -ef "$1" ]]; then
+    workdir="$(systemctl show -p WorkingDirectory --value "$unit")"
+    if [[ ! -L "$workdir" && "$workdir" -ef "$1" ]]; then
       echo "$unit"
       return 0
     fi
@@ -136,11 +138,6 @@ installed_unit() {
 # WorkingDirectory is stale.
 remove_unit() {
   local dir="$1" unit
-  # A job can swap its folder for a link to another runner's: -ef, .runner and
-  # rm would all act on that runner. dirname and basename drop trailing slashes,
-  # which make -L follow the link.
-  [[ ! -L "$(dirname "$dir")/$(basename "$dir")" ]] \
-    || die "$dir is a symlink; folder kept. Delete the link and clear the runner by hand."
   if ! unit="$(installed_unit "$dir")"; then
     if [[ ! -e "$dir/.service" ]]; then
       {
@@ -262,8 +259,15 @@ cmd_remove() {
 
   require_deps
 
+  # A plain name: with a trailing / or /. the -L check and rm follow a link.
+  folder="${folder%/}"
+  [[ "$folder" =~ ^[^/.][^/]*$ ]] || die "$1 is not a runner folder name"
+
   local dir="$BASE_DIR/$folder"
   [[ -d "$dir" ]] || die "$dir not found"
+  # A job can swap its folder for a link to another runner's: .runner, svc.sh and
+  # the unit lookup would all act on that runner.
+  [[ ! -L "$dir" ]] || die "$dir is a symlink; folder kept. Delete the link and clear the runner by hand."
 
   local runner_file="$dir/.runner"
   if [[ ! -f "$runner_file" ]]; then

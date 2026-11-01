@@ -666,22 +666,60 @@ test_remove_linux_finds_the_unit_by_any_path() {
   done
 }
 
-# The swapped folder reaches the other runner's WorkingDirectory and .runner.
-test_remove_linux_refuses_a_symlinked_folder() {
-  echo "test_remove_linux_refuses_a_symlinked_folder"
+# The swapped folder reaches the other runner's service, .runner and files.
+test_remove_refuses_a_symlinked_folder() {
+  echo "test_remove_refuses_a_symlinked_folder"
+  local folder="actions-runner-acme-zed" other="actions-runner-acme-alpha" arg host
+  for host in macos linux; do
+    for arg in "$folder" "$folder/"; do
+      new_sandbox
+      [[ "$host" == "macos" ]] || linux_host
+      seed_configured_runner "$other" 7 '"https://github.com/acme/alpha"'
+      ln -s "$GITHUB_RUNNERS_DIR/$other" "$GITHUB_RUNNERS_DIR/$folder"
+      export STUB_UNITS="actions.runner.acme-alpha.b.service=$GITHUB_RUNNERS_DIR/$other"
+      run_runner remove "$arg"
+      assert_remove_refused "is a symlink" "$host $arg" "$folder"
+      assert_not_contains "$(cat "$PKG_LOG")" "sudo" "$host $arg: nothing ran as root"
+      assert_dir "$GITHUB_RUNNERS_DIR/$other" "$host $arg: the other runner's folder kept"
+      [[ -e "$GITHUB_RUNNERS_DIR/$other/.runner" ]] && ok "$host $arg: its files kept" || bad "$host $arg: its files kept"
+      drop_sandbox
+    done
+  done
+}
+
+# A / or . in the name would let rm, -L or cd reach past the folder.
+test_remove_refuses_a_folder_path() {
+  echo "test_remove_refuses_a_folder_path"
   local folder="actions-runner-acme-zed" other="actions-runner-acme-alpha" arg
-  for arg in "$folder" "$folder/" "$folder//"; do
+  for arg in "$folder//" "$folder/." "../runners/$folder" "." ".."; do
     new_sandbox
     linux_host
     seed_configured_runner "$other" 7 '"https://github.com/acme/alpha"'
     ln -s "$GITHUB_RUNNERS_DIR/$other" "$GITHUB_RUNNERS_DIR/$folder"
-    export STUB_UNITS="actions.runner.acme-alpha.b.service=$GITHUB_RUNNERS_DIR/$other"
     run_runner remove "$arg"
-    assert_remove_refused "is a symlink" "$arg" "$folder"
-    assert_not_contains "$(cat "$PKG_LOG")" "sudo" "$arg: nothing ran as root"
+    assert_remove_refused "not a runner folder name" "$arg" "$folder"
     assert_dir "$GITHUB_RUNNERS_DIR/$other" "$arg: the other runner's folder kept"
+    [[ -e "$GITHUB_RUNNERS_DIR/$other/.runner" ]] && ok "$arg: its files kept" || bad "$arg: its files kept"
     drop_sandbox
   done
+}
+
+# A job can turn another runner's folder into a link to its own.
+test_remove_linux_skips_a_unit_whose_folder_is_a_link() {
+  echo "test_remove_linux_skips_a_unit_whose_folder_is_a_link"
+  new_sandbox
+  linux_host
+  local folder="actions-runner-acme-zed" other="actions-runner-acme-alpha"
+  local unit="actions.runner.acme-zed.a.service"
+  seed_configured_runner "$folder" 42 '"https://github.com/acme/zed"'
+  ln -s "$GITHUB_RUNNERS_DIR/$folder" "$GITHUB_RUNNERS_DIR/$other"
+  export STUB_UNITS="actions.runner.acme-alpha.b.service=$GITHUB_RUNNERS_DIR/$other $unit=$GITHUB_RUNNERS_DIR/$folder"
+  run_runner remove "$folder"
+  assert_eq "$RC" "0" "exits 0"
+  local pkg; pkg="$(cat "$PKG_LOG")"
+  assert_contains "$pkg" "sudo rm -f /etc/systemd/system/$unit" "removes this runner's unit"
+  assert_not_contains "$pkg" "actions.runner.acme-alpha" "another runner's unit is safe"
+  drop_sandbox
 }
 
 test_remove_linux_finds_a_later_unit() {
@@ -930,7 +968,9 @@ test_remove_linux_rejects_bad_unit
 test_remove_linux_without_service_file
 test_remove_linux_finds_the_unit_a_job_hid
 test_remove_linux_finds_the_unit_by_any_path
-test_remove_linux_refuses_a_symlinked_folder
+test_remove_refuses_a_symlinked_folder
+test_remove_refuses_a_folder_path
+test_remove_linux_skips_a_unit_whose_folder_is_a_link
 test_remove_linux_finds_a_later_unit
 test_remove_linux_installed_unit_beats_service_file
 test_remove_linux_ignores_another_folders_unit
