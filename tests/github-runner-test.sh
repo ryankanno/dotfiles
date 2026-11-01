@@ -666,6 +666,24 @@ test_remove_linux_finds_the_unit_by_any_path() {
   done
 }
 
+# The swapped folder reaches the other runner's WorkingDirectory and .runner.
+test_remove_linux_refuses_a_symlinked_folder() {
+  echo "test_remove_linux_refuses_a_symlinked_folder"
+  local folder="actions-runner-acme-zed" other="actions-runner-acme-alpha" arg
+  for arg in "$folder" "$folder/" "$folder//"; do
+    new_sandbox
+    linux_host
+    seed_configured_runner "$other" 7 '"https://github.com/acme/alpha"'
+    ln -s "$GITHUB_RUNNERS_DIR/$other" "$GITHUB_RUNNERS_DIR/$folder"
+    export STUB_UNITS="actions.runner.acme-alpha.b.service=$GITHUB_RUNNERS_DIR/$other"
+    run_runner remove "$arg"
+    assert_remove_refused "is a symlink" "$arg" "$folder"
+    assert_not_contains "$(cat "$PKG_LOG")" "sudo" "$arg: nothing ran as root"
+    assert_dir "$GITHUB_RUNNERS_DIR/$other" "$arg: the other runner's folder kept"
+    drop_sandbox
+  done
+}
+
 test_remove_linux_finds_a_later_unit() {
   echo "test_remove_linux_finds_a_later_unit"
   new_sandbox
@@ -912,6 +930,7 @@ test_remove_linux_rejects_bad_unit
 test_remove_linux_without_service_file
 test_remove_linux_finds_the_unit_a_job_hid
 test_remove_linux_finds_the_unit_by_any_path
+test_remove_linux_refuses_a_symlinked_folder
 test_remove_linux_finds_a_later_unit
 test_remove_linux_installed_unit_beats_service_file
 test_remove_linux_ignores_another_folders_unit

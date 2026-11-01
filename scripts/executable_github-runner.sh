@@ -136,6 +136,11 @@ installed_unit() {
 # WorkingDirectory is stale.
 remove_unit() {
   local dir="$1" unit
+  # A job can swap its folder for a link to another runner's: -ef, .runner and
+  # rm would all act on that runner. dirname and basename drop trailing slashes,
+  # which make -L follow the link.
+  [[ ! -L "$(dirname "$dir")/$(basename "$dir")" ]] \
+    || die "$dir is a symlink; folder kept. Delete the link and clear the runner by hand."
   if ! unit="$(installed_unit "$dir")"; then
     if [[ ! -e "$dir/.service" ]]; then
       {
