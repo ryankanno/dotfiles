@@ -8,29 +8,34 @@ use_mise() {
     direnv_load mise direnv exec
 }
 
-# Function to refuse a .venv that git tracks. Run it before a repository's .env
-# loads: the check keeps HOME and XDG_CONFIG_HOME, and .env can set either to set core.fsmonitor.
-check_venv_untracked() {
+# Function to refuse a path that git tracks: $1 is the caller, $2 the path, $3 what git tracks
+# and why that refuses it. Run it before a repository's .env loads: the check keeps HOME and
+# XDG_CONFIG_HOME, and .env can set either to set core.fsmonitor.
+check_untracked() {
     local output status=0
     # env -i: GIT_* can hide tracked files, and git translates the fatal line matched below
     # HOME: git expands ~ with it. HOME and XDG_CONFIG_HOME: git reads safe.directory under them.
     # icase: a case-insensitive file system serves a tracked .VENV as .venv
     output=$(env -i PATH="$PATH" HOME="$HOME" XDG_CONFIG_HOME="${XDG_CONFIG_HOME-}" LC_ALL=C \
-        git ls-files --error-unmatch -- ':(icase).venv' 2>&1) || status=$?
+        git ls-files --error-unmatch -- ":(icase)$2" 2>&1) || status=$?
     case $status in
         0)
-            log_error "use_venv: git tracks files under .venv, so its scripts are repository code"
+            log_error "$1: git tracks $3"
             return 1
             ;;
         1 | 127) ;; # 1: nothing tracked. 127: no git, so no work tree.
         *)
             # the last line: a warning can come before git's fatal line
             if [[ ${output##*$'\n'} != "fatal: not a git repository"* ]]; then
-                log_error "use_venv: git cannot list .venv: $output"
+                log_error "$1: git cannot list $2: $output"
                 return 1
             fi
             ;;
     esac
+}
+
+check_venv_untracked() {
+    check_untracked use_venv .venv "files under .venv, so its scripts are repository code"
 }
 
 # Function to create a venv if it doesn't exist and set the environment for it
@@ -48,10 +53,45 @@ use_venv() {
     setup_venv
 }
 
+# Function to refuse a .env that sets a name that runs code. .env is outside the allow
+# hash, so a later commit can add one. The names come from direnv's own dotenv output,
+# so the checked names are the exported names.
+check_dotenv_names() {
+    local exports names name
+    if ! exports=$("$direnv" dotenv bash .env); then
+        log_error "use_uv: direnv cannot read .env"
+        return 1
+    fi
+    # export is shadowed in a subshell: eval then lists each name and exports nothing.
+    # set +o posix: POSIX mode refuses a function named export.
+    if ! names=$(
+        set +o posix
+        export() { printf '%s\n' "${@%%=*}"; }
+        eval "$exports"
+    ); then
+        log_error "use_uv: cannot list the names that .env sets"
+        return 1
+    fi
+    while IFS= read -r name; do
+        case $name in
+            PATH | PYTHONPATH | LD_* | DYLD_* | BASH_ENV | HOME | GIT_* | UV_*)
+                log_error "use_uv: .env sets $name, which can run code"
+                return 1
+                ;;
+        esac
+    done <<<"$names"
+}
+
 # Function to set up a Python virtual environment using uv
 use_uv() {
-    watch_file uv.lock pyproject.toml
+    # .env is watched before the checks, so an edit to a refused .env reloads and re-checks
+    watch_file uv.lock pyproject.toml .env
     check_venv_untracked || return
+    # dotenv_if_exists loads only a file, so a tracked .env deleted from the work tree loads nothing
+    if [[ -f .env ]]; then
+        check_untracked use_uv .env ".env, so its values are repository code" || return
+        check_dotenv_names || return
+    fi
     dotenv_if_exists
     setup_venv || return
     uv sync --quiet
