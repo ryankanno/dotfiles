@@ -53,11 +53,12 @@ use_venv() {
     setup_venv
 }
 
-# Function to refuse a .env that sets a name that runs code. .env is outside the allow
-# hash, so a later commit can add one. The names come from direnv's own dotenv output,
-# so the checked names are the exported names.
+# Function to refuse a .env that sets a name that runs code, or a name that no argument
+# allows. Each argument is a name or a case glob. .env is outside the allow hash, so a
+# later commit can add one; .envrc is in it, so only a new allow can widen the list.
+# The names come from direnv's own dotenv output, so the checked names are the exported names.
 check_dotenv_names() {
-    local exports names name
+    local exports names name pattern unlisted=0
     if ! exports=$("$direnv" dotenv bash .env); then
         log_error "use_uv: direnv cannot read .env"
         return 1
@@ -73,13 +74,24 @@ check_dotenv_names() {
         return 1
     fi
     while IFS= read -r name; do
+        # an empty .env sets no name, and <<< still feeds one empty line
+        [[ -n $name ]] || continue
         case $name in
             PATH | PYTHONPATH | LD_* | DYLD_* | BASH_ENV | HOME | GIT_* | UV_*)
                 log_error "use_uv: .env sets $name, which can run code"
                 return 1
                 ;;
         esac
+        # a deny list cannot end: PROMPT_COMMAND, XDG_CONFIG_HOME and PYTHONHOME also run code
+        for pattern in "$@"; do
+            case $name in
+                $pattern) continue 2 ;;
+            esac
+        done
+        log_error "use_uv: .env sets $name, which .envrc does not list"
+        unlisted=1
     done <<<"$names"
+    return "$unlisted"
 }
 
 # Function to set up a Python virtual environment using uv
@@ -90,7 +102,7 @@ use_uv() {
     # dotenv_if_exists loads only a file, so a tracked .env deleted from the work tree loads nothing
     if [[ -f .env ]]; then
         check_untracked use_uv .env ".env, so its values are repository code" || return
-        check_dotenv_names || return
+        check_dotenv_names "$@" || return
     fi
     dotenv_if_exists
     setup_venv || return
