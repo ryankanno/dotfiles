@@ -85,10 +85,10 @@ Write the final summary to $OUT/review-output.html, then stop."
     ;;
 esac
 
-# LunaRoute uses the session headers for session routing, which the prompt
-# cache depends on: one id per scan, the header set the LunaRoute opencode
-# extension sends. Only the scan gets it; fix's review rounds get their own
-# id from the issue-to-pr ocr binding.
+# The LunaRoute gateway takes these headers as the request's session; the
+# LunaRoute opencode extension sends the same set. One id per scan. Only the
+# scan gets it; fix's review rounds get their own id from the issue-to-pr ocr
+# binding.
 if [[ $REUSE == 0 ]]; then
   lr_session=$(od -An -tx1 -N16 /dev/urandom | tr -d ' \n')
   OCR_LLM_EXTRA_HEADERS="lunaroute-agent=ocr,x-lunaroute-session=$lr_session,lunaroute-session-id=$lr_session" \

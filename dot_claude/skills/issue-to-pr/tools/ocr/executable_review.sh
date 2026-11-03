@@ -133,10 +133,9 @@ fi
 printf 'ocr' >"$out/cmd.txt"
 printf ' %q' "${args[@]}" >>"$out/cmd.txt"
 printf '\n' >>"$out/cmd.txt"
-# LunaRoute uses the session headers for session routing, which the prompt
-# cache depends on. One id per run keeps a run's requests in one session and
-# apart from loops that run at the same time. The header set is the one the
-# LunaRoute opencode extension sends.
+# The LunaRoute gateway takes these headers as the request's session; the
+# LunaRoute opencode extension sends the same set. One id per run keeps a
+# run's requests in one session and apart from loops that run at the same time.
 lr_session=$(od -An -tx1 -N16 /dev/urandom | tr -d ' \n')
 cd "$repo"
 set +e
