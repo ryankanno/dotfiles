@@ -247,15 +247,50 @@ assert_eq "$PYHOME" unset "use uv unsets PYTHONHOME"
 
 # .env is outside the allow hash, so a commit can add one after the allow.
 new_direnv_sandbox
-allow_envrc 'use uv'
+allow_envrc 'use uv SECRET_KEY FROM_DOTENV'
+printf 'FROM_DOTENV=yes\nSECRET_KEY=k\n' >"$WS/repo/.env"
+direnv_prompt
+assert_eq "$FROM_DOTENV" yes "use uv loads an untracked .env that sets only listed names"
+assert_eq "$UV_CALLS" "[venv][--allow-existing]"$'\n'"[sync][--quiet]" \
+  "an untracked .env that sets only listed names does not stop uv sync"
+
+new_direnv_sandbox
+allow_envrc "use uv 'FROM_*'"
 echo FROM_DOTENV=yes >"$WS/repo/.env"
 direnv_prompt
-assert_eq "$FROM_DOTENV" yes "use uv loads an untracked .env"
+assert_eq "$FROM_DOTENV" yes "use uv loads a .env name that a glob argument matches"
 assert_eq "$UV_CALLS" "[venv][--allow-existing]"$'\n'"[sync][--quiet]" \
-  "an untracked .env with no code-running names does not stop uv sync"
+  "a .env name that a glob argument matches does not stop uv sync"
+
+# Names outside the deny families still run code: the shell runs PROMPT_COMMAND,
+# git reads XDG_CONFIG_HOME, and uv venv reads PYTHONHOME.
+new_direnv_sandbox
+allow_envrc 'use uv FROM_DOTENV'
+printf 'FROM_DOTENV=yes\nPROMPT_COMMAND=%s\nXDG_CONFIG_HOME=x\nPYTHONHOME=p\n' "$REPO/evil" >"$WS/repo/.env"
+direnv_prompt
+for name in PROMPT_COMMAND XDG_CONFIG_HOME PYTHONHOME; do
+  assert_contains "$ERR" ".env sets $name, which .envrc does not list" "an unlisted $name fails with its name"
+done
+assert_eq "$FROM_DOTENV" unset "a .env that sets an unlisted name does not load"
+assert_eq "$UV_CALLS" "" "a .env that sets an unlisted name stops use uv before any uv call"
 
 new_direnv_sandbox
 allow_envrc 'use uv'
+echo FROM_DOTENV=yes >"$WS/repo/.env"
+direnv_prompt
+assert_contains "$ERR" ".env sets FROM_DOTENV, which .envrc does not list" "use uv with no arguments refuses a .env"
+assert_eq "$FROM_DOTENV" unset "use uv with no arguments does not load a .env"
+assert_eq "$UV_CALLS" "" "use uv with no arguments and a .env runs no uv call"
+
+new_direnv_sandbox
+allow_envrc 'use uv'
+: >"$WS/repo/.env"
+direnv_prompt
+assert_eq "$UV_CALLS" "[venv][--allow-existing]"$'\n'"[sync][--quiet]" \
+  "an empty .env sets no name, so use uv with no arguments syncs"
+
+new_direnv_sandbox
+allow_envrc 'use uv FROM_DOTENV'
 echo .venv >"$WS/repo/.gitignore"
 echo FROM_DOTENV=yes >"$WS/repo/.env"
 git_commit_all
@@ -266,12 +301,13 @@ assert_eq "$UV_CALLS" "" "a tracked .env stops use uv before any uv call"
 
 for name in PATH PYTHONPATH LD_PRELOAD DYLD_INSERT_LIBRARIES BASH_ENV HOME GIT_DIR UV_PYTHON; do
   new_direnv_sandbox
-  allow_envrc 'use uv'
+  # The deny families refuse a name even when .envrc lists it.
+  allow_envrc "use uv FROM_DOTENV $name"
   write_marker_script "$WS/repo/evil/uv" evil
   chmod +x "$WS/repo/evil/uv"
   printf 'FROM_DOTENV=yes\n%s=%s\n' "$name" "$REPO/evil:/usr/bin:/bin" >"$WS/repo/.env"
   direnv_prompt
-  assert_contains "$ERR" ".env sets $name" "an untracked .env that sets $name fails with the reason"
+  assert_contains "$ERR" ".env sets $name, which can run code" "an untracked .env that sets a listed $name fails with the reason"
   assert_eq "$FROM_DOTENV" unset "an untracked .env that sets $name does not load"
   assert_eq "$UV_CALLS" "" "an untracked .env that sets $name stops use uv before any uv call"
   assert_eq "$(ran evil)" no "an untracked .env that sets $name does not run repository code"
@@ -280,7 +316,7 @@ done
 # Each case starts with an untracked .env that sets PATH to the repository's evil/uv.
 new_evil_dotenv_sandbox() {
   new_direnv_sandbox
-  allow_envrc 'use uv'
+  allow_envrc 'use uv FROM_DOTENV PATH'
   write_marker_script "$WS/repo/evil/uv" evil
   chmod +x "$WS/repo/evil/uv"
   printf 'FROM_DOTENV=yes\nPATH=%s\n' "$REPO/evil:/usr/bin:/bin" >"$WS/repo/.env"
@@ -299,7 +335,7 @@ assert_contains "$ERR" ".env sets PATH" "an untracked .env that sets PATH fails 
 assert_eq "$(ran evil)" no "an untracked .env that sets PATH does not run repository code in POSIX mode"
 
 new_direnv_sandbox
-allow_envrc 'use uv'
+allow_envrc 'use uv FROM_DOTENV'
 echo FROM_DOTENV=yes >"$WS/repo/.env"
 POSIXLY_CORRECT=1 direnv_prompt
 assert_eq "$FROM_DOTENV" yes "use uv loads an untracked .env in POSIX mode"
@@ -312,7 +348,7 @@ assert_contains "$ERR" "use_uv: direnv cannot read .env" "an unreadable .env fai
 assert_eq "$UV_CALLS" "" "an unreadable .env stops use uv before any uv call"
 
 new_direnv_sandbox
-allow_envrc 'use uv'
+allow_envrc 'use uv FROM_DOTENV'
 echo FROM_DOTENV=yes >"$WS/repo/.env"
 git_commit_all
 rm "$WS/repo/.env"
