@@ -57,10 +57,21 @@ use_venv() {
 # hash, so a later commit can add one. The names come from direnv's own dotenv output,
 # so the checked names are the exported names.
 check_dotenv_names() {
-    [[ -f .env ]] || return 0
-    local exports name
-    exports=$("$direnv" dotenv bash .env) || return
-    # export is shadowed in a subshell: eval then lists each name and exports nothing
+    local exports names name
+    if ! exports=$("$direnv" dotenv bash .env); then
+        log_error "use_uv: direnv cannot read .env"
+        return 1
+    fi
+    # export is shadowed in a subshell: eval then lists each name and exports nothing.
+    # set +o posix: POSIX mode refuses a function named export.
+    if ! names=$(
+        set +o posix
+        export() { printf '%s\n' "${@%%=*}"; }
+        eval "$exports"
+    ); then
+        log_error "use_uv: cannot list the names that .env sets"
+        return 1
+    fi
     while IFS= read -r name; do
         case $name in
             PATH | PYTHONPATH | LD_* | DYLD_* | BASH_ENV | HOME | GIT_* | UV_*)
@@ -68,10 +79,7 @@ check_dotenv_names() {
                 return 1
                 ;;
         esac
-    done < <(
-        export() { printf '%s\n' "${@%%=*}"; }
-        eval "$exports"
-    )
+    done <<<"$names"
 }
 
 # Function to set up a Python virtual environment using uv
@@ -79,8 +87,11 @@ use_uv() {
     # .env is watched before the checks, so an edit to a refused .env reloads and re-checks
     watch_file uv.lock pyproject.toml .env
     check_venv_untracked || return
-    check_untracked use_uv .env ".env, so its values are repository code" || return
-    check_dotenv_names || return
+    # dotenv_if_exists loads only a file, so a tracked .env deleted from the work tree loads nothing
+    if [[ -f .env ]]; then
+        check_untracked use_uv .env ".env, so its values are repository code" || return
+        check_dotenv_names || return
+    fi
     dotenv_if_exists
     setup_venv || return
     uv sync --quiet

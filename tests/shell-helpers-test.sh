@@ -277,6 +277,55 @@ for name in PATH PYTHONPATH LD_PRELOAD DYLD_INSERT_LIBRARIES BASH_ENV HOME GIT_D
   assert_eq "$(ran evil)" no "an untracked .env that sets $name does not run repository code"
 done
 
+# Each case starts with an untracked .env that sets PATH to the repository's evil/uv.
+new_evil_dotenv_sandbox() {
+  new_direnv_sandbox
+  allow_envrc 'use uv'
+  write_marker_script "$WS/repo/evil/uv" evil
+  chmod +x "$WS/repo/evil/uv"
+  printf 'FROM_DOTENV=yes\nPATH=%s\n' "$REPO/evil:/usr/bin:/bin" >"$WS/repo/.env"
+}
+
+new_evil_dotenv_sandbox
+in_direnv_repo git init -q
+direnv_prompt
+assert_contains "$ERR" ".env sets PATH" "an untracked .env in a git work tree that sets PATH fails with the reason"
+assert_eq "$UV_CALLS" "" "an untracked .env in a git work tree that sets PATH stops use uv before any uv call"
+
+# In POSIX mode, bash refuses a function named export.
+new_evil_dotenv_sandbox
+POSIXLY_CORRECT=1 direnv_prompt
+assert_contains "$ERR" ".env sets PATH" "an untracked .env that sets PATH fails with the reason in POSIX mode"
+assert_eq "$(ran evil)" no "an untracked .env that sets PATH does not run repository code in POSIX mode"
+
+new_direnv_sandbox
+allow_envrc 'use uv'
+echo FROM_DOTENV=yes >"$WS/repo/.env"
+POSIXLY_CORRECT=1 direnv_prompt
+assert_eq "$FROM_DOTENV" yes "use uv loads an untracked .env in POSIX mode"
+
+new_direnv_sandbox
+allow_envrc 'use uv'
+echo 'not a dotenv line' >"$WS/repo/.env"
+direnv_prompt
+assert_contains "$ERR" "use_uv: direnv cannot read .env" "an unreadable .env fails with the reason"
+assert_eq "$UV_CALLS" "" "an unreadable .env stops use uv before any uv call"
+
+new_direnv_sandbox
+allow_envrc 'use uv'
+echo FROM_DOTENV=yes >"$WS/repo/.env"
+git_commit_all
+rm "$WS/repo/.env"
+direnv_prompt
+assert_eq "$UV_CALLS" "[venv][--allow-existing]"$'\n'"[sync][--quiet]" \
+  "a tracked .env deleted from the work tree does not stop use uv"
+
+# Two prompts in one shell: direnv reloads only when a watched file changes.
+new_evil_dotenv_sandbox
+in_direnv_repo bash -c 'eval "$(direnv export bash)"; sleep 1; echo FROM_DOTENV=yes >.env
+  eval "$(direnv export bash)"; echo "${FROM_DOTENV-unset}" >"$STUB_DIR/env"' >/dev/null 2>&1
+assert_eq "$(cat "$WS/env")" yes "an edit to a refused .env reloads and loads it at the next prompt"
+
 new_direnv_sandbox
 allow_envrc 'use venv'
 write_marker_script "$WS/repo/.venv/bin/activate" activate
