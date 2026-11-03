@@ -57,7 +57,7 @@ use uv SECRET_KEY DATABASE_URL 'CSP_*'   # now sees mise's Python via UV_PYTHON
 
 `use_venv` (create/activate venv only) and `use_uv` (venv + uv sync, requires pyproject.toml) are defined in `dot_config/direnv/direnvrc`.
 
-`use uv` loads an untracked `.env`. Each name that `.env` sets must match an argument to `use uv`: a name or a bash `case` glob. If a name matches no argument, `use uv` refuses the `.env`, names each unlisted name, and runs no `uv` command. `use uv` with no arguments allows no name. Quote a glob in `.envrc`: bash expands an unquoted glob to the repository's file names. A broad glob such as `'*'` allows every name. `use uv` always refuses a tracked `.env` and a `.env` that sets `PATH`, `PYTHONPATH`, `HOME`, `BASH_ENV`, or a name that starts with `LD_`, `DYLD_`, `GIT_` or `UV_`.
+`use uv` loads an untracked `.env`. Each name that `.env` sets must match an argument to `use uv`: a name or a bash `case` glob that matches the whole name. If a name matches no argument, `use uv` refuses the `.env`, names each unlisted name, and runs no `uv` command. `use uv` with no arguments allows no name. Quote a glob in `.envrc`: bash expands an unquoted glob to the repository's file names. Do not use a broad glob such as `'*'`: `.env` is outside the `direnv allow` hash, so a later commit can then add any name. Whatever the arguments, `use uv` refuses a tracked `.env` and a `.env` that sets `PATH`, `PYTHONPATH`, `HOME`, `BASH_ENV`, or a name that starts with `LD_`, `DYLD_`, `GIT_` or `UV_`.
 
 ## home-manager (linux/macmini)
 
