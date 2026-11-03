@@ -13,6 +13,8 @@ command -v zoxide &>/dev/null && eval "$(zoxide init --cmd j bash)"
 export BASH_IT=$HOME/.bash_it
 export BASH_IT_THEME='hawaii50'
 export TODO="t"
+# bash-it forks `brew --prefix` on every shell unless this is set
+[[ "$OSTYPE" == "darwin"* && -x /opt/homebrew/bin/brew ]] && export BASH_IT_HOMEBREW_PREFIX=/opt/homebrew
 
 # bat
 export BAT_THEME='Monokai Extended'
