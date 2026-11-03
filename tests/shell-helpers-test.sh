@@ -208,14 +208,14 @@ allow_envrc() {
 }
 
 # Evaluates what the shell hook evaluates at a prompt in $WS/repo, with
-# PYTHONHOME set as a shell could have it. Sets VENV, PYHOME, FIRST_PATH, ERR
-# and UV_CALLS.
+# PYTHONHOME set as a shell could have it. Sets VENV, PYHOME, FIRST_PATH,
+# FROM_DOTENV, ERR and UV_CALLS.
 direnv_prompt() {
   rm -f "$WS/env"
   in_direnv_repo env PYTHONHOME=/from/the/shell bash -c \
-    'eval "$(direnv export bash)"; printf "%s\n" "${VIRTUAL_ENV-}" "${PYTHONHOME-unset}" "$PATH" >"$STUB_DIR/env"' \
+    'eval "$(direnv export bash)"; printf "%s\n" "${VIRTUAL_ENV-}" "${PYTHONHOME-unset}" "$PATH" "${FROM_DOTENV-unset}" >"$STUB_DIR/env"' \
     >/dev/null 2>"$WS/direnv.err"
-  { IFS= read -r VENV; IFS= read -r PYHOME; IFS= read -r FIRST_PATH; } <"$WS/env"
+  { IFS= read -r VENV; IFS= read -r PYHOME; IFS= read -r FIRST_PATH; IFS= read -r FROM_DOTENV; } <"$WS/env"
   FIRST_PATH="${FIRST_PATH%%:*}"
   ERR="$(cat "$WS/direnv.err")"
   UV_CALLS="$(cat "$WS/uv.calls" 2>/dev/null)"
@@ -244,6 +244,38 @@ assert_eq "$UV_CALLS" "[venv][--allow-existing]"$'\n'"[sync][--quiet]" \
 assert_eq "$VENV" "$REPO/.venv" "use uv sets VIRTUAL_ENV to the absolute .venv path"
 assert_eq "$FIRST_PATH" "$REPO/.venv/bin" "use uv puts .venv/bin first on PATH"
 assert_eq "$PYHOME" unset "use uv unsets PYTHONHOME"
+
+# .env is outside the allow hash, so a commit can add one after the allow.
+new_direnv_sandbox
+allow_envrc 'use uv'
+echo FROM_DOTENV=yes >"$WS/repo/.env"
+direnv_prompt
+assert_eq "$FROM_DOTENV" yes "use uv loads an untracked .env"
+assert_eq "$UV_CALLS" "[venv][--allow-existing]"$'\n'"[sync][--quiet]" \
+  "an untracked .env with no code-running names does not stop uv sync"
+
+new_direnv_sandbox
+allow_envrc 'use uv'
+echo .venv >"$WS/repo/.gitignore"
+echo FROM_DOTENV=yes >"$WS/repo/.env"
+git_commit_all
+direnv_prompt
+assert_contains "$ERR" "git tracks .env" "a tracked .env fails with the reason"
+assert_eq "$FROM_DOTENV" unset "a tracked .env does not load"
+assert_eq "$UV_CALLS" "" "a tracked .env stops use uv before any uv call"
+
+for name in PATH PYTHONPATH LD_PRELOAD DYLD_INSERT_LIBRARIES BASH_ENV HOME GIT_DIR UV_PYTHON; do
+  new_direnv_sandbox
+  allow_envrc 'use uv'
+  write_marker_script "$WS/repo/evil/uv" evil
+  chmod +x "$WS/repo/evil/uv"
+  printf 'FROM_DOTENV=yes\n%s=%s\n' "$name" "$REPO/evil:/usr/bin:/bin" >"$WS/repo/.env"
+  direnv_prompt
+  assert_contains "$ERR" ".env sets $name" "an untracked .env that sets $name fails with the reason"
+  assert_eq "$FROM_DOTENV" unset "an untracked .env that sets $name does not load"
+  assert_eq "$UV_CALLS" "" "an untracked .env that sets $name stops use uv before any uv call"
+  assert_eq "$(ran evil)" no "an untracked .env that sets $name does not run repository code"
+done
 
 new_direnv_sandbox
 allow_envrc 'use venv'
