@@ -284,6 +284,7 @@ make_stub() {
   cat >"$stub/ocr" <<'STUB'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >>"$STUB_LOG"
+printf '%s\n' "${OCR_LLM_EXTRA_HEADERS-}" >>"$STUB_LOG.headers"
 out=""
 args=("$@")
 for ((i = 0; i < $#; i++)); do
@@ -296,7 +297,24 @@ STUB
   export STUB_LOG="$WS/args.txt"
   export STUB_EXIT=""
   : >"$STUB_LOG"
+  : >"$STUB_LOG.headers"
 }
+
+echo "wrapper: each ocr run is its own LunaRoute session"
+new_sandbox
+make_stub
+mkdir -p "$WS/repo" "$WS/out"
+PATH="$WS/stub:$PATH" "$REVIEW" --repo "$WS/repo" --out "$WS/out" --commit x
+PATH="$WS/stub:$PATH" "$REVIEW" --repo "$WS/repo" --out "$WS/out" --commit x
+h1="$(sed -n 1p "$WS/args.txt.headers")"
+h2="$(sed -n 2p "$WS/args.txt.headers")"
+sid1="$(sed -E 's/.*x-lunaroute-session=([^,]+).*/\1/' <<<"$h1")"
+sid2="$(sed -E 's/.*x-lunaroute-session=([^,]+).*/\1/' <<<"$h2")"
+assert_contains "$h1" "lunaroute-agent=ocr" "the gateway sees ocr as the agent"
+assert_contains "$h1" "x-lunaroute-session=$sid1" "the run sends a session id"
+assert_contains "$h1" "lunaroute-session-id=$sid1" "both session headers carry the same id"
+assert_eq "$([[ -n "$sid1" && "$sid1" != "$h1" ]] && printf yes || printf no)" "yes" "the session id is not empty"
+assert_eq "$([[ "$sid1" != "$sid2" ]] && printf yes || printf no)" "yes" "a second run gets a new session"
 
 echo "wrapper: range mode passes the range, brief and provenance"
 new_sandbox

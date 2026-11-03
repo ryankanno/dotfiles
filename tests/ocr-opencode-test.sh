@@ -40,6 +40,7 @@ new_sandbox() {
   cat >"$WS/bin/ocr" <<'OCR'
 #!/usr/bin/env bash
 echo "ocr $*" >>"$LOG"
+[[ "$1" == "scan" ]] && echo "${OCR_LLM_EXTRA_HEADERS-}" >>"$LOG.headers"
 [[ "$1" == "scan" && "${OCR_SCAN_FAIL:-0}" == "1" ]] && exit 1
 [[ "$1" == "session" && "${OCR_EXPORT_FAIL:-0}" == "1" ]] && exit 1
 [[ "$1" == "session" ]] && echo "new" >"$4"
@@ -103,6 +104,20 @@ assert_contains "$calls" "$OUT/review-progress.md." "progress goes to .ocr-openc
 assert_contains "$calls" "$OUT/review-progress.md, because review.html is new." "a new scan starts new progress in .ocr-opencode"
 assert_not_contains "$calls" "old review-progress.md" "the reset names the full progress path"
 assert_not_contains "$calls" "skip each bug" "a new scan does not resume"
+
+echo "each scan is its own LunaRoute session"
+new_sandbox
+mkdir -p src
+bash "$SCRIPT" explore src >/dev/null 2>&1
+bash "$SCRIPT" explore src >/dev/null 2>&1
+h1="$(sed -n 1p "$LOG.headers")"
+h2="$(sed -n 2p "$LOG.headers")"
+sid1="$(sed -E 's/.*x-lunaroute-session=([^,]+).*/\1/' <<<"$h1")"
+sid2="$(sed -E 's/.*x-lunaroute-session=([^,]+).*/\1/' <<<"$h2")"
+assert_contains "$h1" "lunaroute-agent=ocr" "the gateway sees ocr as the agent"
+assert_contains "$h1" "lunaroute-session-id=$sid1" "both session headers carry the same id"
+assert_eq "$([[ -n "$sid1" && "$sid1" != "$h1" ]] && echo yes)" "yes" "the scan sends a session id"
+assert_eq "$([[ "$sid1" != "$sid2" ]] && echo yes)" "yes" "a second scan gets a new session"
 
 echo "an existing review.html without --reuse is scanned again"
 new_sandbox

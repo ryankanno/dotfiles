@@ -85,7 +85,13 @@ Write the final summary to $OUT/review-output.html, then stop."
     ;;
 esac
 
-[[ $REUSE == 1 ]] || ocr scan --path "$2"
+# LunaRoute uses the session headers for session routing, which the prompt
+# cache depends on: one id per scan, the header set the LunaRoute opencode
+# extension sends. Only the scan gets it; fix's review rounds get their own
+# id from the issue-to-pr ocr binding.
+lr_session=$(od -An -tx1 -N16 /dev/urandom | tr -d ' \n')
+[[ $REUSE == 1 ]] || OCR_LLM_EXTRA_HEADERS="lunaroute-agent=ocr,x-lunaroute-session=$lr_session,lunaroute-session-id=$lr_session" \
+  ocr scan --path "$2"
 mkdir -p "$OUT"
 # review.html holds every finding, security ones too; a git add -A must not
 # commit it. --reuse writes it too, for a folder moved from .git/ocr-opencode.
