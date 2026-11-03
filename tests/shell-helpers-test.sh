@@ -255,6 +255,14 @@ assert_eq "$UV_CALLS" "[venv][--allow-existing]"$'\n'"[sync][--quiet]" \
   "an untracked .env that sets only listed names does not stop uv sync"
 
 new_direnv_sandbox
+allow_envrc 'use uv FROM'
+echo FROM_DOTENV=yes >"$WS/repo/.env"
+direnv_prompt
+assert_contains "$ERR" ".env sets FROM_DOTENV, which .envrc does not list" \
+  "a literal argument does not allow a name it only prefixes"
+assert_eq "$UV_CALLS" "" "a literal argument that only prefixes a .env name stops use uv before any uv call"
+
+new_direnv_sandbox
 allow_envrc "use uv 'FROM_*'"
 echo FROM_DOTENV=yes >"$WS/repo/.env"
 direnv_prompt
