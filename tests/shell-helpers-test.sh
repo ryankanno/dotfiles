@@ -459,6 +459,25 @@ two_prompts "$commit_venv_tool"
 assert_eq "$FIRST_VENV" "$REPO/.venv" "use venv loads a linked worktree with an ignored .venv"
 assert_contains "$ERR" "git tracks files under .venv" "a commit in a linked worktree that tracks .venv refuses use venv at the next prompt"
 
+# A fresh git init has no index yet, so the watched index does not exist at the first prompt.
+new_direnv_sandbox
+allow_envrc 'use venv'
+in_direnv_repo git init -q
+two_prompts "$commit_venv_tool"
+assert_eq "$FIRST_VENV" "$REPO/.venv" "use venv loads a git work tree with no index"
+assert_contains "$ERR" "git tracks files under .venv" "a first commit that tracks .venv refuses use venv at the next prompt"
+
+# git before 2.31 has no --path-format, and the watch must not need it.
+new_direnv_sandbox
+allow_envrc 'use venv'
+echo .venv >"$WS/repo/.gitignore"
+git_commit_all
+wrap_git <<'STUB'
+for arg; do [[ $arg != --path-format=* ]] || exit 129; done
+STUB
+two_prompts "$commit_venv_tool"
+assert_contains "$ERR" "git tracks files under .venv" "a git with no --path-format still refuses a commit that tracks .venv"
+
 # An .envrc can load .env before use venv, so .env can reach the check's git call.
 for envrc in 'use uv' $'dotenv_if_exists\nuse venv'; do
   for dotenv in GIT_DIR=/nonexistent GIT_LITERAL_PATHSPECS=1; do
