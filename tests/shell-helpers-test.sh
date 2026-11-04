@@ -411,6 +411,73 @@ direnv_prompt
 assert_eq "$VENV" "$REPO/.venv" "use venv works in a git work tree with an ignored .venv"
 assert_eq "$FIRST_PATH" "$REPO/.venv/bin" "an ignored .venv puts .venv/bin first on PATH"
 
+# Two prompts in one shell, with the commands in $1 run in the repository between
+# them. Sets FIRST_VENV and VENV from each prompt, and ERR from the second.
+two_prompts() {
+  rm -f "$WS/env"
+  in_direnv_repo bash -c 'eval "$(direnv export bash)"; echo "${VIRTUAL_ENV-}" >"$STUB_DIR/env"
+    sleep 1; eval "$1"
+    eval "$(direnv export bash 2>"$STUB_DIR/direnv.err")"; echo "${VIRTUAL_ENV-}" >>"$STUB_DIR/env"' _ "$1" >/dev/null 2>&1
+  { IFS= read -r FIRST_VENV; IFS= read -r VENV; } <"$WS/env"
+  ERR="$(cat "$WS/direnv.err")"
+}
+commit_venv_tool='mkdir -p .venv/bin; : >.venv/bin/tool; git add -f .venv/bin/tool
+  git -c user.name=test -c user.email=test@example.com commit -qm venv'
+
+# A pull that adds files under an ignored .venv changes no file the .envrc names.
+for envrc in 'use venv' 'use uv'; do
+  new_direnv_sandbox
+  allow_envrc "$envrc"
+  echo .venv >"$WS/repo/.gitignore"
+  git_commit_all
+  two_prompts "$commit_venv_tool"
+  assert_eq "$FIRST_VENV" "$REPO/.venv" "$envrc loads a git work tree with an ignored .venv"
+  assert_contains "$ERR" "git tracks files under .venv" "a commit that tracks .venv refuses $envrc at the next prompt"
+  assert_eq "$VENV" "" "a commit that tracks .venv unloads $envrc at the next prompt"
+done
+
+# A refused .venv stays watched, so a commit that untracks it loads at the next prompt.
+new_direnv_sandbox
+allow_envrc 'use venv'
+write_marker_script "$WS/repo/.venv/bin/activate" activate
+git_commit_all
+two_prompts 'echo .venv >.gitignore; git rm -rq --cached .venv; git add .gitignore
+  git -c user.name=test -c user.email=test@example.com commit -qm untrack'
+assert_eq "$FIRST_VENV" "" "use venv refuses a tracked .venv at the first prompt"
+assert_eq "$VENV" "$REPO/.venv" "a commit that untracks .venv loads use venv at the next prompt"
+
+# A linked worktree has its own index, and a commit there leaves the main index as it was.
+new_direnv_sandbox
+mkdir "$WS/main"
+echo .venv >"$WS/main/.gitignore"
+in_direnv_repo git -C "$WS/main" init -q
+in_direnv_repo git -C "$WS/main" add -A
+in_direnv_repo git -C "$WS/main" -c user.name=test -c user.email=test@example.com commit -qm test
+in_direnv_repo git -C "$WS/main" worktree add -q "$WS/repo"
+allow_envrc 'use venv'
+two_prompts "$commit_venv_tool"
+assert_eq "$FIRST_VENV" "$REPO/.venv" "use venv loads a linked worktree with an ignored .venv"
+assert_contains "$ERR" "git tracks files under .venv" "a commit in a linked worktree that tracks .venv refuses use venv at the next prompt"
+
+# A fresh git init has no index yet, so the watched index does not exist at the first prompt.
+new_direnv_sandbox
+allow_envrc 'use venv'
+in_direnv_repo git init -q
+two_prompts "$commit_venv_tool"
+assert_eq "$FIRST_VENV" "$REPO/.venv" "use venv loads a git work tree with no index"
+assert_contains "$ERR" "git tracks files under .venv" "a first commit that tracks .venv refuses use venv at the next prompt"
+
+# git before 2.31 has no --path-format, and the watch must not need it.
+new_direnv_sandbox
+allow_envrc 'use venv'
+echo .venv >"$WS/repo/.gitignore"
+git_commit_all
+wrap_git <<'STUB'
+for arg; do [[ $arg != --path-format=* ]] || exit 129; done
+STUB
+two_prompts "$commit_venv_tool"
+assert_contains "$ERR" "git tracks files under .venv" "a git with no --path-format still refuses a commit that tracks .venv"
+
 # An .envrc can load .env before use venv, so .env can reach the check's git call.
 for envrc in 'use uv' $'dotenv_if_exists\nuse venv'; do
   for dotenv in GIT_DIR=/nonexistent GIT_LITERAL_PATHSPECS=1; do
