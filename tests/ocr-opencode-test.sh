@@ -40,6 +40,8 @@ new_sandbox() {
   cat >"$WS/bin/ocr" <<'OCR'
 #!/usr/bin/env bash
 echo "ocr $*" >>"$LOG"
+[[ "$1" == "scan" ]] && echo "${OCR_LLM_EXTRA_HEADERS-}" >>"$LOG.headers"
+echo "$1 ${OCR_LLM_EXTRA_HEADERS-}" >>"$LOG.env"
 [[ "$1" == "scan" && "${OCR_SCAN_FAIL:-0}" == "1" ]] && exit 1
 [[ "$1" == "session" && "${OCR_EXPORT_FAIL:-0}" == "1" ]] && exit 1
 [[ "$1" == "session" ]] && echo "new" >"$4"
@@ -48,6 +50,7 @@ OCR
   cat >"$WS/bin/opencode" <<'OC'
 #!/usr/bin/env bash
 echo "opencode $*" >>"$LOG"
+echo "opencode ${OCR_LLM_EXTRA_HEADERS-}" >>"$LOG.env"
 OC
   chmod +x "$WS/bin/ocr" "$WS/bin/opencode"
   export PATH="$WS/bin:$PATH"
@@ -103,6 +106,22 @@ assert_contains "$calls" "$OUT/review-progress.md." "progress goes to .ocr-openc
 assert_contains "$calls" "$OUT/review-progress.md, because review.html is new." "a new scan starts new progress in .ocr-opencode"
 assert_not_contains "$calls" "old review-progress.md" "the reset names the full progress path"
 assert_not_contains "$calls" "skip each bug" "a new scan does not resume"
+
+echo "each scan is its own LunaRoute session"
+new_sandbox
+mkdir -p src
+bash "$SCRIPT" explore src >/dev/null 2>&1
+bash "$SCRIPT" explore src >/dev/null 2>&1
+h1="$(sed -n 1p "$LOG.headers")"
+h2="$(sed -n 2p "$LOG.headers")"
+sid1="$(sed -E 's/.*x-lunaroute-session=([^,]+).*/\1/' <<<"$h1")"
+sid2="$(sed -E 's/.*x-lunaroute-session=([^,]+).*/\1/' <<<"$h2")"
+assert_eq "$h1" "lunaroute-agent=ocr,x-lunaroute-session=$sid1,lunaroute-session-id=$sid1" "the scan sends the agent and one id in both session headers"
+assert_eq "$h2" "lunaroute-agent=ocr,x-lunaroute-session=$sid2,lunaroute-session-id=$sid2" "the second scan sends the headers too"
+assert_eq "$([[ "$sid1" =~ ^[0-9a-f]{32}$ && "$sid2" =~ ^[0-9a-f]{32}$ ]] && echo yes)" "yes" "each scan sends a session id"
+assert_eq "$([[ "$sid1" != "$sid2" ]] && echo yes)" "yes" "a second scan gets a new session"
+assert_eq "$(grep -c '^session $' "$LOG.env")" "2" "the export gets no headers"
+assert_eq "$(grep -c '^opencode $' "$LOG.env")" "2" "opencode gets no headers"
 
 echo "an existing review.html without --reuse is scanned again"
 new_sandbox

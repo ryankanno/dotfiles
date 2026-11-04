@@ -133,9 +133,14 @@ fi
 printf 'ocr' >"$out/cmd.txt"
 printf ' %q' "${args[@]}" >>"$out/cmd.txt"
 printf '\n' >>"$out/cmd.txt"
+# The LunaRoute gateway takes these headers as the request's session; the
+# LunaRoute opencode extension sends the same set. One id per run keeps a
+# run's requests in one session and apart from loops that run at the same time.
+lr_session=$(od -An -tx1 -N16 /dev/urandom | tr -d ' \n')
 cd "$repo"
 set +e
-ocr "${args[@]}" >"$out/stdout.txt" 2>"$out/stderr.txt"
+OCR_LLM_EXTRA_HEADERS="lunaroute-agent=ocr,x-lunaroute-session=$lr_session,lunaroute-session-id=$lr_session" \
+  ocr "${args[@]}" >"$out/stdout.txt" 2>"$out/stderr.txt"
 rc=$?
 set -e
 if [[ $rc -ne 0 ]]; then
