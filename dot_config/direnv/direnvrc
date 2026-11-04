@@ -39,6 +39,13 @@ check_untracked() {
 }
 
 check_venv_untracked() {
+    local index
+    # a pull that tracks .venv changes the index and no file the .envrc names; watching it
+    # first reloads and re-checks at the next prompt, a refused .venv included.
+    # Outside a work tree, rev-parse fails and nothing is watched.
+    if index=$(git_clean_env rev-parse --path-format=absolute --git-path index 2>/dev/null); then
+        watch_file "$index"
+    fi
     check_untracked use_venv .venv "files under .venv, so its scripts are repository code"
 }
 
