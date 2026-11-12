@@ -295,16 +295,14 @@ leaked; the blocked post surfaces in the loop's final report.
 
 ## 8. Post
 
-Post only on a repository the human owns. Read the owner of the PR's
-repository and the gh login:
+Post only on a repository the human owns. Read the gh user's
+permission on the PR's repository:
 
 ```bash
-gh repo view <owner/repo> --json owner --jq .owner.login
-gh api user --jq .login
+gh repo view <owner/repo> --json viewerPermission --jq .viewerPermission
 ```
 
-The repository is owned when its owner is the gh login or an org on
-this list. Owned orgs: `i9-io`.
+The repository is owned when the check prints `ADMIN`.
 
 On an owned repository, post the file:
 
