@@ -614,7 +614,7 @@ for sibling in "$HOME/.cache/pr-loop/$owner_repo/pr-$pr"/round-*/round.json; do
   prior_unfinished=$(jq -r '.runs[]?.dir' "$sibling" 2>/dev/null \
     | while IFS= read -r d; do
         jq -r '(.manifest.coverage.failed[]?.path // empty),
-               ([.warnings[]? | select(.type == "review_round_failed") | .file // empty]
+               ([.warnings[]? | objects | select(.type == "review_round_failed") | .file | strings]
                 | map(split(",")[]) | .[] | select(. != ""))' "$d/review.json" 2>/dev/null || true
       done | sort -u || true)
   # A base-merge-only round and a convergence round ran no reviewer, so

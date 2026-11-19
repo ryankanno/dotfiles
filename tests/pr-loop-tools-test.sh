@@ -2693,6 +2693,20 @@ rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
 assert_eq "$(jq -r '.range.review_scope' "$rd/round.json")" "delta" "the round is still a delta round"
 assert_eq "$(cat "$rd/prior-unfinished.txt" 2>/dev/null)" $'a.py\nb.py' "the files of the lost pass are recorded for the critic"
 
+echo "pr-round: failed files and a lost pass's files merge, and an odd warning drops none of them"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+export STUB_COVERAGE_FAILED='[{"path":"b.py"}]'
+export STUB_WARNINGS='["odd",{"type":"review_round_failed","file":7},{"type":"review_round_failed","file":"c.py,b.py,a.py"}]'
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
+export STUB_COVERAGE_FAILED="" STUB_WARNINGS=""
+advance_head g.txt 'new\n'
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
+assert_eq "$(cat "$rd/prior-unfinished.txt" 2>/dev/null)" $'a.py\nb.py\nc.py' "each file is recorded once, sorted, past a warning the jq cannot read"
+
 echo "pr-round: a complete prior round leaves nothing unfinished"
 new_sandbox
 make_pr_round_env
