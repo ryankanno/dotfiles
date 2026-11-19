@@ -2700,6 +2700,7 @@ make_fixture_repo
 export STUB_COVERAGE_FAILED='[{"path":"b.py"}]'
 export STUB_WARNINGS='["odd",{"type":"review_round_failed","file":7},{"type":"review_round_failed","file":"c.py,b.py,a.py"}]'
 run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+assert_eq "$(jq -r '.runs[0].status' "$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-1/round.json")" "partial" "an odd warning does not hide the lost pass from the run's status"
 finish_round 1
 export STUB_COVERAGE_FAILED="" STUB_WARNINGS=""
 advance_head g.txt 'new\n'

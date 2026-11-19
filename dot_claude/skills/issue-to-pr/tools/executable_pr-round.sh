@@ -754,7 +754,7 @@ status_of() { # dir
   # every other file completed; both are partial coverage and read as such.
   if [[ -f "$1/review.json" ]]; then
     jq -r 'if .status == "complete"
-              and (([.warnings[]? | select(.type == "review_round_failed")] | length) > 0
+              and (([.warnings[]? | objects | select(.type == "review_round_failed")] | length) > 0
                    or ((.manifest.coverage.failed // []) | length) > 0)
             then "partial" else .status // "missing" end' "$1/review.json" 2>/dev/null || printf 'missing\n'
   else printf 'missing\n'; fi
