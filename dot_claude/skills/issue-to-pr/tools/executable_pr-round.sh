@@ -608,10 +608,14 @@ for sibling in "$HOME/.cache/pr-loop/$owner_repo/pr-$pr"/round-*/round.json; do
   # a whole-PR re-review: the same caps re-fail the same files (issue
   # #41: two files failed in both of a PR's first two rounds).
   # An unreadable prior round.json contributes nothing, as for prior_head,
-  # never an aborted round.
+  # never an aborted round. ocr reports a timed-out pass as a
+  # review_round_failed warning and still lists its files completed
+  # (issue #228), so the warning's comma-separated files count too.
   prior_unfinished=$(jq -r '.runs[]?.dir' "$sibling" 2>/dev/null \
     | while IFS= read -r d; do
-        jq -r '.manifest.coverage.failed[]?.path // empty' "$d/review.json" 2>/dev/null || true
+        jq -r '(.manifest.coverage.failed[]?.path // empty),
+               ([.warnings[]? | select(.type == "review_round_failed") | .file // empty]
+                | map(split(",")[]) | .[] | select(. != ""))' "$d/review.json" 2>/dev/null || true
       done | sort -u || true)
   # A base-merge-only round and a convergence round ran no reviewer, so
   # they have no runs to read: the list they carried passes on, or the

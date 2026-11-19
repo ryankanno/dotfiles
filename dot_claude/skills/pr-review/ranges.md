@@ -63,7 +63,9 @@ a finding blocks or follows up as it did when the reviewer ran.
 A `partial` prior round does not send the next round back to the whole
 PR: the same caps re-fail the same files. Its unfinished files go to
 `prior-unfinished.txt`, and `critic-input.sh` hands the critic their
-whole-PR diff, where only a high finding blocks.
+whole-PR diff, where only a high finding blocks. Its unfinished files
+are its `coverage.failed` paths and the files that each
+`review_round_failed` warning names in its `file` field.
 
 ## A reviewer that did not finish
 

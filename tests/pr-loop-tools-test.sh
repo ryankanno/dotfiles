@@ -2679,6 +2679,20 @@ assert_contains "$(cat "$rd/cmd.txt")" "--from $FR_HEAD --to $FR_NEXT" "a re-rev
 assert_eq "$(jq -r '.range.review_scope' "$rd/round.json")" "delta" "the round is still a delta round"
 assert_eq "$(cat "$rd/prior-unfinished.txt" 2>/dev/null)" $'big.ts\nf.txt' "the files the prior round left unfinished are recorded for the critic"
 
+echo "pr-round: a prior round's lost review pass records its files as unfinished"
+new_sandbox
+make_pr_round_env
+make_fixture_repo
+export STUB_WARNINGS='[{"type":"review_round_failed","file":"b.py,a.py","message":"LLM request timeout"}]'
+run_prr --repo "$repo" --pr 39 --round 1 >/dev/null
+finish_round 1
+export STUB_WARNINGS=""
+advance_head g.txt 'new\n'
+run_prr --repo "$repo" --pr 39 --round 2 >/dev/null
+rd="$WS/home/.cache/pr-loop/test-owner/test-repo/pr-39/round-2"
+assert_eq "$(jq -r '.range.review_scope' "$rd/round.json")" "delta" "the round is still a delta round"
+assert_eq "$(cat "$rd/prior-unfinished.txt" 2>/dev/null)" $'a.py\nb.py' "the files of the lost pass are recorded for the critic"
+
 echo "pr-round: a complete prior round leaves nothing unfinished"
 new_sandbox
 make_pr_round_env
