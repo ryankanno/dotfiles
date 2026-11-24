@@ -16,7 +16,21 @@ default_arch() {
 }
 RUNNER_ARCH="${RUNNER_ARCH:-$(default_arch)}"
 
-BASE_DIR="${GITHUB_RUNNERS_DIR:-$HOME/.github-action-runners}"
+# On Linux, runners run as this user and live in its home. A job that runs as
+# the login user can open that user's SSH agent and files.
+RUNNER_USER="github-runner"
+
+# Before the runner user exists, this is the login home, so `remove` still
+# reaches runners that `add` made as the login user.
+default_base_dir() {
+  local home=""
+  if [[ "$(uname -s)" == "Linux" ]]; then
+    home="$(getent passwd "$RUNNER_USER" | cut -d: -f6)" || true
+  fi
+  echo "${home:-$HOME}/.github-action-runners"
+}
+
+BASE_DIR="${GITHUB_RUNNERS_DIR:-$(default_base_dir)}"
 CACHE_DIR="$BASE_DIR/.cache"
 TARBALL="actions-runner-${RUNNER_ARCH}-${RUNNER_VERSION}.tar.gz"
 
@@ -55,23 +69,44 @@ require_deps() {
   gh auth status >/dev/null 2>&1 || die "gh not authenticated. Run: gh auth login"
 }
 
+# The login user reads the runner folders through the runner user's group.
+require_runner_user() {
+  getent passwd "$RUNNER_USER" >/dev/null && return 0
+  die "runner user $RUNNER_USER does not exist. Create it, then log in again:
+  sudo useradd --system --create-home --shell /usr/sbin/nologin $RUNNER_USER
+  sudo usermod -aG $RUNNER_USER $(whoami)"
+}
+
+# Writes in the runner folders. On Linux the runner user owns them, and a job
+# can link a path in them to the login user's files.
+as_runner() {
+  if [[ "$(uname -s)" == "Linux" ]]; then
+    sudo -u "$RUNNER_USER" "$@"
+  else
+    "$@"
+  fi
+}
+
 # Populate the tarball cache: copy a seed if RUNNER_TARBALL_SEED points at one,
 # otherwise download from the actions/runner releases.
 ensure_tarball() {
-  mkdir -p "$CACHE_DIR"
+  as_runner mkdir -p "$CACHE_DIR"
   local dest="$CACHE_DIR/$TARBALL"
-  [[ -f "$dest" ]] && return 0
+  [[ -e "$dest" ]] && return 0
   local seed="${RUNNER_TARBALL_SEED:-}"
   if [[ -n "$seed" && -f "$seed" ]]; then
-    cp "$seed" "$dest"
+    as_runner tee "$dest" <"$seed" >/dev/null
     return 0
   fi
   echo "Downloading $TARBALL ..."
+  # Only the login user has gh auth, and only the runner user can write here.
   gh release download "v${RUNNER_VERSION}" \
     --repo actions/runner \
     --pattern "$TARBALL" \
-    --dir "$CACHE_DIR" \
+    --output - \
+    | as_runner tee "$dest.part" >/dev/null \
     || die "failed to download $TARBALL"
+  as_runner mv "$dest.part" "$dest"
 }
 
 sha256_of() {
@@ -189,6 +224,9 @@ cmd_add() {
   [[ -n "$owner" ]] || usage
 
   require_deps
+  if [[ "$(uname -s)" == "Linux" ]]; then
+    require_runner_user
+  fi
 
   local target url folder
   if [[ -n "$repo" ]]; then
@@ -225,8 +263,9 @@ cmd_add() {
   [[ -f "$CACHE_DIR/$TARBALL" ]] || die "no tarball at $CACHE_DIR/$TARBALL"
   cp "$CACHE_DIR/$TARBALL" "$staged" || die "failed to copy $CACHE_DIR/$TARBALL"
   verify_tarball "$staged"
-  mkdir -p "$dir"
-  tar -xzf "$staged" -C "$dir"
+  as_runner mkdir -p "$dir"
+  # stdin, because the runner user cannot read the login user's private copy.
+  as_runner tar -xzf - -C "$dir" <"$staged"
 
   echo "Requesting registration token for $target ..."
   local token
@@ -237,11 +276,11 @@ cmd_add() {
     cd "$dir"
     local -a args=(--unattended --replace --url "$url" --token "$token" --name "$name" --work _work)
     [[ -n "$labels" ]] && args+=(--labels "$labels")
-    ./config.sh "${args[@]}"
+    as_runner ./config.sh "${args[@]}"
     # svc.sh manages a launchd agent on macOS (no sudo) but a systemd service on
     # Linux (needs root, and the user to run the service as).
     if [[ "$(uname -s)" == "Linux" ]]; then
-      sudo ./svc.sh install "$(whoami)"
+      sudo ./svc.sh install "$RUNNER_USER"
       sudo ./svc.sh start
     else
       ./svc.sh install
@@ -279,7 +318,7 @@ cmd_remove() {
       echo "Not deregistered. A GitHub-side runner may linger; list with:"
       echo "  gh api /<orgs|repos>/<owner>[/<repo>]/actions/runners"
     } >&2
-    rm -rf "$dir"
+    as_runner rm -rf "$dir"
     echo "Deleted $dir"
     return 0
   fi
@@ -309,7 +348,7 @@ cmd_remove() {
   gh api -X DELETE "/$target/actions/runners/$agent_id" \
     || echo "warning: GitHub deregister failed (already gone?); continuing." >&2
 
-  rm -rf "$dir"
+  as_runner rm -rf "$dir"
   echo "Removed runner '$name'; deleted $dir"
 }
 
