@@ -104,12 +104,17 @@ TAR
   cat >"$fakebin/sudo" <<'SUDO'
 #!/usr/bin/env bash
 echo "sudo $*" >>"$PKG_LOG"
-if [[ "$1" == "-u" ]]; then shift 2; exec "$@"; fi
+if [[ "$1" == "-u" ]]; then
+  [[ -n "$STUB_PASSWD" && "${STUB_PASSWD%%:*}" == "$2" ]] || { echo "sudo: unknown user $2" >&2; exit 1; }
+  shift 2
+  exec "$@"
+fi
 [[ "$1" == "rm" ]] && exit 0
 exec "$@"
 SUDO
   # The host's user list: STUB_PASSWD is the one passwd entry that exists.
   export STUB_PASSWD="github-runner:x:999:999::$WS/runner-home:/usr/sbin/nologin"
+  mkdir -p "$WS/runner-home"
   cat >"$fakebin/getent" <<'GETENT'
 #!/usr/bin/env bash
 [[ "$1" == "passwd" && -n "$STUB_PASSWD" && "${STUB_PASSWD%%:*}" == "$2" ]] || exit 2
@@ -543,8 +548,41 @@ test_add_linux_without_runner_user_fails() {
   linux_host
   export STUB_PASSWD=""
   run_runner add acme widget
-  assert_add_refused "sudo useradd --system --create-home --shell /usr/sbin/nologin github-runner" "no runner user"
+  assert_add_refused "sudo useradd --system --user-group --create-home --shell /usr/sbin/nologin github-runner" "no runner user"
   assert_contains "$OUT" "sudo usermod -aG github-runner" "says how to read the runner folders"
+  drop_sandbox
+}
+
+# Group membership takes effect only in a new login, and some hosts make
+# homes 0700.
+test_add_linux_unreadable_runner_home_fails() {
+  echo "test_add_linux_unreadable_runner_home_fails"
+  new_sandbox
+  linux_host
+  chmod 000 "$WS/runner-home"
+  run_runner add acme widget
+  chmod 755 "$WS/runner-home"
+  assert_add_refused "cannot read $WS/runner-home" "unreadable runner home"
+  assert_contains "$OUT" "sudo usermod -aG github-runner" "says how to join the group"
+  assert_contains "$OUT" "sudo chmod 0750 $WS/runner-home" "says how to open a 0700 home"
+  drop_sandbox
+}
+
+test_add_linux_downloads_as_the_runner_user() {
+  echo "test_add_linux_downloads_as_the_runner_user"
+  new_sandbox
+  linux_host
+  unset RUNNER_TARBALL_SEED
+  export DOWNLOAD_SRC="$WS/seed.tgz"
+  run_runner add acme widget
+  assert_eq "$RC" "0" "exits 0"
+  local pkg; pkg="$(cat "$PKG_LOG")"
+  assert_contains "$pkg" "sudo -u github-runner tee $GITHUB_RUNNERS_DIR/.cache/$TARBALL_NAME.part" "runner user writes the download"
+  assert_contains "$pkg" "sudo -u github-runner mv" "runner user moves the finished download into place"
+  assert_eq "$(cat "$GITHUB_RUNNERS_DIR/.cache/$TARBALL_NAME")" "dummy" "cache holds the downloaded tarball"
+  assert_nodir "$GITHUB_RUNNERS_DIR/.cache/$TARBALL_NAME.part" "no partial download left"
+  assert_contains "$pkg" "tar-input dummy" "extracts the downloaded tarball"
+  unset DOWNLOAD_SRC
   drop_sandbox
 }
 
@@ -641,6 +679,24 @@ test_remove_linux_uses_systemctl() {
   assert_not_contains "$pkg" "svc.sh" "never runs svc.sh"
   assert_contains "$(cat "$GH_LOG")" "api -X DELETE /repos/acme/widget/actions/runners/42" "deregisters"
   assert_contains "$pkg" "sudo -u github-runner rm -rf $GITHUB_RUNNERS_DIR/$folder" "runner user deletes its folder"
+  assert_nodir "$GITHUB_RUNNERS_DIR/$folder" "folder deleted"
+  drop_sandbox
+}
+
+# Old runners are removed before the runner user exists: they belong to the
+# login user.
+test_remove_linux_without_runner_user() {
+  echo "test_remove_linux_without_runner_user"
+  new_sandbox
+  linux_host
+  export STUB_PASSWD=""
+  local folder="actions-runner-acme-widget" unit="actions.runner.acme-widget.actions-runner-acme-widget.service"
+  seed_configured_runner "$folder" 42 '"https://github.com/acme/widget"'
+  echo "$unit" >"$GITHUB_RUNNERS_DIR/$folder/.service"
+  run_runner remove "$folder"
+  assert_eq "$RC" "0" "exits 0"
+  assert_not_contains "$(cat "$PKG_LOG")" "sudo -u" "nothing runs as the missing user"
+  assert_contains "$(cat "$GH_LOG")" "api -X DELETE /repos/acme/widget/actions/runners/42" "deregisters"
   assert_nodir "$GITHUB_RUNNERS_DIR/$folder" "folder deleted"
   drop_sandbox
 }
@@ -1024,6 +1080,8 @@ test_add_missing_digest
 test_add_linux_keeps_svc_install_under_sudo
 test_add_linux_runs_the_runner_as_the_runner_user
 test_add_linux_without_runner_user_fails
+test_add_linux_unreadable_runner_home_fails
+test_add_linux_downloads_as_the_runner_user
 test_add_linux_defaults_to_the_runner_users_home
 test_add_macos_runs_the_runner_as_the_login_user
 test_remove_repo
@@ -1032,6 +1090,7 @@ test_remove_rejects_bad_agent_id
 test_remove_rejects_bad_github_url
 test_remove_accepts_github_name_characters
 test_remove_linux_uses_systemctl
+test_remove_linux_without_runner_user
 test_remove_linux_rejects_bad_unit
 test_remove_linux_without_service_file
 test_remove_linux_finds_the_unit_a_job_hid

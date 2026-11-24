@@ -71,16 +71,23 @@ require_deps() {
 
 # The login user reads the runner folders through the runner user's group.
 require_runner_user() {
-  getent passwd "$RUNNER_USER" >/dev/null && return 0
-  die "runner user $RUNNER_USER does not exist. Create it, then log in again:
-  sudo useradd --system --create-home --shell /usr/sbin/nologin $RUNNER_USER
+  local home
+  home="$(getent passwd "$RUNNER_USER" | cut -d: -f6)" \
+    || die "runner user $RUNNER_USER does not exist. Create it, then log in again:
+  sudo useradd --system --user-group --create-home --shell /usr/sbin/nologin $RUNNER_USER
   sudo usermod -aG $RUNNER_USER $(whoami)"
+  # Group membership takes effect only in a new login.
+  [[ -x "$home" ]] || die "$(whoami) cannot read $home. Join the $RUNNER_USER group, then log in again:
+  sudo usermod -aG $RUNNER_USER $(whoami)
+If $home is mode 0700:
+  sudo chmod 0750 $home"
 }
 
 # Writes in the runner folders. On Linux the runner user owns them, and a job
-# can link a path in them to the login user's files.
+# can link a path in them to the login user's files. Before that user exists,
+# the folders are the login user's.
 as_runner() {
-  if [[ "$(uname -s)" == "Linux" ]]; then
+  if [[ "$(uname -s)" == "Linux" ]] && getent passwd "$RUNNER_USER" >/dev/null; then
     sudo -u "$RUNNER_USER" "$@"
   else
     "$@"
