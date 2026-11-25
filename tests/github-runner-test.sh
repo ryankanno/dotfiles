@@ -107,6 +107,8 @@ echo "sudo $*" >>"$PKG_LOG"
 if [[ "$1" == "-u" ]]; then
   [[ -n "$STUB_PASSWD" && "${STUB_PASSWD%%:*}" == "$2" ]] || { echo "sudo: unknown user $2" >&2; exit 1; }
   shift 2
+  # PAM or sudoers can set the command's umask, whatever the caller's is.
+  umask 0077
   exec "$@"
 fi
 [[ "$1" == "rm" ]] && exit 0
@@ -161,6 +163,9 @@ write_release() { # digest as a JSON value; the release API's response body
   printf '{"assets":[{"name":"actions-runner-other.tar.gz","digest":"sha256:0"},{"name":"%s","digest":%s}]}\n' \
     "$TARBALL_NAME" "$1" >"$RELEASE_JSON"
 }
+
+# How the script starts a command as the runner user, as the sandbox sudo logs it.
+RUN_AS='sudo -u github-runner sh -c umask 0022; exec "$@" sh'
 
 root_log() { # PKG_LOG without the commands that ran as the runner user
   grep -v '^sudo -u github-runner ' "$PKG_LOG"
@@ -543,8 +548,8 @@ test_add_linux_runs_the_runner_as_the_runner_user() {
   local pkg; pkg="$(cat "$PKG_LOG")"
   assert_contains "$pkg" "sudo ./svc.sh install github-runner" "service runs as the runner user"
   assert_not_contains "$pkg" "svc.sh install $(whoami)" "service does not run as the login user"
-  assert_contains "$pkg" "sudo -u github-runner tar" "runner user owns the extracted files"
-  assert_contains "$pkg" "sudo -u github-runner ./config.sh" "runner user owns the runner config"
+  assert_contains "$pkg" "$RUN_AS tar" "runner user owns the extracted files"
+  assert_contains "$pkg" "$RUN_AS ./config.sh" "runner user owns the runner config"
   assert_contains "$pkg" "tar-input dummy" "extracts the verified tarball"
   drop_sandbox
 }
@@ -572,8 +577,8 @@ test_add_linux_looks_up_the_runner_user_once() {
   unset GETENT_ONCE
   assert_eq "$RC" "0" "exits 0"
   local pkg; pkg="$(cat "$PKG_LOG")"
-  assert_contains "$pkg" "sudo -u github-runner mkdir" "runner user makes the folder"
-  assert_contains "$pkg" "sudo -u github-runner ./config.sh" "runner user owns the runner config"
+  assert_contains "$pkg" "$RUN_AS mkdir" "runner user makes the folder"
+  assert_contains "$pkg" "$RUN_AS ./config.sh" "runner user owns the runner config"
   assert_contains "$pkg" "sudo ./svc.sh install github-runner" "service runs as the runner user"
   drop_sandbox
 }
@@ -589,8 +594,10 @@ test_add_linux_opens_runner_folders_to_the_group() {
   run_runner add acme widget
   umask "$old"
   assert_eq "$RC" "0" "exits 0"
-  assert_eq "$(stat -c %a "$GITHUB_RUNNERS_DIR/.cache")" "750" "group reads the cache"
-  assert_eq "$(stat -c %a "$GITHUB_RUNNERS_DIR/actions-runner-acme-widget")" "750" "group reads the runner folder"
+  local d
+  for d in "$GITHUB_RUNNERS_DIR/.cache" "$GITHUB_RUNNERS_DIR/actions-runner-acme-widget"; do
+    assert_eq "$(find "$d" -maxdepth 0 -perm 755)" "$d" "login user reads $d"
+  done
   drop_sandbox
 }
 
@@ -618,8 +625,8 @@ test_add_linux_downloads_as_the_runner_user() {
   run_runner add acme widget
   assert_eq "$RC" "0" "exits 0"
   local pkg; pkg="$(cat "$PKG_LOG")"
-  assert_contains "$pkg" "sudo -u github-runner tee $GITHUB_RUNNERS_DIR/.cache/$TARBALL_NAME.part" "runner user writes the download"
-  assert_contains "$pkg" "sudo -u github-runner mv" "runner user moves the finished download into place"
+  assert_contains "$pkg" "$RUN_AS tee $GITHUB_RUNNERS_DIR/.cache/$TARBALL_NAME.part" "runner user writes the download"
+  assert_contains "$pkg" "$RUN_AS mv" "runner user moves the finished download into place"
   assert_eq "$(cat "$GITHUB_RUNNERS_DIR/.cache/$TARBALL_NAME")" "dummy" "cache holds the downloaded tarball"
   assert_nodir "$GITHUB_RUNNERS_DIR/.cache/$TARBALL_NAME.part" "no partial download left"
   assert_contains "$pkg" "tar-input dummy" "extracts the downloaded tarball"
@@ -719,7 +726,7 @@ test_remove_linux_uses_systemctl() {
   assert_contains "$pkg" "sudo systemctl daemon-reload" "reloads systemd"
   assert_not_contains "$pkg" "svc.sh" "never runs svc.sh"
   assert_contains "$(cat "$GH_LOG")" "api -X DELETE /repos/acme/widget/actions/runners/42" "deregisters"
-  assert_contains "$pkg" "sudo -u github-runner rm -rf $GITHUB_RUNNERS_DIR/$folder" "runner user deletes its folder"
+  assert_contains "$pkg" "$RUN_AS rm -rf $GITHUB_RUNNERS_DIR/$folder" "runner user deletes its folder"
   assert_nodir "$GITHUB_RUNNERS_DIR/$folder" "folder deleted"
   drop_sandbox
 }
