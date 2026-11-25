@@ -115,8 +115,15 @@ SUDO
   # The host's user list: STUB_PASSWD is the one passwd entry that exists.
   export STUB_PASSWD="github-runner:x:999:999::$WS/runner-home:/usr/sbin/nologin"
   mkdir -p "$WS/runner-home"
+  chmod 0750 "$WS/runner-home"
+  # GETENT_ONCE names a file: the lookup answers once, then fails like a lost
+  # NSS source.
   cat >"$fakebin/getent" <<'GETENT'
 #!/usr/bin/env bash
+if [[ -n "${GETENT_ONCE:-}" ]]; then
+  [[ -e "$GETENT_ONCE" ]] && exit 2
+  : >"$GETENT_ONCE"
+fi
 [[ "$1" == "passwd" && -n "$STUB_PASSWD" && "${STUB_PASSWD%%:*}" == "$2" ]] || exit 2
 echo "$STUB_PASSWD"
 GETENT
@@ -550,6 +557,40 @@ test_add_linux_without_runner_user_fails() {
   run_runner add acme widget
   assert_add_refused "sudo useradd --system --user-group --create-home --shell /usr/sbin/nologin github-runner" "no runner user"
   assert_contains "$OUT" "sudo usermod -aG github-runner" "says how to read the runner folders"
+  assert_contains "$OUT" "sudo chmod 0750 ~github-runner" "says how to open a 0700 home"
+  drop_sandbox
+}
+
+# A lookup that fails partway through add must not move the folder writes to
+# the login user while the service still runs as the runner user.
+test_add_linux_looks_up_the_runner_user_once() {
+  echo "test_add_linux_looks_up_the_runner_user_once"
+  new_sandbox
+  linux_host
+  export GETENT_ONCE="$WS/getent-once"
+  run_runner add acme widget
+  unset GETENT_ONCE
+  assert_eq "$RC" "0" "exits 0"
+  local pkg; pkg="$(cat "$PKG_LOG")"
+  assert_contains "$pkg" "sudo -u github-runner mkdir" "runner user makes the folder"
+  assert_contains "$pkg" "sudo -u github-runner ./config.sh" "runner user owns the runner config"
+  assert_contains "$pkg" "sudo ./svc.sh install github-runner" "service runs as the runner user"
+  drop_sandbox
+}
+
+# The login user reads the runner folders through the group, also under a
+# login umask of 077.
+test_add_linux_opens_runner_folders_to_the_group() {
+  echo "test_add_linux_opens_runner_folders_to_the_group"
+  new_sandbox
+  linux_host
+  local old; old="$(umask)"
+  umask 077
+  run_runner add acme widget
+  umask "$old"
+  assert_eq "$RC" "0" "exits 0"
+  assert_eq "$(stat -c %a "$GITHUB_RUNNERS_DIR/.cache")" "750" "group reads the cache"
+  assert_eq "$(stat -c %a "$GITHUB_RUNNERS_DIR/actions-runner-acme-widget")" "750" "group reads the runner folder"
   drop_sandbox
 }
 
@@ -1080,6 +1121,8 @@ test_add_missing_digest
 test_add_linux_keeps_svc_install_under_sudo
 test_add_linux_runs_the_runner_as_the_runner_user
 test_add_linux_without_runner_user_fails
+test_add_linux_looks_up_the_runner_user_once
+test_add_linux_opens_runner_folders_to_the_group
 test_add_linux_unreadable_runner_home_fails
 test_add_linux_downloads_as_the_runner_user
 test_add_linux_defaults_to_the_runner_users_home

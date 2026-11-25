@@ -22,15 +22,15 @@ RUNNER_USER="github-runner"
 
 # Before the runner user exists, this is the login home, so `remove` still
 # reaches runners that `add` made as the login user.
-default_base_dir() {
-  local home=""
-  if [[ "$(uname -s)" == "Linux" ]]; then
-    home="$(getent passwd "$RUNNER_USER" | cut -d: -f6)" || true
-  fi
-  echo "${home:-$HOME}/.github-action-runners"
-}
+# One lookup per run: a lookup that fails partway through would move the folder
+# writes to the login user while the service still runs as the runner user.
+RUNNER_ENTRY=""
+if [[ "$(uname -s)" == "Linux" ]]; then
+  RUNNER_ENTRY="$(getent passwd "$RUNNER_USER")" || true
+fi
+RUNNER_HOME="$(echo "$RUNNER_ENTRY" | cut -d: -f6)"
 
-BASE_DIR="${GITHUB_RUNNERS_DIR:-$(default_base_dir)}"
+BASE_DIR="${GITHUB_RUNNERS_DIR:-${RUNNER_HOME:-$HOME}/.github-action-runners}"
 CACHE_DIR="$BASE_DIR/.cache"
 TARBALL="actions-runner-${RUNNER_ARCH}-${RUNNER_VERSION}.tar.gz"
 
@@ -71,24 +71,25 @@ require_deps() {
 
 # The login user reads the runner folders through the runner user's group.
 require_runner_user() {
-  local home
-  home="$(getent passwd "$RUNNER_USER" | cut -d: -f6)" \
+  [[ -n "$RUNNER_ENTRY" ]] \
     || die "runner user $RUNNER_USER does not exist. Create it, then log in again:
   sudo useradd --system --user-group --create-home --shell /usr/sbin/nologin $RUNNER_USER
+  sudo chmod 0750 ~$RUNNER_USER
   sudo usermod -aG $RUNNER_USER $(whoami)"
   # Group membership takes effect only in a new login.
-  [[ -x "$home" ]] || die "$(whoami) cannot read $home. Join the $RUNNER_USER group, then log in again:
+  [[ -x "$RUNNER_HOME" ]] || die "$(whoami) cannot read $RUNNER_HOME. Join the $RUNNER_USER group, then log in again:
   sudo usermod -aG $RUNNER_USER $(whoami)
-If $home is mode 0700:
-  sudo chmod 0750 $home"
+If $RUNNER_HOME is mode 0700:
+  sudo chmod 0750 $RUNNER_HOME"
 }
 
 # Writes in the runner folders. On Linux the runner user owns them, and a job
 # can link a path in them to the login user's files. Before that user exists,
 # the folders are the login user's.
 as_runner() {
-  if [[ "$(uname -s)" == "Linux" ]] && getent passwd "$RUNNER_USER" >/dev/null; then
-    sudo -u "$RUNNER_USER" "$@"
+  if [[ -n "$RUNNER_ENTRY" ]]; then
+    # sudo keeps the login umask (joined with 022); 077 would lock out the group.
+    (umask 0027; sudo -u "$RUNNER_USER" "$@")
   else
     "$@"
   fi
