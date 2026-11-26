@@ -165,7 +165,7 @@ write_release() { # digest as a JSON value; the release API's response body
 }
 
 # How the script starts a command as the runner user, as the sandbox sudo logs it.
-RUN_AS='sudo -u github-runner sh -c umask 0022; exec "$@" sh'
+RUN_AS='sudo -u github-runner sh -c umask 0027; exec "$@" sh'
 
 root_log() { # PKG_LOG without the commands that ran as the runner user
   grep -v '^sudo -u github-runner ' "$PKG_LOG"
@@ -596,7 +596,7 @@ test_add_linux_opens_runner_folders_to_the_group() {
   assert_eq "$RC" "0" "exits 0"
   local d
   for d in "$GITHUB_RUNNERS_DIR/.cache" "$GITHUB_RUNNERS_DIR/actions-runner-acme-widget"; do
-    assert_eq "$(find "$d" -maxdepth 0 -perm 755)" "$d" "login user reads $d"
+    assert_eq "$(find "$d" -maxdepth 0 -perm 750)" "$d" "only the group reads $d"
   done
   drop_sandbox
 }

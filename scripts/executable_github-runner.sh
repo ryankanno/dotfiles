@@ -89,8 +89,8 @@ If $RUNNER_HOME is mode 0700:
 as_runner() {
   if [[ -n "$RUNNER_ENTRY" ]]; then
     # PAM or sudoers sets the command's umask; 077 would lock the login user
-    # out. The runner home's 0750 keeps other users out.
-    sudo -u "$RUNNER_USER" sh -c 'umask 0022; exec "$@"' sh "$@"
+    # out, and 022 would open the runner credentials to every local user.
+    sudo -u "$RUNNER_USER" sh -c 'umask 0027; exec "$@"' sh "$@"
   else
     "$@"
   fi
