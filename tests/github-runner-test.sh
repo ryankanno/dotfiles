@@ -65,7 +65,7 @@ case "$*" in
   *registration-token*)       echo "FAKETOKEN";;
   *"/actions/runners --paginate"*) printf '%s\n' "alpha	online	false	self-hosted" "beta	offline	false	self-hosted,gpu";;
   *"releases/tags/v$RUNNER_VERSION"*) [[ -f "$RELEASE_JSON" ]] || exit 1; cat "$RELEASE_JSON";;
-  *"release download"*)       cp "$DOWNLOAD_SRC" "$GITHUB_RUNNERS_DIR/.cache/$TARBALL_NAME";;
+  *"release download"*"--output -"*) cat "$DOWNLOAD_SRC";;
 esac
 exit 0
 GH
@@ -97,15 +97,38 @@ for s in config.sh svc.sh; do
 done
 TAR
 
-  # The sandbox sudo logs its command so tests can see what ran as root, then
-  # drops the prefix. It never runs rm, and systemctl is stubbed: nothing here
-  # may reach the host's real actions.runner.* units.
+  # The sandbox sudo logs its command so tests can see what ran as root or as
+  # the runner user, then drops the prefix. It never runs rm as root, and
+  # systemctl is stubbed: nothing here may reach the host's real
+  # actions.runner.* units.
   cat >"$fakebin/sudo" <<'SUDO'
 #!/usr/bin/env bash
 echo "sudo $*" >>"$PKG_LOG"
+if [[ "$1" == "-u" ]]; then
+  [[ -n "$STUB_PASSWD" && "${STUB_PASSWD%%:*}" == "$2" ]] || { echo "sudo: unknown user $2" >&2; exit 1; }
+  shift 2
+  # PAM or sudoers can set the command's umask, whatever the caller's is.
+  umask 0077
+  exec "$@"
+fi
 [[ "$1" == "rm" ]] && exit 0
 exec "$@"
 SUDO
+  # The host's user list: STUB_PASSWD is the one passwd entry that exists.
+  export STUB_PASSWD="github-runner:x:999:999::$WS/runner-home:/usr/sbin/nologin"
+  mkdir -p "$WS/runner-home"
+  chmod 0750 "$WS/runner-home"
+  # GETENT_ONCE names a file: the lookup answers once, then fails like a lost
+  # NSS source.
+  cat >"$fakebin/getent" <<'GETENT'
+#!/usr/bin/env bash
+if [[ -n "${GETENT_ONCE:-}" ]]; then
+  [[ -e "$GETENT_ONCE" ]] && exit 2
+  : >"$GETENT_ONCE"
+fi
+[[ "$1" == "passwd" && -n "$STUB_PASSWD" && "${STUB_PASSWD%%:*}" == "$2" ]] || exit 2
+echo "$STUB_PASSWD"
+GETENT
   # STUB_UNITS lists <unit>=<WorkingDirectory> entries, in list-unit-files order.
   cat >"$fakebin/systemctl" <<'SYSCTL'
 #!/usr/bin/env bash
@@ -123,13 +146,13 @@ esac
 echo "systemctl $*" >>"$PKG_LOG"
 SYSCTL
 
-  chmod +x "$fakebin/gh" "$fakebin/tar" "$fakebin/sudo" "$fakebin/systemctl" "$fakebin/uname"
+  chmod +x "$fakebin/gh" "$fakebin/tar" "$fakebin/sudo" "$fakebin/systemctl" "$fakebin/uname" "$fakebin/getent"
   export PATH="$fakebin:$PATH"
 }
 
 drop_sandbox() {
   unset OWNER_TYPE RUNNER_VERSION RUNNER_ARCH UNAME_S UNAME_M
-  unset TARBALL_NAME RELEASE_JSON RUNNER_TARBALL_SEED STUB_UNITS
+  unset TARBALL_NAME RELEASE_JSON RUNNER_TARBALL_SEED STUB_UNITS STUB_PASSWD
   rm -rf "$WS"
 }
 
@@ -139,6 +162,13 @@ write_release() { # digest as a JSON value; the release API's response body
   # The other asset comes first: only a match on the name finds the right digest.
   printf '{"assets":[{"name":"actions-runner-other.tar.gz","digest":"sha256:0"},{"name":"%s","digest":%s}]}\n' \
     "$TARBALL_NAME" "$1" >"$RELEASE_JSON"
+}
+
+# How the script starts a command as the runner user, as the sandbox sudo logs it.
+RUN_AS='sudo -u github-runner sh -c umask 0027; exec "$@" sh'
+
+root_log() { # PKG_LOG without the commands that ran as the runner user
+  grep -v '^sudo -u github-runner ' "$PKG_LOG"
 }
 
 run_runner() { # runs runner.sh, captures stdout+stderr in OUT, exit in RC
@@ -508,6 +538,125 @@ test_add_linux_keeps_svc_install_under_sudo() {
   drop_sandbox
 }
 
+# Jobs must not run as the login user: they could open its SSH agent.
+test_add_linux_runs_the_runner_as_the_runner_user() {
+  echo "test_add_linux_runs_the_runner_as_the_runner_user"
+  new_sandbox
+  linux_host
+  run_runner add acme widget
+  assert_eq "$RC" "0" "exits 0"
+  local pkg; pkg="$(cat "$PKG_LOG")"
+  assert_contains "$pkg" "sudo ./svc.sh install github-runner" "service runs as the runner user"
+  assert_not_contains "$pkg" "svc.sh install $(whoami)" "service does not run as the login user"
+  assert_contains "$pkg" "$RUN_AS tar" "runner user owns the extracted files"
+  assert_contains "$pkg" "$RUN_AS ./config.sh" "runner user owns the runner config"
+  assert_contains "$pkg" "tar-input dummy" "extracts the verified tarball"
+  drop_sandbox
+}
+
+test_add_linux_without_runner_user_fails() {
+  echo "test_add_linux_without_runner_user_fails"
+  new_sandbox
+  linux_host
+  export STUB_PASSWD=""
+  run_runner add acme widget
+  assert_add_refused "sudo useradd --system --user-group --create-home --shell /usr/sbin/nologin github-runner" "no runner user"
+  assert_contains "$OUT" "sudo usermod -aG github-runner" "says how to read the runner folders"
+  assert_contains "$OUT" "sudo chmod 0750 ~github-runner" "says how to open a 0700 home"
+  drop_sandbox
+}
+
+# A lookup that fails partway through add must not move the folder writes to
+# the login user while the service still runs as the runner user.
+test_add_linux_looks_up_the_runner_user_once() {
+  echo "test_add_linux_looks_up_the_runner_user_once"
+  new_sandbox
+  linux_host
+  export GETENT_ONCE="$WS/getent-once"
+  run_runner add acme widget
+  unset GETENT_ONCE
+  assert_eq "$RC" "0" "exits 0"
+  local pkg; pkg="$(cat "$PKG_LOG")"
+  assert_contains "$pkg" "$RUN_AS mkdir" "runner user makes the folder"
+  assert_contains "$pkg" "$RUN_AS ./config.sh" "runner user owns the runner config"
+  assert_contains "$pkg" "sudo ./svc.sh install github-runner" "service runs as the runner user"
+  drop_sandbox
+}
+
+# The login user reads the runner folders through the group, also under a
+# login umask of 077.
+test_add_linux_opens_runner_folders_to_the_group() {
+  echo "test_add_linux_opens_runner_folders_to_the_group"
+  new_sandbox
+  linux_host
+  local old; old="$(umask)"
+  umask 077
+  run_runner add acme widget
+  umask "$old"
+  assert_eq "$RC" "0" "exits 0"
+  local d
+  for d in "$GITHUB_RUNNERS_DIR/.cache" "$GITHUB_RUNNERS_DIR/actions-runner-acme-widget"; do
+    assert_eq "$(find "$d" -maxdepth 0 -perm 750)" "$d" "only the group reads $d"
+  done
+  drop_sandbox
+}
+
+# Group membership takes effect only in a new login, and some hosts make
+# homes 0700.
+test_add_linux_unreadable_runner_home_fails() {
+  echo "test_add_linux_unreadable_runner_home_fails"
+  new_sandbox
+  linux_host
+  chmod 000 "$WS/runner-home"
+  run_runner add acme widget
+  chmod 755 "$WS/runner-home"
+  assert_add_refused "cannot read $WS/runner-home" "unreadable runner home"
+  assert_contains "$OUT" "sudo usermod -aG github-runner" "says how to join the group"
+  assert_contains "$OUT" "sudo chmod 0750 $WS/runner-home" "says how to open a 0700 home"
+  drop_sandbox
+}
+
+test_add_linux_downloads_as_the_runner_user() {
+  echo "test_add_linux_downloads_as_the_runner_user"
+  new_sandbox
+  linux_host
+  unset RUNNER_TARBALL_SEED
+  export DOWNLOAD_SRC="$WS/seed.tgz"
+  run_runner add acme widget
+  assert_eq "$RC" "0" "exits 0"
+  local pkg; pkg="$(cat "$PKG_LOG")"
+  assert_contains "$pkg" "$RUN_AS tee $GITHUB_RUNNERS_DIR/.cache/$TARBALL_NAME.part" "runner user writes the download"
+  assert_contains "$pkg" "$RUN_AS mv" "runner user moves the finished download into place"
+  assert_eq "$(cat "$GITHUB_RUNNERS_DIR/.cache/$TARBALL_NAME")" "dummy" "cache holds the downloaded tarball"
+  assert_nodir "$GITHUB_RUNNERS_DIR/.cache/$TARBALL_NAME.part" "no partial download left"
+  assert_contains "$pkg" "tar-input dummy" "extracts the downloaded tarball"
+  unset DOWNLOAD_SRC
+  drop_sandbox
+}
+
+test_add_linux_defaults_to_the_runner_users_home() {
+  echo "test_add_linux_defaults_to_the_runner_users_home"
+  new_sandbox
+  linux_host
+  mkdir -p "$WS/runner-home" "$WS/login-home"
+  unset GITHUB_RUNNERS_DIR
+  # A sandbox HOME: a fallback to the login home must not reach the real runners.
+  HOME="$WS/login-home" run_runner add acme widget
+  assert_eq "$RC" "0" "exits 0"
+  assert_dir "$WS/runner-home/.github-action-runners/actions-runner-acme-widget" "folder in the runner user's home"
+  assert_nodir "$WS/login-home/.github-action-runners" "nothing in the login user's home"
+  drop_sandbox
+}
+
+test_add_macos_runs_the_runner_as_the_login_user() {
+  echo "test_add_macos_runs_the_runner_as_the_login_user"
+  new_sandbox
+  run_runner add acme widget
+  assert_eq "$RC" "0" "exits 0"
+  assert_not_contains "$(cat "$PKG_LOG")" "sudo" "nothing runs as another user"
+  drop_sandbox
+}
+
 test_remove_rejects_bad_agent_id() {
   echo "test_remove_rejects_bad_agent_id"
   local bad_id folder="actions-runner-acme-widget"
@@ -577,6 +726,25 @@ test_remove_linux_uses_systemctl() {
   assert_contains "$pkg" "sudo systemctl daemon-reload" "reloads systemd"
   assert_not_contains "$pkg" "svc.sh" "never runs svc.sh"
   assert_contains "$(cat "$GH_LOG")" "api -X DELETE /repos/acme/widget/actions/runners/42" "deregisters"
+  assert_contains "$pkg" "$RUN_AS rm -rf $GITHUB_RUNNERS_DIR/$folder" "runner user deletes its folder"
+  assert_nodir "$GITHUB_RUNNERS_DIR/$folder" "folder deleted"
+  drop_sandbox
+}
+
+# Old runners are removed before the runner user exists: they belong to the
+# login user.
+test_remove_linux_without_runner_user() {
+  echo "test_remove_linux_without_runner_user"
+  new_sandbox
+  linux_host
+  export STUB_PASSWD=""
+  local folder="actions-runner-acme-widget" unit="actions.runner.acme-widget.actions-runner-acme-widget.service"
+  seed_configured_runner "$folder" 42 '"https://github.com/acme/widget"'
+  echo "$unit" >"$GITHUB_RUNNERS_DIR/$folder/.service"
+  run_runner remove "$folder"
+  assert_eq "$RC" "0" "exits 0"
+  assert_not_contains "$(cat "$PKG_LOG")" "sudo -u" "nothing runs as the missing user"
+  assert_contains "$(cat "$GH_LOG")" "api -X DELETE /repos/acme/widget/actions/runners/42" "deregisters"
   assert_nodir "$GITHUB_RUNNERS_DIR/$folder" "folder deleted"
   drop_sandbox
 }
@@ -614,7 +782,7 @@ test_remove_linux_without_service_file() {
   assert_eq "$RC" "0" "exits 0"
   assert_contains "$OUT" "list-unit-files" "says how to find a leftover unit"
   assert_contains "$OUT" "sudo rm /etc/systemd/system/" "says how to clear a leftover unit"
-  assert_not_contains "$(cat "$PKG_LOG")" "sudo" "nothing ran as root"
+  assert_not_contains "$(root_log)" "sudo" "nothing ran as root"
   assert_contains "$(cat "$GH_LOG")" "api -X DELETE /repos/acme/widget/actions/runners/42" "still deregisters"
   assert_nodir "$GITHUB_RUNNERS_DIR/$folder" "folder deleted"
   drop_sandbox
@@ -765,7 +933,7 @@ test_remove_linux_ignores_another_folders_unit() {
   export STUB_UNITS="actions.runner.acme-other.b.service=$GITHUB_RUNNERS_DIR/actions-runner-acme-other"
   run_runner remove "$folder"
   assert_eq "$RC" "0" "exits 0"
-  assert_not_contains "$(cat "$PKG_LOG")" "sudo" "another runner's unit is safe"
+  assert_not_contains "$(root_log)" "sudo" "another runner's unit is safe"
   drop_sandbox
 }
 
@@ -809,7 +977,7 @@ test_remove_linux_half_built_without_service_file() {
   run_runner remove "$folder"
   assert_eq "$RC" "0" "exits 0"
   assert_contains "$OUT" "list-unit-files" "says how to find a leftover unit"
-  assert_not_contains "$(cat "$PKG_LOG")" "sudo" "nothing ran as root"
+  assert_not_contains "$(root_log)" "sudo" "nothing ran as root"
   assert_nodir "$GITHUB_RUNNERS_DIR/$folder" "folder deleted"
   drop_sandbox
 }
@@ -958,12 +1126,21 @@ test_add_refused_add_leaves_no_private_copy
 test_add_cached_entry_not_a_file
 test_add_missing_digest
 test_add_linux_keeps_svc_install_under_sudo
+test_add_linux_runs_the_runner_as_the_runner_user
+test_add_linux_without_runner_user_fails
+test_add_linux_looks_up_the_runner_user_once
+test_add_linux_opens_runner_folders_to_the_group
+test_add_linux_unreadable_runner_home_fails
+test_add_linux_downloads_as_the_runner_user
+test_add_linux_defaults_to_the_runner_users_home
+test_add_macos_runs_the_runner_as_the_login_user
 test_remove_repo
 test_remove_half_built
 test_remove_rejects_bad_agent_id
 test_remove_rejects_bad_github_url
 test_remove_accepts_github_name_characters
 test_remove_linux_uses_systemctl
+test_remove_linux_without_runner_user
 test_remove_linux_rejects_bad_unit
 test_remove_linux_without_service_file
 test_remove_linux_finds_the_unit_a_job_hid
